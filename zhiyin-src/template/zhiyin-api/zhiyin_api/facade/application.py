@@ -1,7 +1,7 @@
 """Application Facade 实现（**骨架**，方法体未实现）。
 
 落位：`api/facade/application.py` —— 接口/前端联调负责人。
-依赖：业务层的 8 个服务 Port（只调不实现）+ DTO Mapper。
+依赖：业务层的 9 个服务 Port（只调不实现）+ DTO Mapper。
 
 为什么它决定前端能否并行开工
 ----------------------------
