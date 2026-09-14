@@ -19,8 +19,8 @@ from __future__ import annotations
 
 from zhiyin_business.policies.intervention import InterventionPolicy
 from zhiyin_business.ports.blackboard import BehaviorService
-from zhiyin_business.workers.base import Worker
 from zhiyin_data_sdk.repositories import RegistryRepository
+from zhiyin_kernel.worker import Worker
 from zhiyin_orchestration import Notifier, Scheduler
 
 _TODO = "TODO(骨架): ActiveEventWorker 未实现"

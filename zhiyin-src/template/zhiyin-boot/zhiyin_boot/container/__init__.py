@@ -33,6 +33,7 @@ from zhiyin_boot.container.services import (
     build_workers,
 )
 from zhiyin_boot.settings import Settings
+from zhiyin_boot.workers import run_until_cancelled
 
 @dataclass
 class Container:
@@ -96,6 +97,7 @@ class Container:
     asset_service: Any = None
     workspace_service: Any = None
     function_service: Any = None
+    identity_service: Any = None
 
     # ---- 业务层 Worker（复用本容器的 Port）----
     workers: list[Any] = field(default_factory=list)
@@ -168,9 +170,9 @@ def wire_application(container: Optional[Container] = None) -> Any:
 
         interval = container.settings.worker_interval_s
         for worker in container.workers:
-            runner = getattr(worker, "run_until_cancelled", None)
-            if callable(runner):
-                tasks.append(asyncio.create_task(runner(interval, stop)))
+            tasks.append(
+                asyncio.create_task(run_until_cancelled(worker, interval, stop))
+            )
 
         try:
             yield
@@ -188,6 +190,9 @@ def wire_application(container: Optional[Container] = None) -> Any:
     return create_app(
         title=f"{container.settings.app_name} API",
         lifespan=_lifespan,
+        # 前缀只有一个来源：Settings.api_prefix（默认 /api/v1）。
+        # 换版本改配置即可，路由声明与前端都不用动。
+        api_prefix=container.settings.api_prefix,
     )
 
 

@@ -14,7 +14,7 @@ lifespan 统一启停，未注册时 `--check` 会如实报 `not_wired`。
 from __future__ import annotations
 
 from zhiyin_business.ports.blackboard import AssetService
-from zhiyin_business.workers.base import Worker
+from zhiyin_kernel.worker import Worker
 from zhiyin_orchestration import EventBus
 
 _TODO = "TODO(骨架): ImpactPropagationWorker 未实现"

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from zhiyin_api.app import API_PREFIX
 from zhiyin_boot import Settings, build_container, wire_application
 from zhiyin_api.app import create_app
 from zhiyin_api.dto.common import ErrorCode
@@ -47,17 +48,18 @@ def test_healthz_reports_assembly(client: TestClient) -> None:
 
 def test_openapi_is_served(client: TestClient) -> None:
     """有 app 工厂的直接收益：/docs 与 openapi.json 可用，前端能生成类型。"""
-    response = client.get("/openapi.json")
+    response = client.get(f"{API_PREFIX}/openapi.json")
     assert response.status_code == 200
     paths = response.json()["paths"]
-    assert "/app/bootstrap" in paths
-    assert "/app/task/enter" in paths
+    # 业务接口一律在版本前缀下（见 tests/test_api_prefix.py 的守卫）
+    assert f"{API_PREFIX}/app/bootstrap" in paths
+    assert f"{API_PREFIX}/app/task/enter" in paths
     assert "/healthz" in paths
 
 
 def test_unimplemented_capability_degrades_instead_of_500(client: TestClient) -> None:
     """第一期 Facade 未实现：接口按 DEPENDENCY_UNAVAILABLE 降级，不返回 500（§6.2）。"""
-    response = client.get("/app/bootstrap")
+    response = client.get(f"{API_PREFIX}/app/bootstrap")
     assert response.status_code == 503
 
     body = response.json()

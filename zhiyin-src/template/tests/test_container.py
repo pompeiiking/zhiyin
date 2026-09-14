@@ -94,5 +94,6 @@ def test_wire_application_returns_asgi_app(settings: Settings) -> None:
     # 路由已挂载：用 openapi 断言，避免依赖 starlette 内部的路由表示形式。
     paths = set(app.openapi()["paths"])
     assert "/healthz" in paths
-    assert "/app/bootstrap" in paths
-    assert "/app/task/enter" in paths
+    # 业务路由统一挂在 /api/v1 下，前缀由 create_app 拼接（见 tests/test_api_prefix.py）
+    assert "/api/v1/app/bootstrap" in paths
+    assert "/api/v1/app/task/enter" in paths

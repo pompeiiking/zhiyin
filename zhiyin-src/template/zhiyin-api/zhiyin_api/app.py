@@ -3,6 +3,22 @@
 第一期约定（R-API-001）：前端启动只请求一次 `/app/bootstrap` 即可渲染首页，
 因此这里只做"挂载路由 + 统一错误信封 + 健康检查"，不承载业务装配 ——
 具体实现的装配由 `zhiyin-boot.wire_application()` 完成。
+
+⚠️ 接口前缀：**全站唯一收口在 `API_PREFIX`（`/api/v1`）**
+-----------------------------------------------------------
+版本段只在**这一个地方**拼接：`create_app` 把每个 router 统一挂到 `API_PREFIX` 下。
+因此：
+
+1. **Controller 里的路由不要写版本段。** 正确写法是 `@router.get("/app/bootstrap")`，
+   最终对外是 `/api/v1/app/bootstrap`；写成 `"/api/v1/app/bootstrap"` 会变成
+   `/api/v1/api/v1/app/bootstrap`，前端 404 而 OpenAPI 里看起来"有这条路由"。
+2. **不要在别处再拼一次前缀。** 前端 baseURL、vite proxy、反向代理、网关都只做
+   "原样转发"，不要再加 `/v1`；需要换版本时只改本文件的 `API_PREFIX` 一处。
+3. **OpenAPI 与文档同前缀**（`{prefix}/openapi.json`、`{prefix}/docs`），
+   所以 `npm run gen:api` 抓的就是真正对外的地址，不会生成一份对不上的类型。
+4. **唯一例外是 `/healthz`**：运维探针不随 API 版本变化，故意留在版本命名空间之外。
+
+该规则由 `tests/test_api_prefix.py` 守卫（路由声明里出现版本段即失败）。
 """
 
 from __future__ import annotations
@@ -19,22 +35,36 @@ from zhiyin_api.runtime import get_runtime
 DEFAULT_TITLE = "职引 API"
 DEFAULT_VERSION = "0.1.0"
 
+API_PREFIX = "/api/v1"
+"""唯一接口前缀。改版本只改这里，别在路由或前端里再拼一次。"""
+
 
 def create_app(
     *,
     title: str = DEFAULT_TITLE,
     version: str = DEFAULT_VERSION,
+    api_prefix: str = API_PREFIX,
     routers: Optional[Iterable[Any]] = None,
     lifespan: Optional[Any] = None,
 ) -> FastAPI:
     """构造 ASGI 应用。
 
     `routers` 可覆盖，便于单测只挂载需要的路由；默认挂载 `controllers.ROUTERS`。
+    `api_prefix` 由启动方传入（boot 传 `Settings.api_prefix`），保证"配的值"与
+    "实际挂载的值"是同一个；不传时回落到本模块的 `API_PREFIX`。
     """
-    app = FastAPI(title=title, version=version, lifespan=lifespan)
+    app = FastAPI(
+        title=title,
+        version=version,
+        lifespan=lifespan,
+        # 文档与 OpenAPI 跟着版本前缀走，前端 gen:api 抓到的就是对外地址。
+        docs_url=f"{api_prefix}/docs",
+        redoc_url=f"{api_prefix}/redoc",
+        openapi_url=f"{api_prefix}/openapi.json",
+    )
 
     for router in routers if routers is not None else ROUTERS:
-        app.include_router(router)
+        app.include_router(router, prefix=api_prefix)
 
     _install_error_handlers(app)
     return app
@@ -87,6 +117,7 @@ def _install_error_handlers(app: FastAPI) -> None:
             ).model_dump(mode="json"),
         )
 
+    # 唯一不带版本前缀的端点：运维探针不随 API 版本变化（见模块 docstring 第 4 条）。
     @app.get("/healthz", tags=["ops"], summary="装配健康检查")
     async def healthz() -> dict[str, Any]:
         report = get_runtime()

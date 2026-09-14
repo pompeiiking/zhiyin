@@ -26,6 +26,7 @@ import sys
 
 from zhiyin_boot.container import build_container, wire_application
 from zhiyin_boot.report import describe_assembly, evaluate_gate, load_gates
+from zhiyin_boot.workers import run_forever
 
 
 def _ensure_utf8_stdout() -> None:
@@ -95,7 +96,7 @@ def _run_worker(argv: list[str]) -> int:
         return 0
 
     interval = args.interval or container.settings.worker_interval_s
-    asyncio.run(worker.run_forever(interval))
+    asyncio.run(run_forever(worker, interval))
     return 0
 
 

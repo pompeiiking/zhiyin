@@ -86,6 +86,7 @@
           "asset_service",
           "workspace_service",
           "function_service",
+          "identity_service",
           "facade"
         ],
         "workers": ["impact", "active_event"]
@@ -144,6 +145,7 @@
           "asset_service",
           "workspace_service",
           "function_service",
+          "identity_service",
           "facade"
         ],
         "workers": ["impact", "active_event"]
@@ -202,6 +204,7 @@
           "asset_service",
           "workspace_service",
           "function_service",
+          "identity_service",
           "facade"
         ],
         "workers": ["impact", "active_event"]

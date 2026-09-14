@@ -191,6 +191,47 @@ def test_kernel_has_no_dependencies() -> None:
     assert not offenders, f"共享内核不得依赖任何其它 zhiyin 包：{offenders}"
 
 
+def test_kernel_holds_only_shapes_and_contracts() -> None:
+    """内核只放两类东西：数据形状，和"零依赖的最小接口契约"。
+
+    准入选自 `zhiyin_kernel/__init__.py` 的 docstring。这条守卫防的是内核慢慢变成
+    杂物间：只要有人往内核的类里塞一个带方法体的方法（行为、IO、asyncio 循环），
+    "所有层都能安全引用"的前提就没了——因为行为会带依赖，也会带副作用。
+
+    允许：`@abstractmethod`（纯声明）、`@property`（无依赖的取值）。
+    """
+    offenders: list[str] = []
+    for source in _iter_sources("zhiyin_kernel"):
+        tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for item in node.body:
+                if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                decorators = {_decorator_name(d) for d in item.decorator_list}
+                if decorators & {"abstractmethod", "property"}:
+                    continue
+                offenders.append(
+                    f"{source.relative_to(TEMPLATE_ROOT)}::{node.name}.{item.name}"
+                )
+    assert not offenders, (
+        "内核里出现了带方法体的方法（内核只允许数据形状与最小接口契约）：\n  "
+        + "\n  ".join(offenders)
+    )
+
+
+def _decorator_name(node: ast.expr) -> str:
+    """取装饰器名（`@abstractmethod` / `@property` / `@x.y` 统一取末段）。"""
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    if isinstance(node, ast.Call):
+        return _decorator_name(node.func)
+    return ""
+
+
 def _defined_class_names(package: str) -> set[str]:
     """收集一个包里所有 class 定义名（用于查重复定义）。"""
     names: set[str] = set()

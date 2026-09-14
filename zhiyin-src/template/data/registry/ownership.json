@@ -37,6 +37,7 @@
     { "port": "asset_service", "owner": "业务编排负责人", "scope": "资产版本与影响面传播" },
     { "port": "workspace_service", "owner": "业务编排负责人", "scope": "工作台聚合" },
     { "port": "function_service", "owner": "业务编排负责人", "scope": "报告 / 日历 / 成就 / 导出" },
+    { "port": "identity_service", "owner": "业务编排负责人", "scope": "身份解析（包装 AuthGateway + 本地用户记录补齐）" },
     { "port": "facade", "owner": "接口/前端联调负责人", "scope": "BFF 门面装配" },
     { "port": "impact", "owner": "业务编排负责人", "scope": "影响面传播 Worker" },
     { "port": "active_event", "owner": "业务编排负责人", "scope": "停滞干预 Worker" }

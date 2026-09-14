@@ -30,14 +30,30 @@ python -m zhiyin_boot --check --phase=2  # 里程碑 2：业务主干端到端
 python -m zhiyin_boot --check --strict   # 全绿门禁：有部件未装配则退出 1
 
 # 2. 启动
-python -m zhiyin_boot            # http://127.0.0.1:8000/docs
+python -m zhiyin_boot            # http://127.0.0.1:8000/api/v1/docs
 ```
 
 验证装配：
 
 ```bash
-curl http://127.0.0.1:8000/healthz
+curl http://127.0.0.1:8000/healthz                      # 运维探针（不随版本变化）
+curl http://127.0.0.1:8000/api/v1/app/bootstrap          # 业务接口（Facade 未装 → 503）
 ```
+
+## 接口前缀：只有一个地方拼 `/api/v1`
+
+所有业务接口都在 `Settings.api_prefix`（默认 `/api/v1`）下，前缀**只由
+`zhiyin_api.app.create_app` 统一挂载**：
+
+| 位置 | 正确做法 | 错误做法（会 404） |
+| --- | --- | --- |
+| Controller 路由 | `@router.get("/app/bootstrap")` | `@router.get("/api/v1/app/bootstrap")` |
+| 前端 | `VITE_API_BASE_URL=/api/v1` + `url: '/app/bootstrap'` | baseURL 再拼一次 `/v1` |
+| 反向代理 / 网关 | 原样转发 | 再加一层 `/v1` |
+| 抓 OpenAPI | `/api/v1/openapi.json`（`npm run gen:api` 已指向它） | 手写前缀 |
+
+唯一的例外是 `/healthz`：运维探针不随 API 版本变化，故意留在版本命名空间之外。
+`tests/test_api_prefix.py` 会拦住"路由里再写一次 v1"和"重复嵌套版本段"。
 
 `/healthz` 返回 `status: ok|degraded` 与逐部件的装配状态。**degraded 不代表启动失败**，
 它表示有部件仍是骨架或未实现（第一期属预期），`assembly.missing` 会列出缺口与归属负责人。
@@ -88,7 +104,7 @@ pytest
 
 外壳已铺完整（**文件存在 ≠ 能力具备**）：Orchestrator、黑板四件套服务
 （Profile / Behavior / ConversationMemory / Asset）、Workspace / Function Service、
-Application Facade、两个 Worker（影响面传播 / 停滞干预）都已落为**类骨架**——
+Identity Service、Application Facade、两个 Worker（影响面传播 / 停滞干预）都已落为**类骨架**——
 签名按 `zhiyin_business/ports/` 冻结、方法体 `raise NotImplementedError`、
 类上自报 `IMPLEMENTATION_STATUS = "skeleton"`，且**不进装配表**。
 因此 `/healthz` 与 `--check` 仍把它们如实报成 `not_wired`（见 `assembly.missing`），

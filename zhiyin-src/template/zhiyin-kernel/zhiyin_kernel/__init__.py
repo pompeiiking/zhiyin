@@ -18,6 +18,17 @@
 约束：
 - DTO 不得直接暴露数据库实体（R-API-007），数据库实体只在 infrastructure
   的 persistence 层出现。
+
+准入规则（只允许两类内容，其余一律拒收）
+----------------------------------------
+1. **数据形状**：跨层枚举与 Pydantic 模型（画像 / 资产 / 身份 / 动态资源）；
+2. **零依赖的最小接口契约**：只有抽象方法的 ABC，且**没有方法体**
+   （例：`Worker` —— 业务层与基础设施层都要用它，而这两层唯一的公共依赖就是内核）。
+
+任何带方法体的类都必须离开内核：行为一进来，"所有层都能安全引用的最小内核"
+就不再成立。纯 `@property` 取值允许，因为它不引入依赖也不承载业务规则。
+该规则由 `tests/test_architecture.py::test_kernel_holds_only_shapes_and_contracts`
+用 AST 守卫。
 """
 
 from zhiyin_kernel.enums import (
@@ -70,6 +81,7 @@ from zhiyin_kernel.registry import (
     TaskEntrySpec,
     TheoryCard,
 )
+from zhiyin_kernel.worker import Worker
 
 __all__ = [
     "AgentRole",
@@ -112,4 +124,5 @@ __all__ = [
     "PolicyParamSet",
     "TaskEntrySpec",
     "TheoryCard",
+    "Worker",
 ]

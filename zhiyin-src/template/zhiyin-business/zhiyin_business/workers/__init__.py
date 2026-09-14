@@ -16,15 +16,21 @@
 两者复用同一个 container（`zhiyin-boot` 装配），第一期可同进程随 lifespan 启动，
 成长期用 `python -m zhiyin_boot worker <name>` 独立部署——**部署形态变了，代码不变**。
 
-实现要求：继承 `workers.base.Worker`，只依赖 Port 与 policies，不得 import 基础设施实现。
+实现要求：继承 `zhiyin_kernel.worker.Worker`，只依赖 Port 与 policies，
+不得 import 基础设施实现。
 
-注意：基础设施侧的纯数据管道（如向量同步）**不能**放在这里，也不能继承本包的
-`Worker`——`zhiyin_infrastructure` 被依赖矩阵禁止 import `zhiyin_business`。
-见 `zhiyin_infrastructure/workers/__init__.py` 的说明。
+基类为什么不在本包：业务层与基础设施层**都有** Worker，而
+`zhiyin_infrastructure` 被依赖矩阵禁止 import `zhiyin_business`。为了不出现两份
+同义基类，契约下放到双方唯一的公共依赖——内核
+（`zhiyin_kernel/worker.py`，只有 `name` + `run_once` 两个成员）。
+"怎么被启动"（轮询 / lifespan 启停）由驱动方 `zhiyin_boot/workers.py` 负责。
+
+本包现在只放**业务规则驱动**的 Worker；纯数据管道（向量同步）在
+`zhiyin_infrastructure/workers/`，两边共享同一个内核契约。
 """
 
 from zhiyin_business.workers.active_event import ActiveEventWorker
-from zhiyin_business.workers.base import Worker
 from zhiyin_business.workers.impact import ImpactPropagationWorker
+from zhiyin_kernel.worker import Worker
 
 __all__ = ["ActiveEventWorker", "ImpactPropagationWorker", "Worker"]

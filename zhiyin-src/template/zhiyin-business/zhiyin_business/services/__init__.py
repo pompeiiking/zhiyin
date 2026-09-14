@@ -22,6 +22,12 @@
 | Asset 服务 | `asset.py` | `DefaultAssetService` | AssetRepository、EventBus + `policies/impact.py` | P0 | 骨架 |
 | Workspace 服务 | `workspace.py` | `DefaultWorkspaceService` | 读侧聚合（Profile / Asset / Memory） | P1 | 骨架 |
 | Function 服务 | `function.py` | `DefaultFunctionService` | ObjectStore、日历 | P1 | 骨架 |
+| Identity 服务 | `identity.py` | `DefaultIdentityService` | AuthGateway、UserRepository | P0 | 骨架 |
+
+> Identity 服务是 api 与数据访问契约之间的**唯一通道**：api 层被禁止 import
+> `zhiyin_data_sdk`，因此 Facade 拿不到 `AuthGateway`；由本服务把它包成业务 Port
+> （`business/ports/identity.py::IdentityService`）。它是 Facade 的硬前置——
+> Facade 一装配就会调它。
 
 实现顺序建议：黑板四件套（Profile / Behavior / Memory / Asset）→ Orchestrator →
 Workspace / Function。Orchestrator 的前置是《技术架构文档》§十五 的 4 项口径定稿，
@@ -38,6 +44,7 @@ from zhiyin_business.services.loop import (
 from zhiyin_business.services.asset import DefaultAssetService
 from zhiyin_business.services.behavior import DefaultBehaviorService
 from zhiyin_business.services.function import DefaultFunctionService
+from zhiyin_business.services.identity import DefaultIdentityService
 from zhiyin_business.services.memory import DefaultConversationMemoryService
 from zhiyin_business.services.orchestrator import DefaultOrchestrator
 from zhiyin_business.services.profile import DefaultProfileService
@@ -51,6 +58,7 @@ __all__ = [
     "DefaultBehaviorService",
     "DefaultConversationMemoryService",
     "DefaultFunctionService",
+    "DefaultIdentityService",
     "DefaultOrchestrator",
     "DefaultProfileService",
     "DefaultWorkspaceService",

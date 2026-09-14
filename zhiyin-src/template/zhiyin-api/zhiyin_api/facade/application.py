@@ -21,7 +21,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 from fastapi import Request
 
@@ -41,6 +41,7 @@ from zhiyin_api.dto.conversation import (
 )
 from zhiyin_api.dto.workspace import WorkspacePageView
 from zhiyin_api.facade.facade import ApplicationFacade
+from zhiyin_business.ports.identity import IdentityService
 from zhiyin_kernel.enums import AssetType
 
 _TODO = "TODO(骨架): ApplicationFacade 未实现"
@@ -51,25 +52,24 @@ class DefaultApplicationFacade(ApplicationFacade):
 
     IMPLEMENTATION_STATUS = "skeleton"
 
-    def __init__(self, *, auth: Any) -> None:
+    def __init__(self, *, identity: IdentityService) -> None:
         """构造依赖由 boot 注入。
 
-        `auth` 这里**故意不做类型标注**：身份解析的契约是
-        `zhiyin_data_sdk.gateways.security.AuthGateway`，而 api 层被
-        `tests/test_architecture.py::test_api_does_not_touch_data_sdk` 禁止
-        import data_sdk。在没有业务侧身份 Port 之前，只能由 boot 注入未类型化的对象。
+        身份解析走业务 Port：api 被禁止 import `zhiyin_data_sdk`，拿不到
+        `AuthGateway`；由 `DefaultIdentityService` 把它包成业务抽象
+        （决策见 `business/ports/identity.py` 的模块 docstring）。
 
-        **待拍板**（这是外壳阶段就该定的事，不是实现细节）：
-        要么为它新增业务侧 Port（如 `business/ports/identity.py::IdentityService`，
-        由 business 包装 AuthGateway），api 只面对业务 Port；要么明确允许 api
-        直连 `AuthGateway` 契约并同步修改依赖矩阵。二选一之前不要在这里写实现。
+        `resolve_user_id` 的职责边界：**只做 HTTP → 业务形状的翻译**
+        （从请求里取 token），用户记录的补齐、游客会话、登录合并都在业务侧。
         """
-        self._auth = auth
+        self._identity = identity
 
     # ---------- 身份 ----------
 
     async def resolve_user_id(self, request: Request) -> str:
-        raise NotImplementedError(f"{_TODO}：经 AuthGateway 解析当前用户")
+        raise NotImplementedError(
+            f"{_TODO}：从 Request 取 token → IdentityService.current_user() → 返回 user_id"
+        )
 
     # ---------- 启动 ----------
 

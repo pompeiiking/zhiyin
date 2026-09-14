@@ -63,6 +63,7 @@ SERVICE_PORTS: tuple[str, ...] = (
     "asset_service",
     "workspace_service",
     "function_service",
+    "identity_service",
     "facade",
 )
 

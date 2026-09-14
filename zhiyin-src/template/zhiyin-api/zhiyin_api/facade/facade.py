@@ -41,7 +41,12 @@ class ApplicationFacade(ABC):
 
     @abstractmethod
     async def resolve_user_id(self, request: Request) -> str:
-        """解析当前用户。第一期由 AuthGateway 返回本地演示用户。"""
+        """解析当前用户。
+
+        实现只做 HTTP → 业务形状的翻译：从请求里取 token，交给业务侧的
+        `IdentityService.current_user()`，返回其 `user_id`。**不要**在这里访问
+        用户表或鉴权网关（api 层被禁止 import data_sdk）。
+        """
 
     # ---------- 启动 ----------
 

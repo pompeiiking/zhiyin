@@ -39,6 +39,7 @@ SERVICE_SHELL: dict[str, tuple[str, str]] = {
     "asset_service": ("zhiyin_business.services.asset", "DefaultAssetService"),
     "workspace_service": ("zhiyin_business.services.workspace", "DefaultWorkspaceService"),
     "function_service": ("zhiyin_business.services.function", "DefaultFunctionService"),
+    "identity_service": ("zhiyin_business.services.identity", "DefaultIdentityService"),
     "facade": ("zhiyin_api.facade.application", "DefaultApplicationFacade"),
 }
 
@@ -59,9 +60,12 @@ SKELETON_PORTS: dict[str, tuple[str, str]] = {
     "DefaultAssetService": ("zhiyin_business.ports.blackboard", "AssetService"),
     "DefaultWorkspaceService": ("zhiyin_business.ports.workspace", "WorkspaceService"),
     "DefaultFunctionService": ("zhiyin_business.ports.function", "FunctionService"),
+    "DefaultIdentityService": ("zhiyin_business.ports.identity", "IdentityService"),
     "DefaultApplicationFacade": ("zhiyin_api.facade.facade", "ApplicationFacade"),
-    "ImpactPropagationWorker": ("zhiyin_business.workers.base", "Worker"),
-    "ActiveEventWorker": ("zhiyin_business.workers.base", "Worker"),
+    # Worker 基类下放到内核：业务层与基础设施层都要用它，
+    # 而这两层唯一的公共依赖是内核（见 zhiyin_kernel/worker.py 的说明）。
+    "ImpactPropagationWorker": ("zhiyin_kernel.worker", "Worker"),
+    "ActiveEventWorker": ("zhiyin_kernel.worker", "Worker"),
 }
 
 
@@ -164,6 +168,26 @@ def test_skeleton_implements_its_port(class_name: str) -> None:
 # --------------------------------------------------------------------------
 
 
+def test_worker_contract_stays_minimal() -> None:
+    """Worker 契约必须保持最小（只有 `name` + `run_once`）。
+
+    它躺在内核里，而内核的准入规则是"零依赖的最小契约"。一旦有人把
+    `run_forever` / `run_until_cancelled` 这类驱动逻辑加回来，内核就持有了行为
+    （asyncio 循环），下放的意义就没了。驱动逻辑的正确位置是
+    `zhiyin_boot/workers.py`。
+    """
+    from zhiyin_kernel.worker import Worker
+
+    # 过滤 `__abstractmethods__` 与 ABCMeta 注入的 `_abc_impl`，
+    # 只看类自己声明的成员。
+    members = {name for name in vars(Worker) if not name.startswith("_")}
+    assert members == {"name", "run_once"}, (
+        f"Worker 契约的成员变了：{sorted(members)}。"
+        "驱动逻辑请放 zhiyin_boot/workers.py，不要加进契约"
+    )
+    assert Worker.__abstractmethods__ == frozenset({"run_once"})
+
+
 @pytest.mark.parametrize("port", sorted(SERVICE_SHELL))
 def test_skeleton_declares_its_status(port: str) -> None:
     module, class_name = SERVICE_SHELL[port]
@@ -200,7 +224,13 @@ def test_skeletons_are_not_wired_into_the_container() -> None:
     report = describe_assembly(build_container(_test_settings()))
 
     assert report.services["facade"] == "not_wired"
-    for port in ("orchestrator", "profile_service", "asset_service", "function_service"):
+    for port in (
+        "orchestrator",
+        "profile_service",
+        "asset_service",
+        "function_service",
+        "identity_service",
+    ):
         assert report.services[port] == "not_wired"
     for port in ("impact", "active_event"):
         assert report.workers[port] == "not_wired"

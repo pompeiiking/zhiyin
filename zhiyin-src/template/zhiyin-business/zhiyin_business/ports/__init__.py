@@ -34,6 +34,7 @@ from zhiyin_business.ports.blackboard import (
 )
 from zhiyin_business.ports.workspace import WorkspaceService, WorkspaceView
 from zhiyin_business.ports.function import FunctionService
+from zhiyin_business.ports.identity import IdentityService
 
 __all__ = [
     "HandoffDecision",
@@ -55,4 +56,5 @@ __all__ = [
     "WorkspaceService",
     "WorkspaceView",
     "FunctionService",
+    "IdentityService",
 ]
