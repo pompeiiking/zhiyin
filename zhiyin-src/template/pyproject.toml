@@ -55,8 +55,10 @@ packages = [
     "zhiyin_data_sdk.repositories",
     "zhiyin_infrastructure",
     "zhiyin_infrastructure.local",
+    "zhiyin_infrastructure.mysql",
     "zhiyin_infrastructure.pami",
     "zhiyin_infrastructure.persistence",
+    "zhiyin_infrastructure.workers",
     "zhiyin_boot",
     "zhiyin_boot.container",
 ]

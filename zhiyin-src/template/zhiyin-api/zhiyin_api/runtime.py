@@ -37,10 +37,16 @@ class AssemblyReport:
     services: dict[str, str] = field(default_factory=dict)
     workers: dict[str, str] = field(default_factory=dict)
     missing: list[str] = field(default_factory=list)
+    skeletons: list[str] = field(default_factory=list)
 
     @property
     def healthy(self) -> bool:
-        """没有任何部件处于 not_wired 才算健康。"""
+        """没有任何部件处于 not_wired 才算健康。
+
+        注意：`healthy` **不**把 skeleton 算作不健康（第一期允许骨架存在，门禁按
+        里程碑分级判断）。"骨架有多少、分别属于谁"看 `skeletons`——它回答的是
+        "外壳铺好了但能力还没接"，与 not_wired 的"外壳都没有"是两件事。
+        """
         groups = (
             self.gateways,
             self.repositories,
@@ -62,6 +68,7 @@ class AssemblyReport:
             "services": dict(self.services),
             "workers": dict(self.workers),
             "missing": list(self.missing),
+            "skeletons": list(self.skeletons),
         }
 
 

@@ -271,14 +271,17 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
         优先用动态资源 output_contract（可在不发版的情况下调整契约），
         取不到时回落到业务层 Pydantic 模型生成的 Schema —— 业务层模型是
         唯一事实来源，因此这条兜底路径不会与契约漂移。
+
+        查找键是 `(主理 agent_id, 当前环节)`，不是契约 id，也不是"该智能体唯一的
+        契约"。原因：一个智能体可以承担多个环节（职业顾问同时负责 ②诊断 与 ③决策），
+        按智能体查会取到另一环节的契约——填了 JSON Schema 之后就会拿错契约去校验。
         """
         try:
-            descriptor = await self._registry.get_agent(context.lead_agent)
-            contract_id = getattr(descriptor, "output_contract_id", None)
-            if contract_id:
-                spec = await self._registry.get_output_contract(contract_id)
-                if spec is not None and spec.json_schema:
-                    return spec.json_schema
+            spec = await self._registry.get_output_contract(
+                context.lead_agent, context.stage
+            )
+            if spec is not None and spec.json_schema:
+                return spec.json_schema
         except NotImplementedError:
             # 第一期的 Registry 可能仍是骨架，回落到模型生成的 Schema。
             pass

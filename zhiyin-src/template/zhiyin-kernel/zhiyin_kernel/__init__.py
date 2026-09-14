@@ -66,6 +66,7 @@ from zhiyin_kernel.identity import (
 from zhiyin_kernel.registry import (
     AgentDescriptor,
     OutputContractSpec,
+    PolicyParamSet,
     TaskEntrySpec,
     TheoryCard,
 )
@@ -108,6 +109,7 @@ __all__ = [
     "UserAccount",
     "AgentDescriptor",
     "OutputContractSpec",
+    "PolicyParamSet",
     "TaskEntrySpec",
     "TheoryCard",
 ]

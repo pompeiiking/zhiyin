@@ -101,20 +101,55 @@ def describe_assembly(container: "Container") -> "AssemblyReport":
             WIRED if getattr(container, name, None) is not None else "not_wired"
         )
 
+    # 服务与 Worker 也读实现自述：骨架（IMPLEMENTATION_STATUS="skeleton"）必须被
+    # 标成 skeleton，否则"类骨架已就位"会被误读成"能力已具备"——这正是本期大规模
+    # 铺设骨架之后最容易发生的假装配。无骨架标记的既有实现仍报 wired。
     for name in SERVICE_PORTS:
-        report.services[name] = (
-            WIRED if getattr(container, name, None) is not None else "not_wired"
+        report.services[name] = _status_of(
+            getattr(container, name, None), skeleton_markers=()
         )
 
     registered = {
-        getattr(worker, "name", "") for worker in getattr(container, "workers", []) or []
+        getattr(worker, "name", ""): worker
+        for worker in getattr(container, "workers", []) or []
     }
     for name in WORKER_PORTS:
-        report.workers[name] = WIRED if name in registered else "not_wired"
+        report.workers[name] = _status_of(
+            registered.get(name), skeleton_markers=()
+        )
 
     ownership = load_ownership(registry_dir)
     report.missing = _collect_missing(report, ownership)
+    report.skeletons = _collect_skeletons(report, ownership)
     return report
+
+
+def _collect_skeletons(
+    report: "AssemblyReport", ownership: Mapping[str, str]
+) -> list[str]:
+    """列出"已装配但仍是骨架"的部件（如铺好签名但未写实现的业务服务）。
+
+    与 `missing`（未装配）分开，因为两者要回答的问题不同：
+    `missing` 是"这个能力位没人管"，`skeletons` 是"外壳就位、实现待补"。
+    本期大规模铺骨架之后，后者才是进度主视图。
+    """
+    from zhiyin_api.runtime import SKELETON
+
+    skeletons: list[str] = []
+    groups = {
+        "gateways": report.gateways,
+        "repositories": report.repositories,
+        "transactions": report.transactions,
+        "orchestration": report.orchestration,
+        "services": report.services,
+        "workers": report.workers,
+    }
+    for group_name, group in groups.items():
+        for port, status in group.items():
+            if status == SKELETON:
+                owner = ownership.get(port, DEFAULT_OWNER)
+                skeletons.append(f"{group_name}.{port}：骨架，待 {owner} 补实现")
+    return skeletons
 
 
 def _collect_missing(

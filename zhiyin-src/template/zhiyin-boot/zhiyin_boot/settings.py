@@ -51,8 +51,9 @@ class Settings:
     local_knowledge_dir: str = "data/knowledge"
 
     # ---------- 调度 ----------
+    # 只放**运行节奏**（多久扫一次），不放**规则参数**（停几天算停滞）。
+    # 规则参数走动态资源：data/registry/policy_params.json（见 PolicyParamSet）。
     stall_check_interval_s: float = 3600.0
-    stall_threshold_days: int = 3
     # Worker 轮询间隔。同进程部署时每个 Worker 按该间隔跑一轮；独立部署
     # （python -m zhiyin_boot worker <name>）时同样使用这个值。
     worker_interval_s: float = 60.0

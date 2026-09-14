@@ -16,8 +16,12 @@
 | `services/` | 服务实现，真正依赖编排层与 SDK 的地方 | 业务编排 / 各业务线 |
 | `workers/` | 异步执行者（影响面传播、主动事件） | 业务编排 |
 | `contracts/` | 五环节产出契约与通用构件 | 业务编排 |
-| `published.py` | 对外发布面，BFF 只允许从这里取业务能力 | 架构 |
 | `events.py` | 领域事件类型与载荷 | 业务编排 |
+
+关于"对外发布面"：原先的 `published.py`（逐项再导出内核符号给 api）**已删除**。
+共享形状归位到零依赖内核 `zhiyin_kernel` 之后，api 按依赖矩阵允许直连内核读枚举与
+读模型，再套一层同名再导出只会制造"两条获取路径"。api 访问 `business` 时只面对
+`ports/` 抽象与 Facade，不再需要发布面补丁。
 
 包内方向单向：`services/ → policies/ → ports/ → kernel`，禁止倒流
 （由 `tests/test_architecture.py::test_business_internal_direction` 守卫）。
@@ -25,4 +29,4 @@
 
 from __future__ import annotations
 
-__all__ = ["contracts", "events", "policies", "ports", "published", "services", "workers"]
+__all__ = ["contracts", "events", "policies", "ports", "services", "workers"]

@@ -14,7 +14,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from zhiyin_business.published import LoopStage, TaskStatus
+from zhiyin_kernel.enums import LoopStage, TaskStatus
 
 
 class TaskEnterRequest(BaseModel):

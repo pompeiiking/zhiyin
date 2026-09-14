@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from zhiyin_business.published import AssetType
 from zhiyin_api.dto.asset import (
     AssetVersionView,
     ExportRequest,
@@ -16,6 +15,7 @@ from zhiyin_api.dto.asset import (
 )
 from zhiyin_api.dto.common import ApiResponse
 from zhiyin_api.facade import get_facade
+from zhiyin_kernel.enums import AssetType
 
 router = APIRouter(tags=["asset"])
 

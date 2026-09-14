@@ -16,7 +16,7 @@ from typing import Optional
 
 from fastapi import Request
 
-from zhiyin_business.published import AssetType
+from zhiyin_kernel.enums import AssetType
 from zhiyin_api.dto.asset import (
     AssetVersionView,
     ExportRequest,

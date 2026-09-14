@@ -6,20 +6,26 @@
 - 从这里开始真正依赖 `zhiyin-orchestration`（AgentEngine / EventBus / Scheduler）
   与 `zhiyin-data-sdk`（Repository / Gateway）。
 
-服务落位表（对应《第一期技术架构文档》§4.5.1 模块归属，一人一列互不阻塞）：
+服务落位表（对应《第一期技术架构文档》§4.5.1 模块归属，一人一列互不阻塞）。
+**每个格子现在都是一个真实文件**：类骨架已就位、签名已按 Port 冻结、方法体
+`raise NotImplementedError`。实现方只填方法体，不需要新建文件、不需要改装配表。
+骨架的 `IMPLEMENTATION_STATUS = "skeleton"` 会被装配报告如实标为 skeleton，
+因此"文件存在"不会被误读成"能力已具备"。
 
-| 服务 | 文件 | 依赖 | 优先级 |
-| --- | --- | --- | --- |
-| Loop 协调器 | `loop.py`（已有参考实现） | AgentEngine、TaskSessionRepository | P0 |
-| Orchestrator | `orchestrator.py` | 黑板四件套 + `policies/` + AgentEngine | P0 |
-| Profile 服务 | `profile.py` | ProfileRepository、EventBus | P0 |
-| Behavior 服务 | `behavior.py` | BehaviorRepository、EventBus | P0 |
-| Memory 服务 | `memory.py` | ConversationMemoryRepository | P0 |
-| Asset 服务 | `asset.py` | AssetRepository、EventBus + `policies/impact.py` | P0 |
-| Workspace 服务 | `workspace.py` | 读侧聚合（Profile / Asset / Memory） | P1 |
-| Function 服务 | `function.py` | ObjectStore、日历 | P1 |
+| 服务 | 文件 | 类 | 依赖 | 优先级 | 状态 |
+| --- | --- | --- | --- | --- | --- |
+| Loop 协调器 | `loop.py` | `AgentDrivenLoopCoordinator` | AgentEngine、TaskSessionRepository | P0 | 参考实现 |
+| Orchestrator | `orchestrator.py` | `DefaultOrchestrator` | 黑板四件套 + `policies/` + AgentEngine | P0 | 骨架 |
+| Profile 服务 | `profile.py` | `DefaultProfileService` | ProfileRepository、EventBus | P0 | 骨架 |
+| Behavior 服务 | `behavior.py` | `DefaultBehaviorService` | BehaviorRepository、EventBus | P0 | 骨架 |
+| Memory 服务 | `memory.py` | `DefaultConversationMemoryService` | ConversationMemoryRepository | P0 | 骨架 |
+| Asset 服务 | `asset.py` | `DefaultAssetService` | AssetRepository、EventBus + `policies/impact.py` | P0 | 骨架 |
+| Workspace 服务 | `workspace.py` | `DefaultWorkspaceService` | 读侧聚合（Profile / Asset / Memory） | P1 | 骨架 |
+| Function 服务 | `function.py` | `DefaultFunctionService` | ObjectStore、日历 | P1 | 骨架 |
 
-目前提供的实现见各模块 docstring；业务线在既有实现上扩展，不要另起一套。
+实现顺序建议：黑板四件套（Profile / Behavior / Memory / Asset）→ Orchestrator →
+Workspace / Function。Orchestrator 的前置是《技术架构文档》§十五 的 4 项口径定稿，
+未定稿不要动手（见 `orchestrator.py` 的 docstring）。
 """
 
 from zhiyin_business.services.loop import (
@@ -29,11 +35,25 @@ from zhiyin_business.services.loop import (
     default_conclusion_builder,
     next_stage_after,
 )
+from zhiyin_business.services.asset import DefaultAssetService
+from zhiyin_business.services.behavior import DefaultBehaviorService
+from zhiyin_business.services.function import DefaultFunctionService
+from zhiyin_business.services.memory import DefaultConversationMemoryService
+from zhiyin_business.services.orchestrator import DefaultOrchestrator
+from zhiyin_business.services.profile import DefaultProfileService
+from zhiyin_business.services.workspace import DefaultWorkspaceService
 
 __all__ = [
     "STAGE_OUTPUT_CONTRACTS",
     "STAGE_SEQUENCE",
     "AgentDrivenLoopCoordinator",
+    "DefaultAssetService",
+    "DefaultBehaviorService",
+    "DefaultConversationMemoryService",
+    "DefaultFunctionService",
+    "DefaultOrchestrator",
+    "DefaultProfileService",
+    "DefaultWorkspaceService",
     "default_conclusion_builder",
     "next_stage_after",
 ]

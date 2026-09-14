@@ -281,3 +281,17 @@ async def test_registry_contract(repositories) -> None:
     assert [entry.sort_order for entry in entries] == sorted(
         entry.sort_order for entry in entries
     )
+
+    # 产出契约按 (agent_id, stage) 查：同一智能体的不同环节必须是两条契约。
+    # 任何实现（本地 JSON / MySQL）都必须按这个键建立索引，不得按契约 id 查。
+    diagnose = await repo.get_output_contract("career_advisor", LoopStage.DIAGNOSE)
+    decide = await repo.get_output_contract("career_advisor", LoopStage.DECIDE)
+    assert diagnose is not None and decide is not None
+    assert diagnose.id != decide.id
+    assert await repo.get_output_contract("profile_analyst", LoopStage.REVIEW) is None
+
+    # 规则参数：读不到返回 None（不静默造默认值），读到必须带定稿状态
+    params = await repo.get_policy_params("intervention")
+    assert params is not None
+    assert params.status in {"draft", "confirmed"}
+    assert await repo.get_policy_params("不存在的规则") is None

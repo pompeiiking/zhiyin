@@ -1,0 +1,13 @@
+{
+  "_note": "职引 · 业务规则参数（DEMO）。属动态资源：调阈值不需要发版。业务规则是代码（zhiyin_business/policies/），但规则的参数必须来自这里，不得写死在 Settings 或规则实现里。status=draft 表示参数仍在业务评审中，实现者不得当成已确认口径；定稿后改 confirmed。",
+  "items": [
+    {
+      "code": "intervention",
+      "status": "draft",
+      "note": "《技术架构文档》§十五 待确认事项 14：主动干预参数需业务定稿。stall_threshold_days=3 是本期已有的默认值，从 zhiyin_boot Settings 原样迁出；cooldown_hours 与 max_notifications_per_window 尚未定稿，定稿前不要在此填猜测值，实现方按「未配置即不打扰」处理。",
+      "value": {
+        "stall_threshold_days": 3
+      }
+    }
+  ]
+}

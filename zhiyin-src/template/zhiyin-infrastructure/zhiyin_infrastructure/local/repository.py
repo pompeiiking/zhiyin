@@ -44,6 +44,7 @@ from zhiyin_kernel.identity import AuthSession, UserAccount
 from zhiyin_kernel.registry import (
     AgentDescriptor,
     OutputContractSpec,
+    PolicyParamSet,
     TaskEntrySpec,
     TheoryCard,
 )
@@ -454,12 +455,13 @@ class InMemoryUserRepository(UserRepository):
 class LocalJsonRegistryRepository(RegistryRepository):
     """动态资源：第一期读本地 JSON。
 
-    文件位置：`{data_dir}/{agents,theory_cards,output_contracts,task_entries}.json`
+    文件位置：`{data_dir}/{agents,theory_cards,output_contracts,task_entries,
+    policy_params}.json`
     文件内容支持两种形状：顶层数组，或 `{"items": [...]}`。
 
     设计意图（《分层实现与接口设计》§三）：页面文案、任务入口、智能体、理论卡、
-    产出契约都必须是**动态资源**。放 JSON 而不是写进代码，是为了在第一期就能验证
-    "改配置不发版"这条口径；接 pami 动态资源表时只替换本类。
+    产出契约、规则参数都必须是**动态资源**。放 JSON 而不是写进代码，是为了在第一期
+    就能验证"改配置不发版"这条口径；接 pami 动态资源表时只替换本类。
     """
 
     FILES: dict[str, str] = {
@@ -467,6 +469,7 @@ class LocalJsonRegistryRepository(RegistryRepository):
         "theory_cards": "theory_cards.json",
         "output_contracts": "output_contracts.json",
         "task_entries": "task_entries.json",
+        "policy_params": "policy_params.json",
     }
 
     def __init__(self, data_dir: str = "data/registry") -> None:
@@ -503,9 +506,13 @@ class LocalJsonRegistryRepository(RegistryRepository):
 
     # ---------- 产出契约 ----------
 
-    async def get_output_contract(self, contract_id: str) -> Optional[OutputContractSpec]:
+    async def get_output_contract(
+        self, agent_id: str, stage: LoopStage
+    ) -> Optional[OutputContractSpec]:
+        """按 `(agent_id, stage)` 查找。`id` 只是标识，不参与查找。"""
+        wanted = stage.value if isinstance(stage, LoopStage) else str(stage)
         for raw in self._load("output_contracts"):
-            if raw.get("id") == contract_id:
+            if raw.get("agent_id") == agent_id and raw.get("stage") == wanted:
                 return OutputContractSpec.model_validate(raw)
         return None
 
@@ -515,6 +522,14 @@ class LocalJsonRegistryRepository(RegistryRepository):
         entries = [TaskEntrySpec.model_validate(raw) for raw in self._load("task_entries")]
         entries.sort(key=lambda item: item.sort_order)
         return entries
+
+    # ---------- 规则参数 ----------
+
+    async def get_policy_params(self, code: str) -> Optional[PolicyParamSet]:
+        for raw in self._load("policy_params"):
+            if raw.get("code") == code:
+                return PolicyParamSet.model_validate(raw)
+        return None
 
     # ---------- 内部 ----------
 

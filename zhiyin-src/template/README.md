@@ -86,11 +86,18 @@ pytest
 对象存储 / 关键词检索）、编排层六个原语的默认实现、五环节 Loop 的参考实现、
 应用工厂与启动入口。
 
-待实现（见 `/healthz` 的 `assembly.missing`）：Orchestrator、黑板四件套服务
+外壳已铺完整（**文件存在 ≠ 能力具备**）：Orchestrator、黑板四件套服务
 （Profile / Behavior / ConversationMemory / Asset）、Workspace / Function Service、
-Application Facade、两个 Worker（影响面传播 / 停滞干预）。接口已冻结在
-`zhiyin_business/ports/`，规则落位在 `policies/`；接上后 `facade` 与 `services`
-会从 `not_wired` 变成 `wired`，`--check --phase=2` 随即转绿。
+Application Facade、两个 Worker（影响面传播 / 停滞干预）都已落为**类骨架**——
+签名按 `zhiyin_business/ports/` 冻结、方法体 `raise NotImplementedError`、
+类上自报 `IMPLEMENTATION_STATUS = "skeleton"`，且**不进装配表**。
+因此 `/healthz` 与 `--check` 仍把它们如实报成 `not_wired`（见 `assembly.missing`），
+不会因为文件存在就假装装好了。规则落位在 `policies/`，规则的**参数**在
+`data/registry/policy_params.json`。实现填完后在
+`zhiyin-boot/zhiyin_boot/container/services.py` 接上一行，`--check --phase=2` 随即转绿。
+
+`--check` 的输出里有两个不同的缺口清单：`missing` 是"能力位没人管"，
+`skeletons` 是"外壳就位、实现待补"——本期进度看后者。
 
 ## 切换外部依赖
 

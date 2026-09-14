@@ -240,7 +240,8 @@ async def test_invalid_output_is_degraded_not_injected(sessions, registry) -> No
 
 async def test_contract_schema_comes_from_registry_when_present(sessions, registry) -> None:
     """产出契约优先取动态资源；种子数据里留空则应回落到模型生成的 Schema。"""
-    spec = await registry.get_output_contract("oc_collect")
+    # 查找键是 (agent_id, stage)，不是契约 id
+    spec = await registry.get_output_contract("profile_analyst", LoopStage.COLLECT)
     assert spec is not None
     assert spec.model_ref.endswith("CollectOutput")
     assert spec.json_schema == {}
@@ -252,3 +253,22 @@ async def test_contract_schema_comes_from_registry_when_present(sessions, regist
     schema = await coord._output_schema(context)
     assert schema.get("type") == "object"
     assert "guide" in schema.get("properties", {})
+
+
+async def test_contract_lookup_is_per_stage_not_per_agent(sessions, registry) -> None:
+    """同一个智能体在不同环节必须取到不同的契约。
+
+    职业顾问同时负责 ②诊断 与 ③决策。此前契约按"智能体唯一的
+    output_contract_id"查，②③ 会取到同一条(②)，`oc_decide` 成为无人引用的孤儿。
+    这条测试把 (agent_id, stage) 这个口径钉住。
+    """
+    diagnose = await registry.get_output_contract("career_advisor", LoopStage.DIAGNOSE)
+    decide = await registry.get_output_contract("career_advisor", LoopStage.DECIDE)
+
+    assert diagnose is not None and decide is not None
+    assert diagnose.id != decide.id, "② 与 ③ 必须是两条不同的契约"
+    assert diagnose.stage is LoopStage.DIAGNOSE
+    assert decide.stage is LoopStage.DECIDE
+
+    # 取不到的 (agent_id, stage) 组合返回 None，不抛异常（由调用方回落）
+    assert await registry.get_output_contract("profile_analyst", LoopStage.REVIEW) is None

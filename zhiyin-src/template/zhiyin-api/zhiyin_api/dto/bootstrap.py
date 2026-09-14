@@ -10,7 +10,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from zhiyin_business.published import LoopStage
+from zhiyin_kernel.enums import LoopStage
 
 
 class TaskEntryView(BaseModel):

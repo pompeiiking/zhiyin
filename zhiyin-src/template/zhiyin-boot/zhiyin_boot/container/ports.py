@@ -5,7 +5,8 @@
 
 1. 报告会自动多出一行状态（wired / skeleton / not_wired）；
 2. 缺口会自动带上 `ownership.json` 里的归属；
-3. 门禁 JSON 里引用的名字若不存在，`tests/test_assembly_gates.py` 会直接失败。
+3. 门禁 JSON 里引用的名字若不存在，`tests/test_assembly.py::test_gates_reference_known_ports`
+   会直接失败；`tests/test_shell_completeness.py` 另外守住"落位表 ↔ 真实文件"一致。
 
 清单是"能力位"，不是"实现"：同一能力位换实现（local → mysql → pami）不改本文件。
 """
