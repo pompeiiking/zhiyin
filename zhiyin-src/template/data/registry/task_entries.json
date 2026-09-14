@@ -1,0 +1,54 @@
+{
+  "_note": "职引 · 首页任务入口（DEMO）。文案取自《职引-前端页面设计-v1.0》§4.1 任务清单（候选文案，待真实用户语言化测试后定稿）。属动态资源：改本文件不需要前端或后端发版。",
+  "items": [
+    {
+      "code": "confused",
+      "label": "还不太清楚自己适合什么",
+      "target_stage": "collect",
+      "lead_agent": "profile_analyst",
+      "sort_order": 1
+    },
+    {
+      "code": "verify_direction",
+      "label": "想验证某方向行不行",
+      "target_stage": "diagnose",
+      "lead_agent": "career_advisor",
+      "sort_order": 2
+    },
+    {
+      "code": "undecided",
+      "label": "几个方向拿不准",
+      "target_stage": "decide",
+      "lead_agent": "career_advisor",
+      "sort_order": 3
+    },
+    {
+      "code": "how_to_act",
+      "label": "定了方向不知道怎么动",
+      "target_stage": "act",
+      "lead_agent": "path_planner",
+      "sort_order": 4
+    },
+    {
+      "code": "stuck",
+      "label": "执行卡住了 / 没进展",
+      "target_stage": "review",
+      "lead_agent": "companion_coach",
+      "sort_order": 5
+    },
+    {
+      "code": "review_due",
+      "label": "好久没管了 / 该复盘了",
+      "target_stage": "review",
+      "lead_agent": "companion_coach",
+      "sort_order": 6
+    },
+    {
+      "code": "free_chat",
+      "label": "直接开聊",
+      "target_stage": null,
+      "lead_agent": null,
+      "sort_order": 7
+    }
+  ]
+}

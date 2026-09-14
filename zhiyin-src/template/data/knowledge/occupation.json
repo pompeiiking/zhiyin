@@ -1,0 +1,48 @@
+{
+  "_note": "职引 · 公共知识库示例（DEMO）。职业与专业条目结构遵循《业务数据采集与存储来源设计》§3.1：以职业编码 / 专业代码为唯一键，必须保留 source_url 与 fetched_at。这里只放结构示例，真实数据由采集链路写入。",
+  "items": [
+    {
+      "id": "occ-2-02-10-01",
+      "title": "软件工程师",
+      "summary": "从事软件设计、编码、测试与维护的技术岗位，核心能力为编程语言、数据结构与工程协作。",
+      "tags": ["计算机", "编程", "工程"],
+      "occupation_code": "2-02-10-01",
+      "requirement_structure": {
+        "knowledge": ["数据结构与算法", "操作系统", "计算机网络"],
+        "skill": ["至少一门主流语言", "版本控制", "单元测试"],
+        "ability": ["问题拆解", "持续学习"]
+      },
+      "source_url": "https://xz.chsi.com.cn/home.action",
+      "fetched_at": "2026-09-14T00:00:00+00:00",
+      "source": "学职平台",
+      "namespace": "occupation"
+    },
+    {
+      "id": "occ-2-06-03-02",
+      "title": "产品经理",
+      "summary": "负责需求发现、方案设计与跨职能推进，核心能力为需求洞察、方案表达与协作推动。",
+      "tags": ["产品", "需求", "协作"],
+      "occupation_code": "2-06-03-02",
+      "requirement_structure": {
+        "knowledge": ["用户研究方法", "行业与竞品常识"],
+        "skill": ["需求文档", "原型工具", "数据分析"],
+        "ability": ["结构化表达", "跨部门沟通"]
+      },
+      "source_url": "https://xz.chsi.com.cn/home.action",
+      "fetched_at": "2026-09-14T00:00:00+00:00",
+      "source": "学职平台",
+      "namespace": "occupation"
+    },
+    {
+      "id": "mj-0809",
+      "title": "计算机类专业",
+      "summary": "培养计算系统与软件设计能力，主干课程含程序设计、数据结构、操作系统、数据库与计算机网络。",
+      "tags": ["计算机", "专业", "课程"],
+      "major_code": "0809",
+      "source_url": "https://gk.chsi.com.cn",
+      "fetched_at": "2026-09-14T00:00:00+00:00",
+      "source": "阳光志愿信息服务系统",
+      "namespace": "profession"
+    }
+  ]
+}

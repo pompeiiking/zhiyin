@@ -1,0 +1,104 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zhiyin"
+version = "0.1.0"
+description = "职引 · 第一期工程（模块化单体：api / business / orchestration / data-sdk / infrastructure / boot）"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+
+# 运行依赖：只保留第一期真正用到的。
+# sqlalchemy 是可选的（仅启用 ZHIYIN_USE_MYSQL 时 import），因此放在 extra 里。
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pydantic>=2.6",
+]
+
+[project.optional-dependencies]
+mysql = ["sqlalchemy>=2.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+zhiyin = "zhiyin_boot.__main__:main"
+
+# ---------------------------------------------------------------------------
+# 六个代码包分布在六个目录下（目录名用连字符、包名用下划线），
+# 这里显式列出，保证 `pip install -e .` 后六层都可 import。
+# 新增子包时记得同步这里的 packages 列表。
+# ---------------------------------------------------------------------------
+[tool.setuptools]
+packages = [
+    "zhiyin_kernel",
+    "zhiyin_api",
+    "zhiyin_api.controllers",
+    "zhiyin_api.dto",
+    "zhiyin_api.facade",
+    "zhiyin_business",
+    "zhiyin_business.contracts",
+    "zhiyin_business.ports",
+    "zhiyin_business.policies",
+    "zhiyin_business.services",
+    "zhiyin_business.workers",
+    "zhiyin_orchestration",
+    "zhiyin_orchestration.impl",
+    "zhiyin_data_sdk",
+    "zhiyin_data_sdk.gateways",
+    "zhiyin_data_sdk.repositories",
+    "zhiyin_infrastructure",
+    "zhiyin_infrastructure.local",
+    "zhiyin_infrastructure.pami",
+    "zhiyin_infrastructure.persistence",
+    "zhiyin_boot",
+    "zhiyin_boot.container",
+]
+
+[tool.setuptools.package-dir]
+zhiyin_kernel = "zhiyin-kernel/zhiyin_kernel"
+zhiyin_api = "zhiyin-api/zhiyin_api"
+zhiyin_business = "zhiyin-business/zhiyin_business"
+zhiyin_orchestration = "zhiyin-orchestration/zhiyin_orchestration"
+zhiyin_data_sdk = "zhiyin-data-sdk/zhiyin_data_sdk"
+zhiyin_infrastructure = "zhiyin-infrastructure/zhiyin_infrastructure"
+zhiyin_boot = "zhiyin-boot/zhiyin_boot"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+# 让 pytest 不装包也能直接跑（pytest>=7 的 pythonpath 选项）。
+pythonpath = [
+    "zhiyin-kernel",
+    "zhiyin-api",
+    "zhiyin-business",
+    "zhiyin-orchestration",
+    "zhiyin-data-sdk",
+    "zhiyin-infrastructure",
+    "zhiyin-boot",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# 只开启「真问题」类别：E/W 语法与错误、F 未使用/未定义、B 常见缺陷。
+# 刻意不开 I（isort 顺序）与 UP（pyupgrade）：`.contracts/` 下的契约文件先于
+# 本次工程化底座冻结，开启后会产生 30+ 文件的大量纯风格改动。团队要统一风格时，
+# 一次性执行 `ruff check --fix` 再把 I、UP 加进来即可。
+select = ["E", "F", "B"]
+ignore = [
+    "E501", # 行长由 formatter 处理，中文注释超长不视为错误
+    "B008", # FastAPI 的 Depends()/Body() 默认值调用是框架惯用法
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 测试里用 assert 与长字符串是正常的
+"tests/*" = ["B011"]

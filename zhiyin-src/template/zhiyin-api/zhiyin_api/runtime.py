@@ -1,0 +1,85 @@
+"""运行时装配状态（只读）。
+
+为什么放在 api 层：`/healthz` 需要回答"哪些部件真的装上了、哪些还是骨架"，
+但 api 不允许 import `zhiyin-boot`（会构成反向依赖）。因此约定：
+
+- `zhiyin-boot` 在 wire 阶段构造一份 `AssemblyReport` 并调用 `configure_runtime()`；
+- api 只读这份报告，不认识 boot 的任何类型。
+
+这样 §九 验收项 8「骨架隔离」变得可观测：healthz 会列出所有仍走本地/默认通过
+实现的部件，以及第一期已知的功能缺口。
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Optional
+
+# 部件状态取值
+WIRED = "wired"
+SKELETON = "skeleton"
+NOT_WIRED = "not_wired"
+
+
+@dataclass
+class AssemblyReport:
+    """一次启动的装配快照。
+
+    分组与装配清单（`zhiyin_boot.container.ports`）一一对应：
+    Gateways / Repositories / Transactions / Orchestration / Services / Workers。
+    """
+
+    env: str = "local"
+    gateways: dict[str, str] = field(default_factory=dict)
+    repositories: dict[str, str] = field(default_factory=dict)
+    transactions: dict[str, str] = field(default_factory=dict)
+    orchestration: dict[str, str] = field(default_factory=dict)
+    services: dict[str, str] = field(default_factory=dict)
+    workers: dict[str, str] = field(default_factory=dict)
+    missing: list[str] = field(default_factory=list)
+
+    @property
+    def healthy(self) -> bool:
+        """没有任何部件处于 not_wired 才算健康。"""
+        groups = (
+            self.gateways,
+            self.repositories,
+            self.transactions,
+            self.orchestration,
+            self.services,
+            self.workers,
+        )
+        return not any(NOT_WIRED in group.values() for group in groups)
+
+    def to_dict(self) -> dict:
+        return {
+            "env": self.env,
+            "healthy": self.healthy,
+            "gateways": dict(self.gateways),
+            "repositories": dict(self.repositories),
+            "transactions": dict(self.transactions),
+            "orchestration": dict(self.orchestration),
+            "services": dict(self.services),
+            "workers": dict(self.workers),
+            "missing": list(self.missing),
+        }
+
+
+_report: Optional[AssemblyReport] = None
+
+
+def configure_runtime(report: AssemblyReport) -> None:
+    """由 zhiyin-boot 在启动时调用。"""
+    global _report
+    _report = report
+
+
+def get_runtime() -> AssemblyReport:
+    """读取装配报告。未装配时返回空报告，healthz 仍可用。"""
+    return _report if _report is not None else AssemblyReport()
+
+
+def reset_runtime() -> None:
+    """清空装配报告。供测试隔离使用，业务代码不应调用。"""
+    global _report
+    _report = None

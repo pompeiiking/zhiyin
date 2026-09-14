@@ -1,0 +1,73 @@
+import axios, { type AxiosInstance } from 'axios'
+
+/**
+ * 统一响应拆包。
+ *
+ * 后端统一信封为 { code, message, data, trace_id }（见 zhiyin_api.dto.common.ApiResponse）。
+ * 本文件是全前端唯一处理该信封的地方：成功直接返回 data，失败抛 ApiError。
+ */
+
+/** 错误码口径，必须与后端 zhiyin_api/dto/common.py 的 ErrorCode 保持一致 */
+export const ErrorCode = {
+  OK: 0,
+  INVALID_PARAM: 1001,
+  NOT_FOUND: 1002,
+  CONFLICT: 1003,
+  UNAUTHORIZED: 1004,
+  GUEST_LIMIT: 1005,
+  STAGE_UNCERTAIN: 1006,
+  DEPENDENCY_UNAVAILABLE: 1007,
+  INTERNAL: 1999,
+} as const
+
+export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode]
+
+export class ApiError extends Error {
+  constructor(
+    readonly code: ErrorCodeValue,
+    message: string,
+    readonly traceId = '',
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+interface Envelope<T> {
+  code: number
+  message: string
+  data: T | null
+  trace_id: string
+}
+
+/** 后端返回码 → 前端应对动作。UI 只按 code 分支，不解析文案。 */
+export const ERROR_HANDLING: Record<number, string> = {
+  [ErrorCode.UNAUTHORIZED]: '拉起登录 Modal',
+  [ErrorCode.GUEST_LIMIT]: '游客采集超过 2 问 → 触发登录拦截',
+  [ErrorCode.STAGE_UNCERTAIN]: '环节判定不确定 → 渲染澄清追问，不报错',
+  [ErrorCode.DEPENDENCY_UNAVAILABLE]: '依赖降级 → 顶部弱提示，不阻塞对话',
+}
+
+const http: AxiosInstance = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL,
+  timeout: 60_000,
+})
+
+http.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    throw new ApiError(ErrorCode.INTERNAL, error?.message ?? '网络异常')
+  },
+)
+
+/** 发起请求并拆掉信封。所有 api/endpoints.ts 里的函数都走这里。 */
+export async function request<T>(config: Parameters<AxiosInstance['request']>[0]): Promise<T> {
+  const response = await http.request<Envelope<T>>(config)
+  const envelope = response.data
+  if (envelope.code !== ErrorCode.OK) {
+    throw new ApiError(envelope.code as ErrorCodeValue, envelope.message, envelope.trace_id)
+  }
+  return envelope.data as T
+}
+
+export default http

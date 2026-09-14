@@ -1,0 +1,73 @@
+{
+  "_note": "职引 · 动态资源种子数据（DEMO）。来源：《职引-PRD-v2.0》§3.3 智能体能力池。第一期由 LocalJsonRegistryRepository 读取；接 pami 动态资源表后本文件不再需要。",
+  "items": [
+    {
+      "id": "profile_analyst",
+      "name": "建档分析师",
+      "role_summary": "把零散信息沉淀成带置信度与缺口的结构化画像",
+      "theory_packages": [
+        "parsons_self",
+        "holland_riasec",
+        "ability_trinity",
+        "super_life_stage",
+        "career_anchor"
+      ],
+      "tools": ["访谈话术", "画像字段 schema", "测评解释"],
+      "call_scenarios": ["任何环节发现画像缺信息或置信度低时"],
+      "not_to_do": ["不替用户下判断"],
+      "output_contract_id": "oc_collect",
+      "status": "enabled"
+    },
+    {
+      "id": "career_advisor",
+      "name": "职业顾问",
+      "role_summary": "画像与目标要求对齐，给出诊断、差距与可撤回的方向选择",
+      "theory_packages": [
+        "parsons_match",
+        "cd_development",
+        "clover",
+        "casve",
+        "decision_balance",
+        "vroom"
+      ],
+      "tools": ["职业库", "岗位要求", "差距算法", "方案生成"],
+      "call_scenarios": ["诊断", "多方案", "方向存疑判别"],
+      "not_to_do": ["不替用户执行"],
+      "output_contract_id": "oc_diagnose",
+      "status": "enabled"
+    },
+    {
+      "id": "path_planner",
+      "name": "路径规划师",
+      "role_summary": "把选择拆成带日历、今天就能勾掉的行动",
+      "theory_packages": ["smart", "if_then", "planned_happenstance"],
+      "tools": ["节点日历", "窗口模板", "任务拆解"],
+      "call_scenarios": ["决策落地成计划", "计划重拆"],
+      "not_to_do": ["不评判方向对错"],
+      "output_contract_id": "oc_act",
+      "status": "enabled"
+    },
+    {
+      "id": "companion_coach",
+      "name": "陪伴教练",
+      "role_summary": "盯执行、给反馈、触发再入环",
+      "theory_packages": ["super_development", "bandura_self_efficacy", "planned_happenstance"],
+      "tools": ["行为日志", "节律", "提醒通道", "成就体系"],
+      "call_scenarios": ["主动干预", "复盘", "停滞预警（唯一可主动发起会话者）"],
+      "not_to_do": ["不越界代产出诊断或方案"],
+      "output_contract_id": "oc_review",
+      "status": "enabled"
+    },
+    {
+      "id": "info_scout",
+      "name": "信息侦查员",
+      "role_summary": "按需供给外部事实，不参与结论",
+      "theory_packages": [],
+      "tools": ["学职平台库", "JD", "行情", "时间窗口"],
+      "call_scenarios": ["任何环节需外部事实时被按需调用"],
+      "not_to_do": ["不与用户闲聊", "不给建议"],
+      "output_contract_id": null,
+      "status": "enabled"
+    }
+  ]
+}

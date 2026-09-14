@@ -1,0 +1,35 @@
+{
+  "_note": "职引 · 公共知识库示例（DEMO，仅用于本地链路验证，不是真实采集结果）。依据《业务数据采集与存储来源设计》：公共知识只作报告引用，绝不写入 profile_field；每条必须带 source_url 与 fetched_at 以便溯源与下架（R-CRAWL-006）。第二期由 pami knowledge-service 替代。",
+  "items": [
+    {
+      "id": "theory-holland-riasec",
+      "title": "霍兰德 RIASEC 兴趣类型",
+      "summary": "把职业兴趣归纳为现实型、研究型、艺术型、社会型、企业型、常规型六类，用三个字母表示兴趣组合。",
+      "tags": ["霍兰德", "兴趣", "RIASEC"],
+      "source_url": "https://xz.chsi.com.cn/home.action",
+      "fetched_at": "2026-09-14T00:00:00+00:00",
+      "source": "学职平台",
+      "namespace": "theory"
+    },
+    {
+      "id": "theory-clover",
+      "title": "三叶草模型",
+      "summary": "兴趣、能力、价值三者重叠处才是最舒服的方向；三者缺一会分别表现为厌倦、焦虑或失落。",
+      "tags": ["三叶草", "兴趣", "能力", "价值"],
+      "source_url": "https://xz.chsi.com.cn/home.action",
+      "fetched_at": "2026-09-14T00:00:00+00:00",
+      "source": "学职平台",
+      "namespace": "theory"
+    },
+    {
+      "id": "theory-casve",
+      "title": "CASVE 循环",
+      "summary": "沟通、分析、综合、评估、执行五步构成一次完整的职业决策过程。",
+      "tags": ["CASVE", "决策", "CIP"],
+      "source_url": "https://xz.chsi.com.cn/home.action",
+      "fetched_at": "2026-09-14T00:00:00+00:00",
+      "source": "学职平台",
+      "namespace": "theory"
+    }
+  ]
+}

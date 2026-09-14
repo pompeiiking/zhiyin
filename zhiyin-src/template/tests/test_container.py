@@ -1,0 +1,98 @@
+"""装配层测试：容器能构造、最低可用部件齐全、装配报告如实反映缺口。"""
+
+from __future__ import annotations
+
+import pytest
+
+from zhiyin_boot import (
+    Settings,
+    assert_minimum_viable,
+    build_container,
+    describe_assembly,
+    wire_application,
+)
+from zhiyin_api.runtime import NOT_WIRED, WIRED
+
+
+@pytest.fixture
+def settings() -> Settings:
+    """指向仓库内种子数据的配置，保证测试与本地演示读同一份动态资源。"""
+    from pathlib import Path
+
+    template_root = Path(__file__).resolve().parents[1]
+    data_dir = template_root / "data"
+    return Settings(
+        env="test",
+        local_data_dir=str(data_dir),
+        local_registry_dir=str(data_dir / "registry"),
+        local_knowledge_dir=str(data_dir / "knowledge"),
+        local_object_dir=str(data_dir / "objects"),
+    )
+
+
+def test_container_builds(settings: Settings) -> None:
+    container = build_container(settings)
+    assert_minimum_viable(container)  # 不抛异常即为通过
+
+
+def test_orchestration_primitives_are_wired(settings: Settings) -> None:
+    container = build_container(settings)
+    for name in (
+        "event_bus_primitive",
+        "scheduler_primitive",
+        "notifier_primitive",
+        "state_store",
+        "agent_engine",
+        "workflow_engine",
+    ):
+        assert getattr(container, name) is not None, f"编排原语未装配：{name}"
+
+
+def test_business_service_depends_on_agent_engine(settings: Settings) -> None:
+    container = build_container(settings)
+    assert container.loop is not None
+    # loop 必须复用容器里的同一个 AgentEngine 实例，而不是自己 new 一个。
+    assert container.loop._agent is container.agent_engine
+
+
+def test_scheduler_gateway_can_publish(settings: Settings) -> None:
+    """调度器必须持有事件总线，否则主动事件（停滞检测）永远不触发。"""
+    container = build_container(settings)
+    assert container.scheduler._event_bus is container.event_bus
+
+
+def test_feature_flags_come_from_dynamic_resource(settings: Settings) -> None:
+    """功能开关必须来自动态资源，而不是代码里的常量（§3.1）。"""
+    container = build_container(settings)
+    flags = container.feature_flags.all()
+    assert flags.get("report_full_text") is True
+    assert flags.get("export") is False
+    assert "mentor" in flags
+
+
+def test_assembly_report_marks_pending_services(settings: Settings) -> None:
+    container = build_container(settings)
+    report = describe_assembly(container)
+
+    # 已实现的部分必须是 wired
+    assert report.orchestration["agent_engine"] == WIRED
+    assert report.services["loop"] == WIRED
+    assert report.gateways["llm"] == WIRED
+
+    # 业务服务与 Facade 第一期未实现，必须如实报 not_wired 而不是假装装好
+    assert report.services["orchestrator"] == NOT_WIRED
+    assert report.services["facade"] == NOT_WIRED
+    assert report.missing, "装配报告必须列出缺口"
+    assert not report.healthy
+
+
+def test_wire_application_returns_asgi_app(settings: Settings) -> None:
+    container = build_container(settings)
+    app = wire_application(container)
+    assert app.title.endswith("API")
+
+    # 路由已挂载：用 openapi 断言，避免依赖 starlette 内部的路由表示形式。
+    paths = set(app.openapi()["paths"])
+    assert "/healthz" in paths
+    assert "/app/bootstrap" in paths
+    assert "/app/task/enter" in paths

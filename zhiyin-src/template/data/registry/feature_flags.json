@@ -1,0 +1,11 @@
+{
+  "_note": "职引 · 功能开关（DEMO）。属动态资源：改本文件不需要发版。此前硬编码在 Settings.feature_flags 里，已改为本地 JSON 读取。第二期迁移到 feature_flag 表。",
+  "items": [
+    { "code": "report_full_text", "enabled": true },
+    { "code": "export", "enabled": false },
+    { "code": "calendar", "enabled": true },
+    { "code": "achievements", "enabled": true },
+    { "code": "mentor", "enabled": false },
+    { "code": "demo", "enabled": true }
+  ]
+}
