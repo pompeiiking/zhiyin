@@ -23,6 +23,7 @@ from zhiyin_data_sdk.gateways.ai import (
 )
 from zhiyin_data_sdk.gateways.cache import CacheGateway
 from zhiyin_data_sdk.gateways.db import Params, RawQueryGateway
+from zhiyin_data_sdk.gateways.feature_flag import FeatureFlagGateway
 from zhiyin_data_sdk.gateways.storage import ObjectStoreGateway, StoredObject
 from zhiyin_data_sdk.gateways.messaging import (
     EventBusGateway,
@@ -42,6 +43,7 @@ from zhiyin_data_sdk.gateways.vector import VectorGateway, VectorHit, VectorReco
 __all__ = [
     "CacheGateway",
     "EmbedGateway",
+    "FeatureFlagGateway",
     "KnowledgeGateway",
     "KnowledgeHit",
     "LLMGateway",

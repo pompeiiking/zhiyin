@@ -8,6 +8,7 @@ from zhiyin_api.controllers.app_controller import router as app_router
 from zhiyin_api.controllers.conversation_controller import router as conversation_router
 from zhiyin_api.controllers.workspace_controller import router as workspace_router
 from zhiyin_api.controllers.asset_controller import router as asset_router
+from zhiyin_api.controllers.track_controller import router as track_router
 
 # 全部路由清单：供 zhiyin-boot 统一挂载
 ROUTERS = [
@@ -15,6 +16,14 @@ ROUTERS = [
     conversation_router,
     workspace_router,
     asset_router,
+    track_router,
 ]
 
-__all__ = ["ROUTERS", "app_router", "conversation_router", "workspace_router", "asset_router"]
+__all__ = [
+    "ROUTERS",
+    "app_router",
+    "conversation_router",
+    "workspace_router",
+    "asset_router",
+    "track_router",
+]

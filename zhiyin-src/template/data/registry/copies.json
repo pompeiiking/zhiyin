@@ -1,0 +1,13 @@
+{
+  "_note": "职引 · 文案（DEMO）。属动态资源：改本文件不需要发版。前端不得硬编码展示文案，BFF 把整包下发给前端按 key 取用。note 字段写清口径来源与定稿程度；文案本身是候选稿，需真实用户语言化测试后再定稿。",
+  "items": [
+    { "code": "app.name", "text": "职引", "bundle": "zh-CN", "status": "enabled", "sort_order": 1, "note": "应用名" },
+    { "code": "home.tagline", "text": "用自己的话说清困惑，一步一步把方向走出来", "bundle": "zh-CN", "status": "enabled", "sort_order": 2, "note": "首页定位，用户视角，不列功能" },
+    { "code": "home.task_group_title", "text": "你现在最想解决的是哪件事？", "bundle": "zh-CN", "status": "enabled", "sort_order": 3, "note": "任务卡组标题" },
+    { "code": "conv.pipeline_title", "text": "微循环管线", "bundle": "zh-CN", "status": "enabled", "sort_order": 4, "note": "右栏管线卡标题" },
+    { "code": "wb.title", "text": "智能工作台", "bundle": "zh-CN", "status": "enabled", "sort_order": 5, "note": "工作台标题" },
+    { "code": "report.export_label", "text": "导出", "bundle": "zh-CN", "status": "enabled", "sort_order": 6, "note": "完整报告页导出按钮" },
+    { "code": "demo.data_notice", "text": "以下为演示数据，仅用于展示流程", "bundle": "zh-CN", "status": "enabled", "sort_order": 7, "note": "演示数据必须显式标注（第一期硬约束：不得出现真实敏感数据）" },
+    { "code": "mock.source_notice", "text": "本期为 Mock 产出，未接真实模型", "bundle": "zh-CN", "status": "enabled", "sort_order": 8, "note": "Mock 来源标注：不得让 Mock 结论被误读为真实能力（见《架构与代码结构评估》B5）" }
+  ]
+}

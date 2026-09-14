@@ -3,8 +3,8 @@
 对应 FR-ORCH-002。产品主线要求"现在是谁在帮我、依据什么"必须能回答，
 因此规则产出的 `LeadDecision.reason` 会被直接用于界面上的显式告知。
 
-轴 A 阶段判定信号尚未定稿（《技术架构文档》§十五待确认事项），
-定稿后在此实现，不要在 Orchestrator 里另写一份。
+轴 A 口径已定稿（《业务口径决策记录-v1.0》决策 1/2/3）：
+五段全量、规则优先 + LLM 兜底、单轨 + 会话路径焦点。
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from abc import ABC, abstractmethod
 
 from zhiyin_business.ports.blackboard import BlackboardView
 from zhiyin_business.ports.orchestrator import IntentType, LeadDecision
-from zhiyin_kernel.enums import LoopStage
+from zhiyin_kernel.enums import AxisAStage, LoopStage
 
 
 class LeadPolicy(ABC):
@@ -24,6 +24,7 @@ class LeadPolicy(ABC):
         self,
         *,
         blackboard: BlackboardView,
+        axis_a: AxisAStage,
         stage: LoopStage,
         intent: IntentType,
     ) -> LeadDecision:

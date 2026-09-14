@@ -1,7 +1,7 @@
 """Application Facade 实现（**骨架**，方法体未实现）。
 
 落位：`api/facade/application.py` —— 接口/前端联调负责人。
-依赖：业务层的 9 个服务 Port（只调不实现）+ DTO Mapper。
+依赖：业务层的服务 Port（只调不实现）+ `api/dto/mappers.py`。
 
 为什么它决定前端能否并行开工
 ----------------------------
@@ -12,7 +12,16 @@
 三条不越界的要求：
 - 不写业务规则（规则在 `business/policies/`，调用在 `business/services/`）；
 - 不直接访问 Repository / Gateway（只经业务服务）；
-- 只做"编排调用 + 模型 → DTO 转换"，转换逻辑集中在各 `dto/*.py` 的 Mapper。
+- 只做"编排调用 + 交给 Mapper"，字段映射全部在 `api/dto/mappers.py`；
+  本文件里不应出现 `XxxView(...)` 的直接构造。
+
+两个硬前置（构造时必须注入，否则 `/app/bootstrap` 无数据可返回）
+---------------------------------------------------------------
+- `IdentityService`：解析当前用户（api 拿不到 `AuthGateway`）；
+- `RegistryService`：菜单 / 路由 / 任务入口 / 文案 / 开关（api 拿不到 `RegistryRepository`）。
+
+两者都是"api 需要、契约却在 data_sdk"逼出来的业务侧出口，
+判据与决策见 `business/ports/identity.py` 与 `business/ports/registry.py` 的模块 docstring。
 
 装配：`zhiyin_boot.wire_application()` 在启动时调用
 `configure_facade(DefaultApplicationFacade(...))`；未装配时 `get_facade()` 抛
@@ -40,8 +49,10 @@ from zhiyin_api.dto.conversation import (
     TaskSessionView,
 )
 from zhiyin_api.dto.workspace import WorkspacePageView
+from zhiyin_api.dto.track import TrackEventAck, TrackEventRequest
 from zhiyin_api.facade.facade import ApplicationFacade
 from zhiyin_business.ports.identity import IdentityService
+from zhiyin_business.ports.registry import RegistryService
 from zhiyin_kernel.enums import AssetType
 
 _TODO = "TODO(骨架): ApplicationFacade 未实现"
@@ -52,17 +63,21 @@ class DefaultApplicationFacade(ApplicationFacade):
 
     IMPLEMENTATION_STATUS = "skeleton"
 
-    def __init__(self, *, identity: IdentityService) -> None:
+    def __init__(self, *, identity: IdentityService, registry: RegistryService) -> None:
         """构造依赖由 boot 注入。
 
         身份解析走业务 Port：api 被禁止 import `zhiyin_data_sdk`，拿不到
         `AuthGateway`；由 `DefaultIdentityService` 把它包成业务抽象
         （决策见 `business/ports/identity.py` 的模块 docstring）。
 
+        动态资源同理：菜单 / 路由 / 任务入口 / 文案 / 开关经
+        `DefaultRegistryService` 取（`business/ports/registry.py`）。
+
         `resolve_user_id` 的职责边界：**只做 HTTP → 业务形状的翻译**
         （从请求里取 token），用户记录的补齐、游客会话、登录合并都在业务侧。
         """
         self._identity = identity
+        self._registry = registry
 
     # ---------- 身份 ----------
 
@@ -74,7 +89,10 @@ class DefaultApplicationFacade(ApplicationFacade):
     # ---------- 启动 ----------
 
     def bootstrap(self, user_id: str) -> BootstrapView:
-        raise NotImplementedError(f"{_TODO}：菜单 / 路由 / 任务入口 / 文案 / 功能开关")
+        raise NotImplementedError(
+            f"{_TODO}：RegistryService 取数（菜单 / 路由 / 任务入口 / 文案 / "
+            "横幅 / 信任块 / FAQ / 开关）→ mappers.bootstrap_view"
+        )
 
     # ---------- 对话 ----------
 
@@ -108,6 +126,15 @@ class DefaultApplicationFacade(ApplicationFacade):
 
     async def export_asset(self, user_id: str, body: ExportRequest) -> ExportResultView:
         raise NotImplementedError(f"{_TODO}：导出（第一期占位）")
+
+    # ---------- 埋点 ----------
+
+    async def track_event(
+        self, user_id: str, body: TrackEventRequest
+    ) -> TrackEventAck:
+        raise NotImplementedError(
+            f"{_TODO}：RegistryService 校验 frontend 事件 → 落库（口径待定）"
+        )
 
 
 __all__ = ["DefaultApplicationFacade"]

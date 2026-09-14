@@ -1,0 +1,1805 @@
+{
+  "components": {
+    "schemas": {
+      "ApiResponse_BootstrapView_": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BootstrapView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[BootstrapView]",
+        "type": "object"
+      },
+      "ApiResponse_ConversationTurnView_": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConversationTurnView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[ConversationTurnView]",
+        "type": "object"
+      },
+      "ApiResponse_ExportResultView_": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExportResultView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[ExportResultView]",
+        "type": "object"
+      },
+      "ApiResponse_ReportFullTextView_": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReportFullTextView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[ReportFullTextView]",
+        "type": "object"
+      },
+      "ApiResponse_SessionListView_": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionListView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[SessionListView]",
+        "type": "object"
+      },
+      "ApiResponse_TaskSessionView_": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskSessionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[TaskSessionView]",
+        "type": "object"
+      },
+      "ApiResponse_TrackEventAck_": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrackEventAck"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[TrackEventAck]",
+        "type": "object"
+      },
+      "ApiResponse_WorkspacePageView_": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkspacePageView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[WorkspacePageView]",
+        "type": "object"
+      },
+      "ApiResponse_list_AssetVersionView__": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AssetVersionView"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[list[AssetVersionView]]",
+        "type": "object"
+      },
+      "AssetType": {
+        "description": "资产类型。影响面传播的最小单位。",
+        "enum": [
+          "report",
+          "direction_plan",
+          "action_plan"
+        ],
+        "title": "AssetType",
+        "type": "string"
+      },
+      "AssetVersionView": {
+        "additionalProperties": false,
+        "description": "资产版本视图（R-API-005）。前端据此展示\"v1→v2 的差异\"。",
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "asset_type": {
+            "$ref": "#/components/schemas/AssetType"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "depends_on_profile_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Depends On Profile Keys",
+            "type": "array"
+          },
+          "diff_from_previous": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diff From Previous"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "asset_type",
+          "asset_id",
+          "version",
+          "created_at"
+        ],
+        "title": "AssetVersionView",
+        "type": "object"
+      },
+      "BannerView": {
+        "additionalProperties": false,
+        "description": "横幅 / 运营位（可上下线、可排序）。",
+        "properties": {
+          "action_label": {
+            "default": "",
+            "title": "Action Label",
+            "type": "string"
+          },
+          "action_route": {
+            "default": "",
+            "title": "Action Route",
+            "type": "string"
+          },
+          "body": {
+            "default": "",
+            "title": "Body",
+            "type": "string"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "title"
+        ],
+        "title": "BannerView",
+        "type": "object"
+      },
+      "BootstrapView": {
+        "additionalProperties": false,
+        "description": "启动装配视图。",
+        "properties": {
+          "app_name": {
+            "default": "",
+            "description": "应用名，取自动态文案 app.name；为空表示文案包缺失",
+            "title": "App Name",
+            "type": "string"
+          },
+          "banners": {
+            "description": "横幅 / 运营位",
+            "items": {
+              "$ref": "#/components/schemas/BannerView"
+            },
+            "title": "Banners",
+            "type": "array"
+          },
+          "copy_bundle": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "文案包（key → text），前端按 key 取用，不从后端解析自然语言",
+            "title": "Copy Bundle",
+            "type": "object"
+          },
+          "faqs": {
+            "description": "常见问题",
+            "items": {
+              "$ref": "#/components/schemas/FaqView"
+            },
+            "title": "Faqs",
+            "type": "array"
+          },
+          "feature_flags": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "description": "功能开关：导出/导师/演示等",
+            "title": "Feature Flags",
+            "type": "object"
+          },
+          "identity": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "当前身份：role / nickname / avatar",
+            "title": "Identity",
+            "type": "object"
+          },
+          "menus": {
+            "items": {
+              "$ref": "#/components/schemas/MenuView"
+            },
+            "title": "Menus",
+            "type": "array"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/RouteView"
+            },
+            "title": "Routes",
+            "type": "array"
+          },
+          "task_entries": {
+            "items": {
+              "$ref": "#/components/schemas/TaskEntryView"
+            },
+            "title": "Task Entries",
+            "type": "array"
+          },
+          "trust_blocks": {
+            "description": "信任区：第一条为主线，其余为可展开示例",
+            "items": {
+              "$ref": "#/components/schemas/TrustBlockView"
+            },
+            "title": "Trust Blocks",
+            "type": "array"
+          }
+        },
+        "title": "BootstrapView",
+        "type": "object"
+      },
+      "ConversationMessageView": {
+        "additionalProperties": false,
+        "description": "对话气泡。",
+        "properties": {
+          "agent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Id"
+          },
+          "agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Name"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "role": {
+            "enum": [
+              "agent",
+              "user",
+              "system"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "theory_refs": {
+            "description": "可点开的理论标签",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Theory Refs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "role",
+          "text"
+        ],
+        "title": "ConversationMessageView",
+        "type": "object"
+      },
+      "ConversationTurnView": {
+        "additionalProperties": false,
+        "description": "一轮回复的完整视图。\n\n对应架构文档 §5 的调用链返回：最短结论 + 显式告知 + 行为引导 + 管线卡。",
+        "properties": {
+          "badge": {
+            "additionalProperties": true,
+            "description": "顶栏主理徽章：agent_id/name/依据",
+            "title": "Badge",
+            "type": "object"
+          },
+          "changed_assets": {
+            "description": "本轮变化的资产版本，用于工作台刷新",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Changed Assets",
+            "type": "array"
+          },
+          "disclosure": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "换主理/换理论/结论变化的显式告知行",
+            "title": "Disclosure"
+          },
+          "guide": {
+            "additionalProperties": true,
+            "description": "行为引导：question/options/task/reminder 四选一",
+            "title": "Guide",
+            "type": "object"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationMessageView"
+            },
+            "title": "Messages",
+            "type": "array"
+          },
+          "pipeline_cards": {
+            "items": {
+              "$ref": "#/components/schemas/PipelineCardView"
+            },
+            "title": "Pipeline Cards",
+            "type": "array"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/LoopStage"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "stage"
+        ],
+        "title": "ConversationTurnView",
+        "type": "object"
+      },
+      "DependencyEdgeView": {
+        "additionalProperties": false,
+        "description": "依赖可视化（FR-WB-005 简版）。",
+        "properties": {
+          "from_asset": {
+            "title": "From Asset",
+            "type": "string"
+          },
+          "to_asset": {
+            "title": "To Asset",
+            "type": "string"
+          },
+          "via_profile_keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Via Profile Keys",
+            "type": "array"
+          }
+        },
+        "required": [
+          "from_asset",
+          "to_asset"
+        ],
+        "title": "DependencyEdgeView",
+        "type": "object"
+      },
+      "ErrorCode": {
+        "description": "统一错误码。前端据此提示，不解析后端文案。",
+        "enum": [
+          0,
+          1001,
+          1002,
+          1003,
+          1004,
+          1005,
+          1006,
+          1007,
+          1999
+        ],
+        "title": "ErrorCode",
+        "type": "integer"
+      },
+      "ExportRequest": {
+        "additionalProperties": false,
+        "description": "导出请求。",
+        "properties": {
+          "asset_type": {
+            "$ref": "#/components/schemas/AssetType"
+          },
+          "format": {
+            "default": "pdf",
+            "enum": [
+              "pdf",
+              "docx"
+            ],
+            "title": "Format",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_type"
+        ],
+        "title": "ExportRequest",
+        "type": "object"
+      },
+      "ExportResultView": {
+        "additionalProperties": false,
+        "description": "导出结果。第一期 available 恒 False，仅预留入口。",
+        "properties": {
+          "available": {
+            "default": false,
+            "title": "Available",
+            "type": "boolean"
+          },
+          "message": {
+            "default": "第一期仅预留导出入口",
+            "title": "Message",
+            "type": "string"
+          },
+          "object_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Object Key"
+          }
+        },
+        "title": "ExportResultView",
+        "type": "object"
+      },
+      "FaqView": {
+        "additionalProperties": false,
+        "description": "常见问题。",
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "question",
+          "answer"
+        ],
+        "title": "FaqView",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "LoopStage": {
+        "description": "轴 B · 服务微循环五环节。",
+        "enum": [
+          "collect",
+          "diagnose",
+          "decide",
+          "act",
+          "review"
+        ],
+        "title": "LoopStage",
+        "type": "string"
+      },
+      "MenuView": {
+        "additionalProperties": false,
+        "description": "顶层导航项。仅\"首页 / 核心对话页 / 智能工作台\"三条主线。",
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "route": {
+            "title": "Route",
+            "type": "string"
+          },
+          "sort_order": {
+            "default": 0,
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "visible": {
+            "default": true,
+            "title": "Visible",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "route"
+        ],
+        "title": "MenuView",
+        "type": "object"
+      },
+      "MessageRequest": {
+        "additionalProperties": false,
+        "description": "一轮用户输入。支持会话续接（R-API-003）。",
+        "properties": {
+          "client_msg_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "前端幂等键",
+            "title": "Client Msg Id"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "message"
+        ],
+        "title": "MessageRequest",
+        "type": "object"
+      },
+      "PipelineCardView": {
+        "additionalProperties": false,
+        "description": "右栏管线卡（①-⑤ 每环节一卡）。\n\n三态：当前产出 / 可展开理论模型 / 可展开评价状态。",
+        "properties": {
+          "active": {
+            "default": false,
+            "description": "是否为当前环节，前端高亮",
+            "title": "Active",
+            "type": "boolean"
+          },
+          "current_output": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "态①：当前产出摘要",
+            "title": "Current Output"
+          },
+          "evaluation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "态③：可展开的评价状态",
+            "title": "Evaluation"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/LoopStage"
+          },
+          "status": {
+            "default": "empty",
+            "enum": [
+              "empty",
+              "in_progress",
+              "done"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "theory_models": {
+            "description": "态②：可展开的理论模型",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Theory Models",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage",
+          "title"
+        ],
+        "title": "PipelineCardView",
+        "type": "object"
+      },
+      "ProfilePanelView": {
+        "additionalProperties": false,
+        "description": "① 画像状态：字段覆盖度 / 置信度 / 缺口 / 更新时间。",
+        "properties": {
+          "coverage": {
+            "default": 0.0,
+            "description": "字段覆盖度",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Coverage",
+            "type": "number"
+          },
+          "fields": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "gaps": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "overall_confidence": {
+            "default": 0.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Overall Confidence",
+            "type": "number"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "title": "ProfilePanelView",
+        "type": "object"
+      },
+      "ReportFullTextView": {
+        "additionalProperties": false,
+        "description": "完整报告页正文（只读资产视图，不承载实时对话）。",
+        "properties": {
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "report_id": {
+            "title": "Report Id",
+            "type": "string"
+          },
+          "sections": {
+            "description": "15 维全景 / 方案 / 行动计划 / 个人画像",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "toc": {
+            "description": "左侧目录导航",
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Toc",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "report_id",
+          "version",
+          "generated_at"
+        ],
+        "title": "ReportFullTextView",
+        "type": "object"
+      },
+      "RouteView": {
+        "additionalProperties": false,
+        "description": "前端路由。",
+        "properties": {
+          "page_code": {
+            "description": "页面锚点口径，如 screen-home / screen-conv",
+            "title": "Page Code",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "require_login": {
+            "default": false,
+            "title": "Require Login",
+            "type": "boolean"
+          },
+          "sort_order": {
+            "default": 0,
+            "title": "Sort Order",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path",
+          "page_code"
+        ],
+        "title": "RouteView",
+        "type": "object"
+      },
+      "SessionListView": {
+        "additionalProperties": false,
+        "description": "左栏会话列表。",
+        "properties": {
+          "current_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Task Id"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/TaskSessionView"
+            },
+            "title": "Sessions",
+            "type": "array"
+          }
+        },
+        "title": "SessionListView",
+        "type": "object"
+      },
+      "StagePanelView": {
+        "additionalProperties": false,
+        "description": "②-⑤ 的节点卡。三态：当前评价 / 理论模型 / 历史 diff。",
+        "properties": {
+          "diff": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "差异说明，如「因更新了 X，v1→v2 的变化」",
+            "title": "Diff"
+          },
+          "evaluation": {
+            "default": "",
+            "title": "Evaluation",
+            "type": "string"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/LoopStage"
+          },
+          "theory_models": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Theory Models",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "stage",
+          "title"
+        ],
+        "title": "StagePanelView",
+        "type": "object"
+      },
+      "TaskEnterRequest": {
+        "additionalProperties": false,
+        "description": "进入任务（FR-HOME-002）。task_code 取自 bootstrap 的任务入口。",
+        "properties": {
+          "task_code": {
+            "title": "Task Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_code"
+        ],
+        "title": "TaskEnterRequest",
+        "type": "object"
+      },
+      "TaskEntryView": {
+        "additionalProperties": false,
+        "description": "首页任务入口（FR-HOME-001）。文案必须用\"用户自己的话\"。",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "lead_agent_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "开场主理展示名",
+            "title": "Lead Agent Name"
+          },
+          "sort_order": {
+            "default": 0,
+            "title": "Sort Order",
+            "type": "integer"
+          },
+          "target_stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoopStage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "为空表示走「直接开聊」，由编排器判定入口"
+          }
+        },
+        "required": [
+          "code",
+          "label"
+        ],
+        "title": "TaskEntryView",
+        "type": "object"
+      },
+      "TaskSessionView": {
+        "additionalProperties": false,
+        "description": "左栏会话项。按\"任务/环节\"命名，不按 agent 名排布（FR-CONV-003）。",
+        "properties": {
+          "last_active_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Active At"
+          },
+          "lead_agent_name": {
+            "default": "",
+            "title": "Lead Agent Name",
+            "type": "string"
+          },
+          "progress": {
+            "default": 0.0,
+            "description": "闭环进度",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Progress",
+            "type": "number"
+          },
+          "stage": {
+            "$ref": "#/components/schemas/LoopStage"
+          },
+          "stage_label": {
+            "description": "环节中文名，用于左栏命名",
+            "title": "Stage Label",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus",
+            "default": "active"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "task_name": {
+            "title": "Task Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "task_name",
+          "stage",
+          "stage_label"
+        ],
+        "title": "TaskSessionView",
+        "type": "object"
+      },
+      "TaskStatus": {
+        "description": "任务会话状态。",
+        "enum": [
+          "active",
+          "paused",
+          "completed"
+        ],
+        "title": "TaskStatus",
+        "type": "string"
+      },
+      "TrackEventAck": {
+        "additionalProperties": false,
+        "description": "上报确认。第一期只确认接收，不返回处理详情。",
+        "properties": {
+          "accepted": {
+            "default": true,
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event"
+        ],
+        "title": "TrackEventAck",
+        "type": "object"
+      },
+      "TrackEventRequest": {
+        "additionalProperties": false,
+        "description": "一次前端埋点上报。",
+        "properties": {
+          "client_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "前端幂等键，用于去重",
+            "title": "Client Event Id"
+          },
+          "event": {
+            "description": "事件名，来自 data/registry/track_events.json",
+            "title": "Event",
+            "type": "string"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "description": "事件属性",
+            "title": "Payload",
+            "type": "object"
+          }
+        },
+        "required": [
+          "event"
+        ],
+        "title": "TrackEventRequest",
+        "type": "object"
+      },
+      "TrustBlockView": {
+        "additionalProperties": false,
+        "description": "信任背书块（FR-HOME-005）。只讲一条主线，可点开方法论示例。",
+        "properties": {
+          "body": {
+            "default": "",
+            "title": "Body",
+            "type": "string"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "expandable_ref": {
+            "default": "",
+            "description": "可展开内容的引用键，空为纯文本",
+            "title": "Expandable Ref",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "title"
+        ],
+        "title": "TrustBlockView",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WorkspacePageView": {
+        "additionalProperties": false,
+        "description": "工作台聚合视图。",
+        "properties": {
+          "action_panel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StagePanelView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "④ 计划与日历"
+          },
+          "axis_a_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "轴 A 阶段过滤依据（FR-WB-004）",
+            "title": "Axis A Stage"
+          },
+          "blocks": {
+            "additionalProperties": true,
+            "description": "功能块入口与静态数据（FR-WB-007）",
+            "title": "Blocks",
+            "type": "object"
+          },
+          "coach_messages": {
+            "description": "教练消息汇总（FR-WB-006）",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Coach Messages",
+            "type": "array"
+          },
+          "dependencies": {
+            "items": {
+              "$ref": "#/components/schemas/DependencyEdgeView"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "plan_panel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StagePanelView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "③ 方案"
+          },
+          "profile_panel": {
+            "$ref": "#/components/schemas/ProfilePanelView"
+          },
+          "report_panel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StagePanelView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "② 诊断与报告"
+          },
+          "review_panel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StagePanelView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "⑤ 跟踪与预警"
+          }
+        },
+        "title": "WorkspacePageView",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "职引 API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/app/assets/export": {
+      "post": {
+        "description": "导出资产。第一期仅预留入口，available 恒 False。",
+        "operationId": "export_asset_api_v1_app_assets_export_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ExportResultView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Asset",
+        "tags": [
+          "asset"
+        ]
+      }
+    },
+    "/api/v1/app/assets/{asset_type}/versions": {
+      "get": {
+        "description": "资产历史版本列表，含 depends_on 与 diff。",
+        "operationId": "list_asset_versions_api_v1_app_assets__asset_type__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "asset_type",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AssetType"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_list_AssetVersionView__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Asset Versions",
+        "tags": [
+          "asset"
+        ]
+      }
+    },
+    "/api/v1/app/bootstrap": {
+      "get": {
+        "description": "启动装配：菜单 / 路由 / 任务入口 / 文案 / 功能开关。\n\n前端启动只请求一次即可渲染首页。",
+        "operationId": "bootstrap_api_v1_app_bootstrap_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_BootstrapView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Bootstrap",
+        "tags": [
+          "app"
+        ]
+      }
+    },
+    "/api/v1/app/conversation/message": {
+      "post": {
+        "description": "发送一轮消息，返回最短结论 + 显式告知 + 行为引导 + 管线卡。",
+        "operationId": "send_message_api_v1_app_conversation_message_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ConversationTurnView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Send Message",
+        "tags": [
+          "conversation"
+        ]
+      }
+    },
+    "/api/v1/app/report/full-text": {
+      "get": {
+        "description": "完整报告页正文。只读资产版本，不重新生成。",
+        "operationId": "get_report_full_text_api_v1_app_report_full_text_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ReportFullTextView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Report Full Text",
+        "tags": [
+          "asset"
+        ]
+      }
+    },
+    "/api/v1/app/sessions": {
+      "get": {
+        "description": "左栏会话列表（并行任务会话，按任务/环节命名）。",
+        "operationId": "list_sessions_api_v1_app_sessions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_SessionListView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Sessions",
+        "tags": [
+          "conversation"
+        ]
+      }
+    },
+    "/api/v1/app/task/enter": {
+      "post": {
+        "description": "从首页任务入口进入微循环。\n\n编排器判定目标环节与主理；已存在进行中的同一任务时执行\"续接\"而非重建。",
+        "operationId": "enter_task_api_v1_app_task_enter_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskEnterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TaskSessionView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enter Task",
+        "tags": [
+          "conversation"
+        ]
+      }
+    },
+    "/api/v1/app/track": {
+      "post": {
+        "description": "前端上报一条埋点事件。",
+        "operationId": "track_event_api_v1_app_track_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrackEventRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TrackEventAck_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Track Event",
+        "tags": [
+          "track"
+        ]
+      }
+    },
+    "/api/v1/app/workspace": {
+      "get": {
+        "description": "工作台聚合视图：画像 / 报告 / 方案 / 计划 / 跟踪 + 功能块。\n\n进入工作台属于持久化行为，游客在此处被登录拦截（PRD §5.3）。",
+        "operationId": "get_workspace_api_v1_app_workspace_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_WorkspacePageView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Workspace",
+        "tags": [
+          "workspace"
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Healthz Healthz Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "装配健康检查",
+        "tags": [
+          "ops"
+        ]
+      }
+    }
+  }
+}

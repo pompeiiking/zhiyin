@@ -33,12 +33,23 @@ python -m zhiyin_boot --check --strict   # 全绿门禁：有部件未装配则�
 python -m zhiyin_boot            # http://127.0.0.1:8000/api/v1/docs
 ```
 
+接口契约快照（后端改字段后跑一次，前端类型由它生成）：
+
+```bash
+python scripts/export_openapi.py           # 按代码现状覆盖 contracts/openapi.json
+python scripts/export_openapi.py --check   # 只校验，不一致退出 1（CI 用）
+cd zhiyin-web && npm run gen:api           # 契约快照 → src/api/types.ts（生成物，不要手改）
+```
+
 验证装配：
 
 ```bash
-curl http://127.0.0.1:8000/healthz                      # 运维探针（不随版本变化）
+curl -i http://127.0.0.1:8000/healthz                   # 运维探针（不随版本变化；响应头带 X-Trace-Id）
 curl http://127.0.0.1:8000/api/v1/app/bootstrap          # 业务接口（Facade 未装 → 503）
 ```
+
+`X-Trace-Id` 由 `zhiyin_api/context.py` 生成（上游带了合法值就沿用），并同时写进响应头与
+统一信封的 `trace_id`——这是"前端看到的错"与"后端日志"能对上的唯一凭据。生成点全站只有一处。
 
 ## 接口前缀：只有一个地方拼 `/api/v1`
 
@@ -50,7 +61,7 @@ curl http://127.0.0.1:8000/api/v1/app/bootstrap          # 业务接口（Facade
 | Controller 路由 | `@router.get("/app/bootstrap")` | `@router.get("/api/v1/app/bootstrap")` |
 | 前端 | `VITE_API_BASE_URL=/api/v1` + `url: '/app/bootstrap'` | baseURL 再拼一次 `/v1` |
 | 反向代理 / 网关 | 原样转发 | 再加一层 `/v1` |
-| 抓 OpenAPI | `/api/v1/openapi.json`（`npm run gen:api` 已指向它） | 手写前缀 |
+| 抓 OpenAPI | `python scripts/export_openapi.py` → `contracts/openapi.json`（或运行时 `GET /api/v1/openapi.json`）；前端 `npm run gen:api` 读的是这份快照 | 手写前缀、手改 `src/api/types.ts` |
 
 唯一的例外是 `/healthz`：运维探针不随 API 版本变化，故意留在版本命名空间之外。
 `tests/test_api_prefix.py` 会拦住"路由里再写一次 v1"和"重复嵌套版本段"。
@@ -64,25 +75,29 @@ curl http://127.0.0.1:8000/api/v1/app/bootstrap          # 业务接口（Facade
 pytest
 ```
 
-不安装也能跑：`pyproject.toml` 里已通过 `pythonpath` 配好六个源码目录。
+不安装也能跑：`pyproject.toml` 里已通过 `pythonpath` 配好七个源码目录
+（kernel / api / business / orchestration / data-sdk / infrastructure / boot）。
 
 ## 目录结构
 
 | 目录 | 包名 | 职责 | 只允许依赖 |
 | --- | --- | --- | --- |
-| `zhiyin-kernel/` | `zhiyin_kernel` | 共享内核：跨层枚举、画像 / 资产 / 身份 / 动态资源数据形状 | 无（零依赖） |
-| `zhiyin-api/` | `zhiyin_api` | Controller / DTO / Application Facade | `zhiyin_business`、`zhiyin_kernel` |
-| `zhiyin-business/` | `zhiyin_business` | `ports/`（接口）· `policies/`（规则）· `services/`（实现）· `workers/`（异步） | `zhiyin_orchestration`、`zhiyin_data_sdk`、`zhiyin_kernel` |
+| `zhiyin-kernel/` | `zhiyin_kernel` | 共享内核：跨层枚举、画像 / 资产 / 身份 / 动态资源与前端页面内容的数据形状 | 无（零依赖） |
+| `zhiyin-api/` | `zhiyin_api` | Controller / DTO / `dto/mappers.py`（字段转换唯一处）/ Application Facade | `zhiyin_business`、`zhiyin_kernel` |
+| `zhiyin-business/` | `zhiyin_business` | `ports/`（接口，含 api 的两个取数出口）· `policies/`（规则）· `services/`（实现）· `workers/`（异步） | `zhiyin_orchestration`、`zhiyin_data_sdk`、`zhiyin_kernel` |
 | `zhiyin-orchestration/` | `zhiyin_orchestration` | Agent / Workflow / EventBus / Schedule / State / Notify | `zhiyin_data_sdk`、`zhiyin_kernel` |
 | `zhiyin-data-sdk/` | `zhiyin_data_sdk` | Repository / Gateway / Transaction 抽象（全部 async） | `zhiyin_kernel` |
-| `zhiyin-infrastructure/` | `zhiyin_infrastructure` | local / pami / MySQL 适配器 | `zhiyin_data_sdk`、`zhiyin_kernel` |
+| `zhiyin-infrastructure/` | `zhiyin_infrastructure` | 第一期实现（`local/`）+ 替换点抽屉（`mysql/` `redis/` `pgvector/` `kafka/` `pami/` `workers/`，有清单无实现） | `zhiyin_data_sdk`、`zhiyin_kernel` |
 | `zhiyin-boot/` | `zhiyin_boot` | 装配（`container/`）、报告与门禁（`report.py`）、CLI | 全部 |
 | `zhiyin-web/` | — | Vue 3 + Vite 前端（第一期骨架） | — |
-| `data/` | — | 第一期动态资源与本地存储（JSON / 对象目录） | — |
+| `data/` | — | 第一期动态资源与本地存储（JSON / 对象目录）。`registry/` 下每一类内容改一个 JSON 即可生效，不需要发版 | — |
+| `contracts/` | — | 接口契约快照（`openapi.json`）：由代码导出，前端类型由它生成，`test_api_contract.py` 守"代码 == 快照" | — |
+| `scripts/` | — | 工程脚本（`export_openapi.py` 导出 / 校验契约快照） | — |
+| `tests/` | — | 架构守卫 · 落位守卫 · 文档守卫 · Port 契约测试 · `e2e/`（五环节主路径） | — |
 
 依赖方向由 `tests/test_architecture.py` 用 AST 静态校验，违反即测试失败。
 
-## 两条容易踩的约定
+## 容易踩的约定
 
 1. **编排层没有第二套契约。** 事件 / 调度 / 通知只有一套语义契约（`zhiyin_orchestration`，
    业务层面向它编程，带信封与幂等）和一套传输契约（`zhiyin_data_sdk.gateways`，
@@ -95,6 +110,11 @@ pytest
    `/healthz` 与 `--check` 据此如实标注，不允许"看起来装好了其实没实现"。
 5. **同一能力只有一处定义。** 共享形状在 `zhiyin_kernel`，数据访问契约在 `data_sdk`，
    业务规则在 `policies/`；同名影子定义会被架构守卫拒绝。
+6. **trace id 只有一处生成。** 生成点是 `zhiyin_api/context.py`（由 `create_app` 挂载），
+   信封 `trace_id` 由它兜底填充。另造一个"自己的 trace"会让响应头与日志对不上。
+7. **生成物不要手改。** `contracts/openapi.json` 与 `zhiyin-web/src/api/types.ts`
+   分别由 `python scripts/export_openapi.py` 与 `npm run gen:api` 生成；
+   改字段的正确顺序是"改 DTO / Mapper → 重新生成"，冲突时重新生成而不是手工合并。
 
 ## 第一期实现边界
 
@@ -104,7 +124,8 @@ pytest
 
 外壳已铺完整（**文件存在 ≠ 能力具备**）：Orchestrator、黑板四件套服务
 （Profile / Behavior / ConversationMemory / Asset）、Workspace / Function Service、
-Identity Service、Application Facade、两个 Worker（影响面传播 / 停滞干预）都已落为**类骨架**——
+Identity / Registry Service、Application Facade、两个业务 Worker（影响面传播 / 停滞干预）
+与一个数据管道 Worker（向量同步）都已落为**类骨架**——
 签名按 `zhiyin_business/ports/` 冻结、方法体 `raise NotImplementedError`、
 类上自报 `IMPLEMENTATION_STATUS = "skeleton"`，且**不进装配表**。
 因此 `/healthz` 与 `--check` 仍把它们如实报成 `not_wired`（见 `assembly.missing`），
@@ -114,6 +135,25 @@ Identity Service、Application Facade、两个 Worker（影响面传播 / 停滞
 
 `--check` 的输出里有两个不同的缺口清单：`missing` 是"能力位没人管"，
 `skeletons` 是"外壳就位、实现待补"——本期进度看后者。
+
+> **两个硬前置**：`identity_service`（我是谁）与 `registry_service`（页面长什么样）。
+> `/app/bootstrap` 没有它们就没有任何数据可返回，前端也连不上；
+> 它们都是"api 需要、契约却在 data_sdk"逼出来的业务侧出口，判据见
+> `business/ports/registry.py` 的模块 docstring。
+
+## 团队分工与并行
+
+| 想做的事 | 先看 |
+| --- | --- |
+| 认领一个业务服务 | `zhiyin_business/services/__init__.py` 的落位表（一人一列） |
+| 认领一个前端页面 / 组件 | `zhiyin-web/README.md` 的页面 → 组件 → 接口落位表 |
+| 改一个页面字段 | `api/dto/mappers.py`（字段口径唯一处），不要改 Facade 里的字段拼接 |
+| 加一条任务入口 / 文案 / 开关 | 只改 `data/registry/*.json`，不发版 |
+| 换 MySQL / Redis / pgvector / Kafka | `zhiyin_boot/container/` 装配表 + 对应抽屉（`infrastructure/{mysql,redis,pgvector,kafka}/`）+ 过 `tests/contracts/` |
+| 改接口字段 | `api/dto/*.py` + `dto/mappers.py` → `python scripts/export_openapi.py` → `cd zhiyin-web && npm run gen:api` |
+
+完整分工与剩余缺口见仓根 `docs/评审/职引-架构与结构评估-最终版.md`（唯一当前状态）
+与 `docs/评审/业务口径决策记录-v1.0.md`（16 项业务口径定稿基线）。
 
 ## 切换外部依赖
 
@@ -125,3 +165,4 @@ Identity Service、Application Facade、两个 Worker（影响面传播 / 停滞
 | `ZHIYIN_USE_PAMI_LLM` / `_KNOWLEDGE` / `_AUTH` | 切换 pami 适配器（骨架，首次调用会明确报未实现，不静默回落） |
 | `ZHIYIN_DATA_DIR` / `_REGISTRY_DIR` / `_KNOWLEDGE_DIR` / `_OBJECT_DIR` | 本地存储位置 |
 | `ZHIYIN_LLM_PROVIDER` | 置空走 Mock（按产出契约 Schema 合成合法结果） |
+| `ZHIYIN_MOCK` | 前端联调开关（决策 15）：置 1 时 boot 装配 `MockApplicationFacade`；该替身目前是骨架，实现完成后启用 |

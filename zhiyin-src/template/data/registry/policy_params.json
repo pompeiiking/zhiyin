@@ -1,12 +1,42 @@
 {
-  "_note": "职引 · 业务规则参数（DEMO）。属动态资源：调阈值不需要发版。业务规则是代码（zhiyin_business/policies/），但规则的参数必须来自这里，不得写死在 Settings 或规则实现里。status=draft 表示参数仍在业务评审中，实现者不得当成已确认口径；定稿后改 confirmed。",
+  "_note": "职引 · 业务规则参数（DEMO）。属动态资源：调阈值不需要发版。业务规则是代码（zhiyin_business/policies/），规则的参数必须来自这里，不得写死在 Settings 或规则实现里。status=confirmed 表示口径已由《业务口径决策记录-v1.0》拍板。",
   "items": [
     {
       "code": "intervention",
-      "status": "draft",
-      "note": "《技术架构文档》§十五 待确认事项 14：主动干预参数需业务定稿。stall_threshold_days=3 是本期已有的默认值，从 zhiyin_boot Settings 原样迁出；cooldown_hours 与 max_notifications_per_window 尚未定稿，定稿前不要在此填猜测值，实现方按「未配置即不打扰」处理。",
+      "status": "confirmed",
+      "note": "决策 6=A：停滞 3 天无关键动作、同一条提醒冷却 48 小时、任意 7 天窗口最多 2 次。有动作 = 作答 / 认领差距 / 选择方案 / 勾任务 / 更新画像；纯浏览不算。",
       "value": {
-        "stall_threshold_days": 3
+        "stall_threshold_days": 3,
+        "cooldown_hours": 48,
+        "max_notifications_per_window": 2,
+        "window_days": 7
+      }
+    },
+    {
+      "code": "profile_collection",
+      "status": "confirmed",
+      "note": "决策 5=A：关键字段覆盖 + 加权平均。覆盖率 80% 且整体置信度 ≥ 0.7 才算采集完成；缺口 = 未覆盖或置信度 < 0.6 的关键字段，按缺口决定追问顺序。",
+      "value": {
+        "key_fields": [
+          "career_interest",
+          "ability_strength",
+          "value_anchor",
+          "target_direction",
+          "decision_window",
+          "real_constraint"
+        ],
+        "coverage_threshold": 0.8,
+        "overall_confidence_threshold": 0.7,
+        "gap_confidence_floor": 0.6
+      }
+    },
+    {
+      "code": "routing",
+      "status": "confirmed",
+      "note": "决策 4=A：意图不确定时温和追问一次，连续两次仍不确定回落 ① 采集；用户明确纠正时允许进入指定环节。",
+      "value": {
+        "clarify_attempts": 1,
+        "fallback_stage": "collect"
       }
     }
   ]

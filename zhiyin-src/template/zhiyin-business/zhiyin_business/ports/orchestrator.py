@@ -20,7 +20,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from zhiyin_kernel.blackboard import AssetVersion, TaskSession
-from zhiyin_kernel.enums import LoopStage
+from zhiyin_kernel.enums import AxisAStage, LoopStage
 from zhiyin_business.contracts.common import (
     AgentBadge,
     BehaviorGuide,
@@ -136,8 +136,22 @@ class Orchestrator(ABC):
         """判定目标环节（轴 B）。"""
 
     @abstractmethod
+    async def infer_axis_a(self, user_id: str, task_id: str) -> AxisAStage:
+        """推断轴 A 阶段。
+
+        口径（《业务口径决策记录-v1.0》决策 1/2）：五段全量，
+        "规则优先 + LLM 兜底"。规则写在 `policies/`，本方法只负责调规则、
+        必要时走模型兜底；**前台不让用户自选阶段**。
+        """
+
+    @abstractmethod
     async def select_lead(
-        self, user_id: str, task_id: str, stage: LoopStage, intent: IntentType
+        self,
+        user_id: str,
+        task_id: str,
+        axis_a: AxisAStage,
+        stage: LoopStage,
+        intent: IntentType,
     ) -> LeadDecision:
         """选择主理 / 协理 / 信息侦查员（轴 A × 轴 B × 意图）。"""
 

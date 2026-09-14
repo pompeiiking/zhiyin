@@ -54,10 +54,15 @@ packages = [
     "zhiyin_data_sdk.gateways",
     "zhiyin_data_sdk.repositories",
     "zhiyin_infrastructure",
+    "zhiyin_infrastructure.kafka",
+    "zhiyin_infrastructure.llm",
     "zhiyin_infrastructure.local",
+    "zhiyin_infrastructure.minio",
     "zhiyin_infrastructure.mysql",
     "zhiyin_infrastructure.pami",
     "zhiyin_infrastructure.persistence",
+    "zhiyin_infrastructure.pgvector",
+    "zhiyin_infrastructure.redis",
     "zhiyin_infrastructure.workers",
     "zhiyin_boot",
     "zhiyin_boot.container",
@@ -75,6 +80,10 @@ zhiyin_boot = "zhiyin-boot/zhiyin_boot"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# 里程碑标记：e2e = 五环节主路径（tests/e2e/），M2 门禁的自动落点。
+markers = [
+    "e2e: 五环节端到端主路径（tests/e2e/，M2 退出条件）",
+]
 # 让 pytest 不装包也能直接跑（pytest>=7 的 pythonpath 选项）。
 pythonpath = [
     "zhiyin-kernel",

@@ -19,6 +19,33 @@ class LoopStage(str, Enum):
     REVIEW = "review"        # ⑤ 复盘校准
 
 
+class AxisAStage(str, Enum):
+    """轴 A · 用户职业发展进程（隐性，后台推断，前台不让用户选）。
+
+    五段全量口径（《业务口径决策记录-v1.0》决策 1 = B）：
+    探索自我 → 验证定向 → 冲刺行动 → 适应 → 再定位。
+    它改变"同一环节被服务的深度与口气"，不新增页面层级。
+    """
+
+    EXPLORE_SELF = "explore_self"          # 探索自我
+    VERIFY_DIRECTION = "verify_direction"  # 验证定向
+    SPRINT_ACTION = "sprint_action"        # 冲刺行动
+    ADAPT = "adapt"                        # 适应
+    REPOSITION = "reposition"              # 再定位
+
+
+class PathFocus(str, Enum):
+    """任务会话的路径焦点（决策 3 = C：轴 A 单轨 + 会话可带焦点标记）。
+
+    一个用户全局只有一个轴 A 阶段；混合路径（就业 / 考研 / 留学并行）时，
+    由会话携带本焦点标记，让主理选择与工作台按"当前关注哪条路"取数。
+    """
+
+    EMPLOYMENT = "employment"        # 就业
+    POSTGRADUATE = "postgraduate"    # 考研
+    STUDY_ABROAD = "study_abroad"    # 留学
+
+
 class AgentRole(str, Enum):
     """五个智能体的稳定标识。
 

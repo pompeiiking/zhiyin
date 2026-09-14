@@ -98,6 +98,7 @@ class Container:
     workspace_service: Any = None
     function_service: Any = None
     identity_service: Any = None
+    registry_service: Any = None
 
     # ---- 业务层 Worker（复用本容器的 Port）----
     workers: list[Any] = field(default_factory=list)
@@ -121,6 +122,18 @@ def build_container(settings: Optional[Settings] = None) -> Container:
     build_orchestration(container)
     build_services(container)
     build_workers(container)
+
+    # 前端联调（决策 15 = A）：`ZHIYIN_MOCK=1` 时用 Mock Facade 走真实路由。
+    # MockApplicationFacade 目前是骨架（方法体 NotImplementedError），实现完成后
+    # 取消下面注释即可；未实现时保持未装配，/app/* 仍按约定返回 503 而非 500。
+    #
+    # if settings.mock_facade:
+    #     from zhiyin_api.facade.mock import MockApplicationFacade
+    #     container.facade = MockApplicationFacade(
+    #         identity=container.identity_service,
+    #         registry=container.registry_service,
+    #     )
+
     return container
 
 

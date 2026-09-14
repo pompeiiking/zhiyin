@@ -2,8 +2,19 @@
 
 职责（R-API-004）：
 - 编排业务层服务调用，组装 View DTO；
-- 通过 Mapper 完成 business 模型 → api DTO 的转换，业务模型变更不外溢到前端；
+- 转换一律交给 `zhiyin_api/dto/mappers.py`（业务模型 → api DTO），
+  本层不内联字段映射，业务模型变更不外溢到前端；
 - 不写业务规则，不直接访问数据库 / 模型 / 知识库。
+
+取数通道（api 被禁止 import `zhiyin_data_sdk`，所以只有这两条业务侧出口）
+------------------------------------------------------------------------
+| 需要的东西 | 出口 |
+| --- | --- |
+| 我是谁（认证主体 → 本地用户记录） | `business/ports/identity.py::IdentityService` |
+| 页面长什么样（菜单 / 路由 / 任务入口 / 文案 / 横幅 / 信任块 / FAQ / 开关） | `business/ports/registry.py::RegistryService` |
+
+因此 Facade 的构造依赖至少包含这两个服务；`bootstrap()` 没有它们就无法返回任何内容。
+其余能力（对话 / 工作台 / 资产）分别走 `Orchestrator` 与 `WorkspaceService` / `AssetService`。
 
 装配方式：zhiyin-boot 在启动时调用 configure_facade(实现)，Controller 通过
 get_facade() 获取。这样 Controller 不依赖任何具体实现，替换实现无需改接口层。
@@ -32,6 +43,7 @@ from zhiyin_api.dto.conversation import (
     TaskSessionView,
 )
 from zhiyin_api.dto.workspace import WorkspacePageView
+from zhiyin_api.dto.track import TrackEventAck, TrackEventRequest
 
 
 class ApplicationFacade(ABC):
@@ -94,6 +106,19 @@ class ApplicationFacade(ABC):
     async def export_asset(self, user_id: str, body: ExportRequest) -> ExportResultView:
         """导出资产（第一期占位）。"""
 
+    # ---------- 埋点 ----------
+
+    @abstractmethod
+    async def track_event(
+        self, user_id: str, body: TrackEventRequest
+    ) -> TrackEventAck:
+        """接收前端埋点上报。
+
+        实现要求：先经 `RegistryService.list_track_events()` 校验事件属于
+        `channel=frontend`，再决定落库口径（体验型事件存储是后续待办）。
+        本层不写事件归属判断，只编排。
+        """
+
 
 # ---------- 装配与获取 ----------
 
@@ -121,3 +146,14 @@ def get_facade() -> ApplicationFacade:
             "ApplicationFacade 尚未装配：请在 zhiyin-boot 启动时调用 configure_facade()"
         )
     return _facade
+
+
+def reset_facade() -> None:
+    """清空已装配的 Facade。供测试隔离使用，业务代码不应调用。
+
+    与 `zhiyin_api.runtime.reset_runtime()` 同源：装配是全局注入，测试之间必须
+    显式还原，否则"某个用例 wire 过一次"会让后面的用例看到别人的装配状态。
+    `tests/conftest.py` 的自动夹具对两者统一还原。
+    """
+    global _facade
+    _facade = None

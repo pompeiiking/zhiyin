@@ -28,8 +28,9 @@ Orchestrator 或某个 Service 的方法体里，结果是规则改一处要动�
 阈值、冷却期、话术这类**可调参数一律来自动态资源**（`data/registry/*.json`），
 不得写死在规则实现里。规则实现只负责"怎么用参数"，不负责"参数是多少"。
 
-状态：本期只冻结接口。轴 A 判定信号、意图→环节兜底、画像置信度算法、
-主动干预参数四项业务口径定稿后，由各业务线在此补实现。
+状态：接口已冻结，**业务口径已定稿**（见《业务口径决策记录-v1.0》）。
+由各业务线在此补实现；规则的参数已写进 `data/registry/policy_params.json`
+（`intervention` / `profile_collection` / `routing` 三项 `confirmed`）。
 """
 
 from zhiyin_business.policies.handoff import HandoffPolicy

@@ -23,15 +23,22 @@
 | Workspace 服务 | `workspace.py` | `DefaultWorkspaceService` | 读侧聚合（Profile / Asset / Memory） | P1 | 骨架 |
 | Function 服务 | `function.py` | `DefaultFunctionService` | ObjectStore、日历 | P1 | 骨架 |
 | Identity 服务 | `identity.py` | `DefaultIdentityService` | AuthGateway、UserRepository | P0 | 骨架 |
+| Registry 服务 | `registry.py` | `DefaultRegistryService` | RegistryRepository、FeatureFlagGateway | P0 | 骨架 |
 
-> Identity 服务是 api 与数据访问契约之间的**唯一通道**：api 层被禁止 import
+> Identity 服务是 api 与数据访问契约之间的通道之一：api 层被禁止 import
 > `zhiyin_data_sdk`，因此 Facade 拿不到 `AuthGateway`；由本服务把它包成业务 Port
 > （`business/ports/identity.py::IdentityService`）。它是 Facade 的硬前置——
 > Facade 一装配就会调它。
 
-实现顺序建议：黑板四件套（Profile / Behavior / Memory / Asset）→ Orchestrator →
-Workspace / Function。Orchestrator 的前置是《技术架构文档》§十五 的 4 项口径定稿，
-未定稿不要动手（见 `orchestrator.py` 的 docstring）。
+> Registry 服务是同一类问题的第二个通道（`business/ports/registry.py`）：
+> `/app/bootstrap` 需要的菜单 / 路由 / 任务入口 / 文案 / 功能开关全在动态资源里，
+> 而取数契约在 `zhiyin_data_sdk`，api 同样拿不到。它是 Facade 的另一个硬前置。
+> 两条通道的分工：Identity 管"我是谁"，Registry 管"页面长什么样"。
+
+实现顺序建议：黑板四件套（Profile / Behavior / Memory / Asset）→ Identity + Registry
+（这两个是 Facade 的硬前置，Facade 一装配就会调它们）→ Facade（前端随即可以联调）
+→ Orchestrator → Workspace / Function。Orchestrator 的前置是《技术架构文档》§十五 的
+4 项口径定稿，未定稿不要动手（见 `orchestrator.py` 的 docstring）。
 """
 
 from zhiyin_business.services.loop import (
@@ -48,6 +55,7 @@ from zhiyin_business.services.identity import DefaultIdentityService
 from zhiyin_business.services.memory import DefaultConversationMemoryService
 from zhiyin_business.services.orchestrator import DefaultOrchestrator
 from zhiyin_business.services.profile import DefaultProfileService
+from zhiyin_business.services.registry import DefaultRegistryService
 from zhiyin_business.services.workspace import DefaultWorkspaceService
 
 __all__ = [
@@ -61,6 +69,7 @@ __all__ = [
     "DefaultIdentityService",
     "DefaultOrchestrator",
     "DefaultProfileService",
+    "DefaultRegistryService",
     "DefaultWorkspaceService",
     "default_conclusion_builder",
     "next_stage_after",

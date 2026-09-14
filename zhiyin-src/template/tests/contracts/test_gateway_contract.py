@@ -1,6 +1,6 @@
 """Gateway 语义契约。
 
-覆盖第一期就存在、且第二期一定会被替换的四类接缝：缓存、向量、嵌入、对象存储。
+覆盖第一期就存在、且第二期一定会被替换的接缝：缓存、向量、嵌入、功能开关、对象存储。
 其它 Gateway（事件总线 / 调度 / 通知 / 鉴权 / 安全 / 限流）的行为断言在
 `tests/test_infrastructure.py` 与 `tests/test_orchestration.py`。
 """
@@ -92,6 +92,24 @@ async def test_embedding_contract(gateways) -> None:
     assert vectors[0] == vectors[2], "同样输入必须得到同样向量（否则索引会漂移）"
     assert len(vectors[0]) == len(vectors[1]), "维度必须一致"
     assert any(value != 0 for value in vectors[0]), "不得返回零向量（无法算余弦）"
+
+
+async def test_feature_flag_contract(gateways) -> None:
+    """功能开关：未知开关必须默认关闭，且返回的是快照。"""
+    flags = gateways["feature_flags"]()
+
+    all_flags = await flags.all()
+    assert all_flags, "种子数据里必须有开关"
+    assert await flags.is_enabled("report_full_text") is True
+    assert await flags.is_enabled("export") is False
+
+    # 配置漏了不能反而把功能打开（这是"默认通过层"最容易犯的错）
+    assert await flags.is_enabled("not_configured") is False
+    assert await flags.is_enabled("not_configured", default=True) is True
+
+    # 快照语义：调用方改返回值不得影响实现内部缓存
+    all_flags["report_full_text"] = False
+    assert await flags.is_enabled("report_full_text") is True
 
 
 async def test_object_store_contract(gateways) -> None:

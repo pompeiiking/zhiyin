@@ -34,6 +34,14 @@ from zhiyin_kernel.blackboard import (
     ProfileGap,
     TaskSession,
 )
+from zhiyin_kernel.dynamic_content import (
+    BannerSpec,
+    CopySpec,
+    FaqSpec,
+    MenuSpec,
+    RouteSpec,
+    TrustBlockSpec,
+)
 from zhiyin_kernel.enums import (
     AssetType,
     BehaviorEventType,
@@ -47,6 +55,7 @@ from zhiyin_kernel.registry import (
     PolicyParamSet,
     TaskEntrySpec,
     TheoryCard,
+    TrackEventSpec,
 )
 from zhiyin_data_sdk.repositories import (
     AssetRepository,
@@ -456,12 +465,16 @@ class LocalJsonRegistryRepository(RegistryRepository):
     """动态资源：第一期读本地 JSON。
 
     文件位置：`{data_dir}/{agents,theory_cards,output_contracts,task_entries,
-    policy_params}.json`
+    policy_params,menus,routes,copies,banners,trust_blocks,faqs}.json`
     文件内容支持两种形状：顶层数组，或 `{"items": [...]}`。
 
     设计意图（《分层实现与接口设计》§三）：页面文案、任务入口、智能体、理论卡、
     产出契约、规则参数都必须是**动态资源**。放 JSON 而不是写进代码，是为了在第一期
     就能验证"改配置不发版"这条口径；接 pami 动态资源表时只替换本类。
+
+    前端页面内容（菜单 / 路由 / 文案 / 横幅 / 信任块 / FAQ）的取数口径统一在本类：
+    只返回 `status == "enabled"` 且按 `sort_order` 升序——上下线与排序是数据语义，
+    散到每个调用方各写一遍必然漂移。
     """
 
     FILES: dict[str, str] = {
@@ -470,6 +483,13 @@ class LocalJsonRegistryRepository(RegistryRepository):
         "output_contracts": "output_contracts.json",
         "task_entries": "task_entries.json",
         "policy_params": "policy_params.json",
+        "menus": "menus.json",
+        "routes": "routes.json",
+        "copies": "copies.json",
+        "banners": "banners.json",
+        "trust_blocks": "trust_blocks.json",
+        "faqs": "faqs.json",
+        "track_events": "track_events.json",
     }
 
     def __init__(self, data_dir: str = "data/registry") -> None:
@@ -531,7 +551,44 @@ class LocalJsonRegistryRepository(RegistryRepository):
                 return PolicyParamSet.model_validate(raw)
         return None
 
+    # ---------- 前端页面内容 ----------
+
+    async def list_menus(self) -> list[MenuSpec]:
+        return self._content("menus", MenuSpec)
+
+    async def list_routes(self) -> list[RouteSpec]:
+        return self._content("routes", RouteSpec)
+
+    async def get_copy_bundle(self, bundle: str = "zh-CN") -> dict[str, str]:
+        items = self._content("copies", CopySpec, bundle=bundle)
+        return {item.code: item.text for item in items}
+
+    async def list_banners(self) -> list[BannerSpec]:
+        return self._content("banners", BannerSpec)
+
+    async def list_trust_blocks(self) -> list[TrustBlockSpec]:
+        return self._content("trust_blocks", TrustBlockSpec)
+
+    async def list_faqs(self) -> list[FaqSpec]:
+        return self._content("faqs", FaqSpec)
+
+    async def list_track_events(self) -> list[TrackEventSpec]:
+        items = [TrackEventSpec.model_validate(raw) for raw in self._load("track_events")]
+        return sorted(items, key=lambda item: item.code)
+
     # ---------- 内部 ----------
+
+    def _content(self, key: str, model, *, bundle: Optional[str] = None):
+        """读一类前端动态内容：过滤停用项 + 按 sort_order 排序。
+
+        `bundle` 只为文案包（copies）使用：多语言文案共表，按包过滤。
+        """
+        items = [model.model_validate(raw) for raw in self._load(key)]
+        if bundle is not None:
+            items = [item for item in items if getattr(item, "bundle", bundle) == bundle]
+        items = [item for item in items if item.status == "enabled"]
+        items.sort(key=lambda item: item.sort_order)
+        return items
 
     def _load(self, key: str) -> list[dict[str, Any]]:
         if key in self._cache:

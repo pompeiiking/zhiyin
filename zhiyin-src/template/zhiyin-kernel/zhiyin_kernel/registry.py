@@ -120,3 +120,20 @@ class TaskEntrySpec(BaseModel):
     )
     lead_agent: Optional[str] = Field(default=None, description="该入口的默认主理")
     sort_order: int = 0
+
+
+class TrackEventSpec(BaseModel):
+    """埋点事件归属（动态资源，PRD §十一）。
+
+    决策 14：**后端派生为主 + 前端上报为辅**。`channel=backend` 的事件由后端
+    行为/接口推导，不进 `POST /app/track`；`channel=frontend` 的是纯体验型事件
+    （点开告知、查看报告、比较方案、进入工作台等），由前端上报。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: str = Field(description="事件名，PRD §十一 事件表的唯一键")
+    channel: Literal["frontend", "backend"] = Field(
+        description="frontend=前端上报；backend=后端派生，不接收入站上报"
+    )
+    note: str = Field(default="", description="触发时机与口径说明")

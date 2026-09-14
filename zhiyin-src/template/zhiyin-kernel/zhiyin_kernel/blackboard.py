@@ -16,6 +16,7 @@ from zhiyin_kernel.enums import (
     AssetType,
     BehaviorEventType,
     LoopStage,
+    PathFocus,
     ProfileSource,
     TaskStatus,
 )
@@ -115,6 +116,10 @@ class TaskSession(BaseModel):
     task_name: str = Field(description="用户可见的任务名")
     loop_stage: LoopStage
     lead_agent: str
+    path_focus: Optional[PathFocus] = Field(
+        default=None,
+        description="路径焦点（就业 / 考研 / 留学）。轴 A 单轨，混合路径时由会话携带",
+    )
     status: TaskStatus = TaskStatus.ACTIVE
     created_at: datetime
     updated_at: datetime

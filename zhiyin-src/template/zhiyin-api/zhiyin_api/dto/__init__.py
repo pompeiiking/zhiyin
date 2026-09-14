@@ -1,15 +1,18 @@
 """API DTO 集合。
 
-前端只依赖本包的模型；业务层模型变化通过 Facade 里的 Mapper 吸收，
+前端只依赖本包的模型；业务层模型变化由 `dto/mappers.py` 吸收，
 避免"数据库字段变更影响前端"（R-API-007）。
 """
 
 from zhiyin_api.dto.common import ApiResponse, ErrorCode
 from zhiyin_api.dto.bootstrap import (
+    BannerView,
     BootstrapView,
+    FaqView,
     MenuView,
     RouteView,
     TaskEntryView,
+    TrustBlockView,
 )
 from zhiyin_api.dto.conversation import (
     ConversationMessageView,
@@ -32,14 +35,18 @@ from zhiyin_api.dto.asset import (
     ExportResultView,
     ReportFullTextView,
 )
+from zhiyin_api.dto.track import TrackEventAck, TrackEventRequest
 
 __all__ = [
     "ApiResponse",
     "ErrorCode",
     "BootstrapView",
+    "BannerView",
+    "FaqView",
     "MenuView",
     "RouteView",
     "TaskEntryView",
+    "TrustBlockView",
     "ConversationMessageView",
     "ConversationTurnView",
     "MessageRequest",
@@ -55,4 +62,6 @@ __all__ = [
     "ExportRequest",
     "ExportResultView",
     "ReportFullTextView",
+    "TrackEventAck",
+    "TrackEventRequest",
 ]

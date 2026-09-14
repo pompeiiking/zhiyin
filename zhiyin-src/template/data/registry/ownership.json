@@ -14,6 +14,7 @@
     { "port": "auth", "owner": "基础设施负责人", "scope": "鉴权（pami IAM）" },
     { "port": "security", "owner": "基础设施负责人", "scope": "加密 / 脱敏 / 审计" },
     { "port": "rate_limit", "owner": "基础设施负责人", "scope": "限流 / 防刷" },
+    { "port": "feature_flags", "owner": "接口/前端联调负责人", "scope": "功能开关读取（动态资源；第二期接配置中心 / feature_flag 表）" },
     { "port": "raw_query", "owner": "数据访问负责人", "scope": "受限裸查询（仅基础设施层可调用）" },
     { "port": "profiles", "owner": "数据访问负责人", "scope": "画像活状态" },
     { "port": "behaviors", "owner": "数据访问负责人", "scope": "行为日志（只追加）" },
@@ -38,8 +39,10 @@
     { "port": "workspace_service", "owner": "业务编排负责人", "scope": "工作台聚合" },
     { "port": "function_service", "owner": "业务编排负责人", "scope": "报告 / 日历 / 成就 / 导出" },
     { "port": "identity_service", "owner": "业务编排负责人", "scope": "身份解析（包装 AuthGateway + 本地用户记录补齐）" },
+    { "port": "registry_service", "owner": "业务编排负责人", "scope": "动态资源读侧（菜单 / 路由 / 任务入口 / 文案 / 开关），BFF 取数入口" },
     { "port": "facade", "owner": "接口/前端联调负责人", "scope": "BFF 门面装配" },
     { "port": "impact", "owner": "业务编排负责人", "scope": "影响面传播 Worker" },
-    { "port": "active_event", "owner": "业务编排负责人", "scope": "停滞干预 Worker" }
+    { "port": "active_event", "owner": "业务编排负责人", "scope": "停滞干预 Worker" },
+    { "port": "vector_sync", "owner": "基础设施负责人", "scope": "向量同步 / 嵌入补偿 Worker（纯数据管道）" }
   ]
 }

@@ -360,13 +360,13 @@ async def test_registry_missing_dir_is_empty_not_crash() -> None:
     assert await repo.get_agent("any") is None
 
 
-def test_feature_flags_come_from_json() -> None:
+async def test_feature_flags_come_from_json() -> None:
     store = LocalFeatureFlagStore(str(DATA_DIR / "registry"))
-    flags = store.all()
+    flags = await store.all()
     assert flags["report_full_text"] is True
     assert flags["export"] is False
     # 未知开关默认关闭，避免"配置漏了反而打开"
-    assert store.is_enabled("not_configured") is False
+    assert await store.is_enabled("not_configured") is False
 
 
 # --------------------------------------------------------------------------

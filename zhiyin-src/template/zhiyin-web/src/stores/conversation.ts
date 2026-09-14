@@ -29,15 +29,18 @@ export const useConversationStore = defineStore('conversation', {
     },
     async enterTask(taskCode: string) {
       // TODO(骨架): 调 enterTask()，切入 #screen-conv
-      throw new Error('TODO(骨架): conversation.enterTask 尚未实现')
+      // 参数写进错误信息：骨架期就把接口形状固定住，实现时不会改成别的入参
+      throw new Error(`TODO(骨架): conversation.enterTask 尚未实现（taskCode=${taskCode}）`)
     },
     async send(message: string) {
       // TODO(骨架): 调 sendMessage()，把 TurnResult 追加进 turns 并刷新 pipeline
-      throw new Error('TODO(骨架): conversation.send 尚未实现')
+      throw new Error(`TODO(骨架): conversation.send 尚未实现（message=${message}）`)
     },
     applyStageUncertain(clarifyQuestion: string) {
       // TODO(骨架): code=1006 时渲染澄清追问，不报错（ERROR_HANDLING 口径）
-      throw new Error('TODO(骨架): conversation.applyStageUncertain 尚未实现')
+      throw new Error(
+        `TODO(骨架): conversation.applyStageUncertain 尚未实现（clarifyQuestion=${clarifyQuestion}）`,
+      )
     },
   },
 })

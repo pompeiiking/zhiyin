@@ -19,6 +19,12 @@
 4. **唯一例外是 `/healthz`**：运维探针不随 API 版本变化，故意留在版本命名空间之外。
 
 该规则由 `tests/test_api_prefix.py` 守卫（路由声明里出现版本段即失败）。
+
+⚠️ 请求上下文：**全站唯一的 trace id 生产者在这里挂载**
+--------------------------------------------------------
+`RequestContextMiddleware`（`zhiyin_api/context.py`）在此挂载，负责生成/沿用
+`X-Trace-Id`、回写响应头、并让 `ApiResponse.trace_id` 有值。
+换任何一层都不需要再生成一次 trace id；日志与前端按同一个 id 串联。
 """
 
 from __future__ import annotations
@@ -29,6 +35,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from zhiyin_api.controllers import ROUTERS
+from zhiyin_api.context import RequestContextMiddleware
 from zhiyin_api.dto.common import ApiResponse, ErrorCode
 from zhiyin_api.runtime import get_runtime
 
@@ -65,6 +72,10 @@ def create_app(
 
     for router in routers if routers is not None else ROUTERS:
         app.include_router(router, prefix=api_prefix)
+
+    # trace id 的唯一生成点：任何进入应用的 HTTP 请求都会被包上上下文，
+    # 因此信封里的 trace_id 不会是空字符串（守卫见 tests/test_request_context.py）。
+    app.add_middleware(RequestContextMiddleware)
 
     _install_error_handlers(app)
     return app

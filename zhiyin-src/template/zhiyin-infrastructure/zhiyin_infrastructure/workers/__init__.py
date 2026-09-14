@@ -1,4 +1,4 @@
-"""基础设施侧后台任务目录（**空抽屉**，尚未实现）。
+"""基础设施侧后台任务目录。
 
 这里放**纯数据管道**，不放业务规则。按《目标架构设计》§5.4 的分家口径：
 
@@ -21,6 +21,17 @@
 `zhiyin_boot/workers.py`）。业务侧 Worker（`zhiyin_business/workers/`）用的是
 **同一个**基类，不存在两份同义定义。
 
-落位：`vector_sync.py` 之类的纯数据管道实现写在本目录，装配在
-`zhiyin_boot/container/services.py::build_workers`。
+落位表（每个格子都必须是真实文件，骨架自报 `IMPLEMENTATION_STATUS="skeleton"`）：
+
+| Worker | 文件 | 类 | 职责 | 触发方式 |
+| --- | --- | --- | --- | --- |
+| `vector_sync` | `workers/vector_sync.py` | `VectorSyncWorker` | 知识文档 → 嵌入 → 向量库 upsert（模型版本迁移时重嵌） | 定时 / 事件补偿 |
+
+装配：写完后在 `zhiyin_boot/container/services.py::build_workers` 注册一行
+（`container.workers.append(VectorSyncWorker(...))`），`--check` 的
+`workers.vector_sync` 随即从 `not_wired` 变为 `wired`。
 """
+
+from zhiyin_infrastructure.workers.vector_sync import VectorSyncWorker
+
+__all__ = ["VectorSyncWorker"]

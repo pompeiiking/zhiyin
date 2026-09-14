@@ -42,7 +42,7 @@ from zhiyin_business.ports.orchestrator import (
     TurnResult,
 )
 from zhiyin_data_sdk.repositories import RegistryRepository, TaskSessionRepository
-from zhiyin_kernel.enums import LoopStage
+from zhiyin_kernel.enums import AxisAStage, LoopStage
 from zhiyin_orchestration import AgentEngine, EventBus
 
 _TODO = "TODO(骨架): Orchestrator 未实现"
@@ -95,8 +95,16 @@ class DefaultOrchestrator(Orchestrator):
             f"{_TODO}：调 StagePolicy 判定环节；不确定时必须回澄清追问，不得硬跳"
         )
 
+    async def infer_axis_a(self, user_id: str, task_id: str) -> AxisAStage:
+        raise NotImplementedError(f"{_TODO}：规则优先 + LLM 兜底推断轴 A 阶段")
+
     async def select_lead(
-        self, user_id: str, task_id: str, stage: LoopStage, intent: IntentType
+        self,
+        user_id: str,
+        task_id: str,
+        axis_a: AxisAStage,
+        stage: LoopStage,
+        intent: IntentType,
     ) -> LeadDecision:
         raise NotImplementedError(f"{_TODO}：调 LeadPolicy 选主理 / 协理 / 信息侦查员")
 

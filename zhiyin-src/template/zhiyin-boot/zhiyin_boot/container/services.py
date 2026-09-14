@@ -51,6 +51,14 @@ def build_services(container: "Container") -> None:
     第一期只提供 LoopCoordinator 的参考实现 —— 它把 business → orchestration 的依赖
     真正建立起来。其余业务服务的落位见 `zhiyin_business/services/__init__.py` 的
     落位表，实现方写完后在这里接上（一行一个），不需要改其它任何地方。
+
+    两个"Facade 硬前置"实现完成后在这里接上（否则 `/app/bootstrap` 无数据可返回）：
+
+        container.identity_service = DefaultIdentityService(container.auth, container.users)
+        container.registry_service = DefaultRegistryService(container.registry, container.feature_flags)
+
+    注意 registry_service 的两个依赖都是**动态资源读取**（内容型 Repository +
+    配置型 Gateway），不是数据表——它不需要事务，也不写任何状态。
     """
     from zhiyin_business.services import AgentDrivenLoopCoordinator
 

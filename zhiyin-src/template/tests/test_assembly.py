@@ -146,3 +146,71 @@ def test_cli_check_is_informational_without_phase(capsys) -> None:
     assert main(["--check"]) == 0
     captured = capsys.readouterr()
     assert "missing" in captured.out
+
+
+def test_port_groups_are_disjoint() -> None:
+    """同一个名字不能出现在两个分组里。
+
+    分组既是报告的行，也是门禁的取值口径（`--check --phase=N`）。重名会让
+    "这个能力位装没装"出现两个互相矛盾的答案，而且装配报告里看起来都正常。
+    """
+    groups: dict[str, str] = {}
+    duplicated: list[str] = []
+    for group, ports in GROUP_PORTS.items():
+        for port in ports:
+            if port in groups:
+                duplicated.append(f"{port}（{groups[port]} 与 {group}）")
+            groups[port] = group
+    assert not duplicated, f"能力位重名：{duplicated}"
+
+
+def test_minimum_viable_is_checked_against_known_ports() -> None:
+    """启动前置校验（`MINIMUM_VIABLE`）引用的名字必须是真实能力位。
+
+    `assert_minimum_viable()` 用 `getattr(container, name)` 判空：名字拼错时它拿到
+    `None`，于是**每次启动都判定"缺少必需部件"**（或者反过来，与真实能力位无关）。
+    这类错字在启动日志里看起来像"配置问题"，排查很贵，因此在这里挡住。
+    """
+    from zhiyin_boot.container.ports import ALL_PORTS, MINIMUM_VIABLE
+
+    unknown = [name for name in MINIMUM_VIABLE if name not in ALL_PORTS]
+    assert not unknown, (
+        f"MINIMUM_VIABLE 引用了未登记的能力位：{unknown}。"
+        "请检查 zhiyin_boot/container/ports.py 的拼写"
+    )
+    assert len(set(MINIMUM_VIABLE)) == len(MINIMUM_VIABLE), "MINIMUM_VIABLE 有重复项"
+
+
+# 能力位名 ↔ Container 字段名：绝大多数能力位就是同名字段（装配报告按名字取值），
+# 下面 4 个是**有意**的例外，各自有更强的形状约束。登记在这里等于把这份对照写下来，
+# 免得下一个人"顺手"把 workers 拆成三个字段、或把事务管理器加成一个新能力位。
+PORT_NOT_A_CONTAINER_FIELD: dict[str, str] = {
+    "transaction_manager": "container.transactions（单个事务管理器，不是每能力位一个字段）",
+    "impact": "container.workers 列表（Worker 按自身的 name 寻址）",
+    "active_event": "container.workers 列表（Worker 按自身的 name 寻址）",
+    "vector_sync": "container.workers 列表（Worker 按自身的 name 寻址）",
+}
+
+
+def test_port_names_match_container_fields() -> None:
+    """每个能力位都必须在容器上有一个可取到状态的落点。
+
+    `describe_assembly` 用 `getattr(container, name)` 逐个取值，名字对不上时它
+    永远报 `not_wired`——**报告与门禁会一起说谎**（能力位明明实现了，却一直显示
+    "无人认领"）。这条守卫把"名字必须能取到"变成机械可判。
+    """
+    from zhiyin_boot.container import Container
+    from zhiyin_boot.container.ports import ALL_PORTS
+
+    fields = set(Container.__dataclass_fields__)
+    unknown = [
+        port for port in ALL_PORTS if port not in fields and port not in PORT_NOT_A_CONTAINER_FIELD
+    ]
+    assert not unknown, (
+        f"这些能力位在 Container 上没有同名落点：{unknown}。\n"
+        "装配报告用 `getattr(container, <能力位名>)` 取值，取不到就会永远报 not_wired。"
+        "请加字段，或在本用例的 PORT_NOT_A_CONTAINER_FIELD 里登记例外与理由"
+    )
+
+    stale = sorted(set(PORT_NOT_A_CONTAINER_FIELD) - set(ALL_PORTS))
+    assert not stale, f"例外表里的能力位已不存在（能力位改名或删除）：{stale}"

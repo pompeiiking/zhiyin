@@ -38,6 +38,9 @@ class Settings:
     use_pami_knowledge: bool = False
     use_pami_auth: bool = False
     use_mysql: bool = False
+    # 前端联调：决策 15 = A。为 True 时 boot 装配 Mock Facade（自报 skeleton），
+    # 让前端在真实 Facade 未实现前就能走真实路由联调。
+    mock_facade: bool = False
 
     # ---------- pami 接入 ----------
     pami_base_url: str = ""
@@ -74,6 +77,7 @@ class Settings:
             use_pami_knowledge=_env_bool("ZHIYIN_USE_PAMI_KNOWLEDGE"),
             use_pami_auth=_env_bool("ZHIYIN_USE_PAMI_AUTH"),
             use_mysql=_env_bool("ZHIYIN_USE_MYSQL"),
+            mock_facade=_env_bool("ZHIYIN_MOCK"),
             pami_base_url=_env("ZHIYIN_PAMI_BASE_URL"),
             pami_api_key=_env("ZHIYIN_PAMI_API_KEY"),
             pami_jwt_secret=_env("ZHIYIN_PAMI_JWT_SECRET"),

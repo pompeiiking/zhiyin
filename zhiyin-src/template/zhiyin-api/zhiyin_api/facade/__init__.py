@@ -5,6 +5,7 @@ from zhiyin_api.facade.facade import (
     FacadeNotConfiguredError,
     configure_facade,
     get_facade,
+    reset_facade,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "FacadeNotConfiguredError",
     "configure_facade",
     "get_facade",
+    "reset_facade",
 ]

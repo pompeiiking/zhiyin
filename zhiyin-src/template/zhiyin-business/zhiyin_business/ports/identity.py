@@ -21,6 +21,13 @@
   "从请求里取 token"是 api 层的事，api 取到 token 后传进来。
 - 返回类型只能是内核形状（`UserAccount` / `UserRole`），不得返回 data_sdk 的类型，
   否则 api 会被迫认识数据访问契约，第 2 条路就白走了。
+
+同类通道不止一个
+----------------
+与此同源的还有 `ports/registry.py::RegistryService`（动态资源读侧：菜单 / 路由 /
+任务入口 / 文案 / 开关）。判据是同一个：**api 需要、契约却在 data_sdk**。
+两条通道的分工是 "我是谁"（Identity）与 "页面长什么样"（Registry）；
+若将来再出现第三个同类需求，按同一模式加 Port，不要放宽 api → data_sdk 的矩阵。
 """
 
 from __future__ import annotations

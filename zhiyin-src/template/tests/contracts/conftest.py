@@ -52,6 +52,7 @@ def _memory_repositories() -> dict[str, RepositoryFactory]:
 def _memory_gateways(tmp_path: Path) -> dict[str, GatewayFactory]:
     from zhiyin_infrastructure.local.cache import InMemoryCache
     from zhiyin_infrastructure.local.embedding import LocalHashEmbedder
+    from zhiyin_infrastructure.local.feature_flag import LocalFeatureFlagStore
     from zhiyin_infrastructure.local.object_store import LocalFileStore
     from zhiyin_infrastructure.local.vector_store import LocalVectorStore
 
@@ -59,6 +60,7 @@ def _memory_gateways(tmp_path: Path) -> dict[str, GatewayFactory]:
         "cache": InMemoryCache,
         "vector": LocalVectorStore,
         "embedding": LocalHashEmbedder,
+        "feature_flags": lambda: LocalFeatureFlagStore(str(DATA_DIR / "registry")),
         "object_store": lambda: LocalFileStore(str(tmp_path / "objects")),
     }
 

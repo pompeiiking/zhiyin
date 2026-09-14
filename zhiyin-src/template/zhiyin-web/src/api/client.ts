@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance } from 'axios'
+import type { BackendErrorCode } from './schema'
 
 /**
  * 统一响应拆包。
@@ -7,7 +8,14 @@ import axios, { type AxiosInstance } from 'axios'
  * 本文件是全前端唯一处理该信封的地方：成功直接返回 data，失败抛 ApiError。
  */
 
-/** 错误码口径，必须与后端 zhiyin_api/dto/common.py 的 ErrorCode 保持一致 */
+/**
+ * 错误码口径：数值必须与后端 `zhiyin_api/dto/common.py::ErrorCode` 一致。
+ *
+ * `satisfies Record<string, BackendErrorCode>` 是编译期守卫——这里写错一个数字，
+ * `npm run typecheck` 直接失败（该联合类型由后端 OpenAPI 生成）。
+ * 运行期的同一份口径由 `tests/test_frontend_alignment.py` 再守一次
+ * （跨语言，只能靠断言比对）。
+ */
 export const ErrorCode = {
   OK: 0,
   INVALID_PARAM: 1001,
@@ -18,7 +26,7 @@ export const ErrorCode = {
   STAGE_UNCERTAIN: 1006,
   DEPENDENCY_UNAVAILABLE: 1007,
   INTERNAL: 1999,
-} as const
+} as const satisfies Record<string, BackendErrorCode>
 
 export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode]
 

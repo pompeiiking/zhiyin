@@ -58,7 +58,8 @@
           "notifier",
           "auth",
           "security",
-          "rate_limit"
+          "rate_limit",
+          "feature_flags"
         ],
         "repositories": [
           "profiles",
@@ -87,6 +88,7 @@
           "workspace_service",
           "function_service",
           "identity_service",
+          "registry_service",
           "facade"
         ],
         "workers": ["impact", "active_event"]
@@ -116,6 +118,7 @@
           "auth",
           "security",
           "rate_limit",
+          "feature_flags",
           "raw_query"
         ],
         "repositories": [
@@ -146,9 +149,10 @@
           "workspace_service",
           "function_service",
           "identity_service",
+          "registry_service",
           "facade"
         ],
-        "workers": ["impact", "active_event"]
+        "workers": ["impact", "active_event", "vector_sync"]
       },
       "manual": [
         "同一套 Port 契约测试对 MySQL / Redis / pgvector 实现同样通过",
@@ -175,6 +179,7 @@
           "auth",
           "security",
           "rate_limit",
+          "feature_flags",
           "raw_query"
         ],
         "repositories": [
@@ -205,9 +210,10 @@
           "workspace_service",
           "function_service",
           "identity_service",
+          "registry_service",
           "facade"
         ],
-        "workers": ["impact", "active_event"]
+        "workers": ["impact", "active_event", "vector_sync"]
       },
       "manual": [
         "事件可靠性：至少一次投递 + 重试 + 死信",

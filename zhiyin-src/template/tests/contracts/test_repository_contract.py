@@ -295,3 +295,26 @@ async def test_registry_contract(repositories) -> None:
     assert params is not None
     assert params.status in {"draft", "confirmed"}
     assert await repo.get_policy_params("不存在的规则") is None
+
+    # 前端页面内容：只下发 enabled、按 sort_order 升序（上下线与排序是数据语义，
+    # 不允许每个调用方各写一遍——BFF 与前端都依赖这个口径）。
+    for items in (
+        await repo.list_menus(),
+        await repo.list_routes(),
+        await repo.list_banners(),
+        await repo.list_trust_blocks(),
+        await repo.list_faqs(),
+    ):
+        assert items, "每类前端动态内容都要有种子数据，否则前端只会看到空页面"
+        assert [item.sort_order for item in items] == sorted(
+            item.sort_order for item in items
+        )
+        assert all(item.status == "enabled" for item in items), "停用项不得下发"
+
+    # 停用项：种子数据里刻意留了一条 status=disabled 的运营位，用来验证过滤真的生效
+    assert all(banner.code != "prelaunch_notice" for banner in await repo.list_banners())
+
+    # 文案包：按 key 取值、按 bundle 过滤
+    bundle = await repo.get_copy_bundle("zh-CN")
+    assert bundle.get("app.name"), "文案包必须能按 key 取到应用名"
+    assert await repo.get_copy_bundle("en-US") == {}, "未配置的文案包返回空，由调用方决定回落"

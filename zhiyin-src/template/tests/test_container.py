@@ -61,10 +61,10 @@ def test_scheduler_gateway_can_publish(settings: Settings) -> None:
     assert container.scheduler._event_bus is container.event_bus
 
 
-def test_feature_flags_come_from_dynamic_resource(settings: Settings) -> None:
+async def test_feature_flags_come_from_dynamic_resource(settings: Settings) -> None:
     """功能开关必须来自动态资源，而不是代码里的常量（§3.1）。"""
     container = build_container(settings)
-    flags = container.feature_flags.all()
+    flags = await container.feature_flags.all()
     assert flags.get("report_full_text") is True
     assert flags.get("export") is False
     assert "mentor" in flags
