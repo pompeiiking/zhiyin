@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Complete stages 3–5 of the approved Wanwu source-and-interface exposure design while preserving the already imported source snapshot and unified deployment baseline.
+**Goal:** Complete stages 3–5 of the approved Wanwu source-and-interface exposure design without re-importing the existing Wanwu snapshot.
 
-**Architecture:** Wanwu remains an independent platform under `platform/wanwu`; its own Nginx/BFF exposes native routes. Zhiyin keeps its `/api/v1/*` product API and disabled pami adapter skeletons, with automated contracts preventing cross-layer imports or accidental claims of real integration.
+**Architecture:** Wanwu remains independent under `platform/wanwu` and exposes native routes through its own Nginx/BFF. Zhiyin keeps its `/api/v1/*` product API and disabled pami skeletons; executable checks enforce route configuration and package boundaries.
 
 **Tech Stack:** Python 3.10+, pytest, JSON, Nginx configuration, Docker Compose, GitHub Actions
 
@@ -12,289 +12,222 @@
 
 ## Global Constraints
 
-- Do not re-import `platform/wanwu` unless the approved upstream revision changes.
-- Keep the imported revision `969a74c7c376169d2a88c72891807d35bb40861b`.
+- Keep imported revision `969a74c7c376169d2a88c72891807d35bb40861b`; do not re-import it.
 - Do not add a Wanwu proxy route to `zhiyin-api`.
 - Do not implement real pami HTTP calls or enable `ZHIYIN_USE_PAMI_*`.
-- Keep Wanwu authentication, organization, permission, API Key, and callback behavior unchanged.
+- Keep Wanwu authentication, permission, API Key, callback, and streaming behavior unchanged.
 - Keep Wanwu internal service ports removed by the Compose override.
-- Treat route presence as configuration evidence only, not proof of a successful business request.
-- Preserve existing Zhiyin architecture, contract, lint, OpenAPI, and phase-one checks.
+- Treat route presence as configuration evidence, not proof of a successful business request.
+- Preserve all existing Zhiyin tests, lint, OpenAPI, frontend, and phase-one checks.
 
 ## Current Baseline
 
-Stages 1 and 2 already exist on `feature/pami-wanwu-baseline`:
+Stages 1 and 2 are already represented by:
 
-- reproducible importer: `scripts/import_wanwu.py`;
-- imported source and provenance: `platform/wanwu/.zhiyin-vendor.json`, `platform/wanwu/UPSTREAM.md`;
-- Zhiyin container: `zhiyin-src/template/Dockerfile`;
-- unified deployment assets: `deploy/compose.yaml`, `deploy/init_env.py`, lifecycle scripts;
-- CI checks for source, container, and Compose assets.
-
-This plan audits that baseline but does not recreate it.
+- `scripts/import_wanwu.py`;
+- `platform/wanwu/.zhiyin-vendor.json` and `UPSTREAM.md`;
+- `zhiyin-src/template/Dockerfile`;
+- `deploy/compose.yaml`, environment initialization, and lifecycle scripts;
+- source, container, and Compose checks in CI.
 
 ## File Map
 
 | File | Responsibility |
 | --- | --- |
-| `deploy/wanwu-routes.json` | Checked-in contract for native Wanwu route prefixes, targets, and trust surfaces |
-| `zhiyin-src/template/tests/test_wanwu_routes.py` | Verifies route contract against Nginx, Compose, and interface documentation |
-| `zhiyin-src/template/tests/test_pami_boundary.py` | Locks disabled pami defaults, explicit skeleton failure, and package/import boundaries |
-| `.github/workflows/ci.yml` | Runs route and boundary checks in CI |
-| `README.md` | States the actual delivered scope and native Wanwu entrypoint |
-| `docs/README.md` | Links the approved design and this completion plan |
-| `docs/superpowers/plans/2026-09-15-pami-wanwu-source-deployment-baseline.md` | Marks the earlier plan as the completed stages 1–2 baseline |
+| `scripts/verify_wanwu_routes.py` | Parse and validate native Nginx routes against a checked-in contract |
+| `deploy/wanwu-routes.json` | Route prefixes, upstream targets, trust surfaces, and documentation anchors |
+| `zhiyin-src/template/tests/test_wanwu_routes.py` | Test verifier behavior using controlled configuration and the checked-in assets |
+| `zhiyin-src/template/tests/test_pami_boundary.py` | Verify default local wiring, explicit pami skeleton failure, and source boundaries |
+| `.github/workflows/ci.yml` | Execute route and boundary verification |
+| `README.md`, `docs/README.md` | State and index the delivered scope |
+| earlier source/deployment plan | Mark stages 1–2 as the retained baseline |
 
 ---
 
-### Task 1: Lock the Wanwu Native Route Contract
+### Task 1: Build an Executable Wanwu Route Contract
 
 **Files:**
+- Create: `scripts/verify_wanwu_routes.py`
 - Create: `deploy/wanwu-routes.json`
 - Create: `zhiyin-src/template/tests/test_wanwu_routes.py`
 
 **Interfaces:**
-- Consumes: `platform/wanwu/configs/middleware/nginx/conf.d/aibase.conf`
-- Consumes: `deploy/compose.yaml`
-- Consumes: `docs/技术架构文档/外部平台/pami-Wanwu/接口.md`
-- Produces: a machine-readable list of native route prefixes and upstream targets
+- Produces: `validate_routes(manifest_path: Path, nginx_path: Path) -> list[str]`
+- Produces: CLI exit 0 for a matching route contract and exit 1 with diagnostics otherwise
 
-- [ ] **Step 1: Write the failing manifest-presence test**
+- [ ] **Step 1: Write the failing behavior test**
 
-Create `zhiyin-src/template/tests/test_wanwu_routes.py`:
+Create `test_wanwu_routes.py` with a dynamic loader that calls `pytest.fail`
+when the verifier does not exist. Use a temporary manifest with one missing route
+and one wrong upstream, then assert these literal diagnostics:
 
 ```python
 from __future__ import annotations
 
+import importlib.util
 import json
-import re
 from pathlib import Path
+
+import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-ROUTE_MANIFEST = REPO_ROOT / "deploy" / "wanwu-routes.json"
-NGINX_CONFIG = (
-    REPO_ROOT
-    / "platform"
-    / "wanwu"
-    / "configs"
-    / "middleware"
-    / "nginx"
-    / "conf.d"
-    / "aibase.conf"
-)
-COMPOSE_OVERRIDE = REPO_ROOT / "deploy" / "compose.yaml"
-INTERFACE_DOC = (
-    REPO_ROOT
-    / "docs"
-    / "技术架构文档"
-    / "外部平台"
-    / "pami-Wanwu"
-    / "接口.md"
-)
-ROUTING_DOC = (
-    REPO_ROOT
-    / "docs"
-    / "技术架构文档"
-    / "外部平台"
-    / "pami-Wanwu"
-    / "架构文档"
-    / "08-接口与通信架构.md"
-)
+VERIFIER = REPO_ROOT / "scripts" / "verify_wanwu_routes.py"
+MANIFEST = REPO_ROOT / "deploy" / "wanwu-routes.json"
+NGINX = REPO_ROOT / "platform" / "wanwu" / "configs" / "middleware" / "nginx" / "conf.d" / "aibase.conf"
 
 
-def _routes() -> list[dict[str, str]]:
-    payload = json.loads(ROUTE_MANIFEST.read_text(encoding="utf-8"))
-    return payload["routes"]
+def _load_verifier():
+    if not VERIFIER.is_file():
+        pytest.fail("Wanwu route verifier is missing")
+    spec = importlib.util.spec_from_file_location("verify_wanwu_routes", VERIFIER)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
-def _location_block(config: str, prefix: str) -> str:
-    pattern = rf"location\s+\^~\s+{re.escape(prefix)}\s*\{{(?P<body>.*?)\n\s*\}}"
-    match = re.search(pattern, config, flags=re.DOTALL)
-    assert match is not None, f"missing nginx location for {prefix}"
-    return match.group("body")
+def test_validator_reports_missing_route_and_wrong_upstream(tmp_path: Path) -> None:
+    manifest = tmp_path / "routes.json"
+    nginx = tmp_path / "nginx.conf"
+    manifest.write_text(
+        json.dumps(
+            {
+                "routes": [
+                    {"prefix": "/user/api/", "upstream": "http://bff-service:6668/"},
+                    {"prefix": "/service/api/", "upstream": "http://bff-service:6668/"},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    nginx.write_text(
+        "location ^~ /user/api/ {\n    proxy_pass http://wrong:9999/;\n}\n",
+        encoding="utf-8",
+    )
 
+    errors = _load_verifier().validate_routes(manifest, nginx)
 
-def test_route_manifest_exists_and_has_all_native_entrypoints() -> None:
-    assert ROUTE_MANIFEST.is_file()
-    assert {route["prefix"] for route in _routes()} == {
-        "/user/api/",
-        "/use/model/api/",
-        "/service/api/",
-        "/workflow/api/",
-        "/minio/download/api/",
-    }
+    assert errors == [
+        "upstream mismatch for /user/api/: expected http://bff-service:6668/, got http://wrong:9999/",
+        "missing nginx location: /service/api/",
+    ]
 ```
 
-- [ ] **Step 2: Run the test and confirm the manifest is missing**
+- [ ] **Step 2: Run RED**
 
-Run:
+Run `python -m pytest tests/test_wanwu_routes.py -v` from
+`zhiyin-src/template`.
 
-```powershell
-Set-Location zhiyin-src/template
-python -m pytest tests/test_wanwu_routes.py::test_route_manifest_exists_and_has_all_native_entrypoints -v
-```
+Expected: FAIL with `Wanwu route verifier is missing`.
 
-Expected: FAIL because `deploy/wanwu-routes.json` does not exist.
+- [ ] **Step 3: Implement the route verifier**
 
-- [ ] **Step 3: Add the route manifest**
+Create `scripts/verify_wanwu_routes.py` with:
 
-Create `deploy/wanwu-routes.json`:
+- `parse_nginx_routes(text: str) -> dict[str, str]` using a location-block
+  regex and a `proxy_pass` regex;
+- `validate_routes(...)` that returns the exact ordered diagnostics above;
+- an argparse CLI with defaults pointing to the checked-in manifest and Nginx file;
+- one diagnostic per line on stderr and exit 1 when validation fails.
 
-```json
-{
-  "entrypoint": "wanwu-nginx",
-  "local_url": "http://127.0.0.1:8081",
-  "claim": "route-configured",
-  "routes": [
-    {
-      "prefix": "/user/api/",
-      "upstream": "http://bff-service:6668/",
-      "trust_surface": "wanwu-jwt-and-permissions"
-    },
-    {
-      "prefix": "/use/model/api/",
-      "upstream": "http://bff-service:6668/",
-      "trust_surface": "wanwu-model-middleware"
-    },
-    {
-      "prefix": "/service/api/",
-      "upstream": "http://bff-service:6668/",
-      "trust_surface": "per-route-jwt-api-key-or-open-rule"
-    },
-    {
-      "prefix": "/workflow/api/",
-      "upstream": "http://agentscope-wanwu:6672/",
-      "trust_surface": "wanwu-workflow-protocol"
-    },
-    {
-      "prefix": "/minio/download/api/",
-      "upstream": "http://minio-wanwu:9000/",
-      "trust_surface": "wanwu-minio-download-rule"
-    }
-  ]
-}
-```
+- [ ] **Step 4: Add the checked-in route manifest**
 
-- [ ] **Step 4: Verify the manifest test passes**
+Create five entries:
 
-Run:
+| Prefix | Upstream | Trust surface |
+| --- | --- | --- |
+| `/user/api/` | `http://bff-service:6668/` | `wanwu-jwt-and-permissions` |
+| `/use/model/api/` | `http://bff-service:6668/` | `wanwu-model-middleware` |
+| `/service/api/` | `http://bff-service:6668/` | `per-route-jwt-api-key-or-open-rule` |
+| `/workflow/api/` | `http://agentscope-wanwu:6672/` | `wanwu-workflow-protocol` |
+| `/minio/download/api/` | `http://minio-wanwu:9000/` | `wanwu-minio-download-rule` |
 
-```powershell
-Set-Location zhiyin-src/template
-python -m pytest tests/test_wanwu_routes.py::test_route_manifest_exists_and_has_all_native_entrypoints -v
-```
+Top-level fields are `entrypoint: wanwu-nginx`,
+`local_url: http://127.0.0.1:8081`, and `claim: route-configured`.
 
-Expected: PASS.
-
-- [ ] **Step 5: Add Nginx and Compose assertions**
-
-Append to `test_wanwu_routes.py`:
-
-```python
-def test_each_manifest_route_matches_the_wanwu_nginx_upstream() -> None:
-    config = NGINX_CONFIG.read_text(encoding="utf-8")
-    for route in _routes():
-        block = _location_block(config, route["prefix"])
-        assert f'proxy_pass       {route["upstream"]}' in block or (
-            f'proxy_pass      {route["upstream"]}' in block
-        )
-
-
-def test_only_wanwu_nginx_is_bound_to_the_host() -> None:
-    compose = COMPOSE_OVERRIDE.read_text(encoding="utf-8")
-    for service in (
-        "mysql",
-        "redis",
-        "minio",
-        "kafka",
-        "es",
-        "bff-service",
-        "agentscope",
-        "rag",
-        "agent",
-    ):
-        assert f"  {service}:\n    ports: !reset []" in compose
-    assert '"127.0.0.1:8081:8081"' in compose
-```
-
-- [ ] **Step 6: Verify the Nginx and Compose assertions**
-
-Run:
-
-```powershell
-Set-Location zhiyin-src/template
-python -m pytest tests/test_wanwu_routes.py -v
-```
-
-Expected: PASS.
-
-- [ ] **Step 7: Commit the route contract**
-
-```powershell
-git add deploy/wanwu-routes.json zhiyin-src/template/tests/test_wanwu_routes.py
-git commit -m "test: lock wanwu native route exposure"
-```
-
----
-
-### Task 2: Cross-check the Route Contract Against Platform Documentation
-
-**Files:**
-- Modify: `zhiyin-src/template/tests/test_wanwu_routes.py`
-
-**Interfaces:**
-- Consumes: route manifest from Task 1
-- Produces: a guard against claiming undocumented route families
-
-- [ ] **Step 1: Write the failing documentation cross-check**
+- [ ] **Step 5: Add the checked-in-assets test**
 
 Append:
 
 ```python
-def test_route_contract_is_anchored_in_platform_documentation() -> None:
-    documentation = (
-        INTERFACE_DOC.read_text(encoding="utf-8")
-        + "\n"
-        + ROUTING_DOC.read_text(encoding="utf-8")
-    )
-    documented_anchors = {
-        "/user/api/": "/user/api/v1/",
-        "/use/model/api/": "/use/model/api/",
-        "/service/api/": "/service/api/openapi/v1/",
-        "/workflow/api/": "/workflow/api/",
-        "/minio/download/api/": "/minio/download/api/",
-    }
-    for route in _routes():
-        assert documented_anchors[route["prefix"]] in documentation
+def test_checked_in_wanwu_routes_match_nginx() -> None:
+    assert _load_verifier().validate_routes(MANIFEST, NGINX) == []
 ```
 
-- [ ] **Step 2: Run the cross-check**
+- [ ] **Step 6: Run GREEN and the CLI**
 
 Run:
 
 ```powershell
-Set-Location zhiyin-src/template
-python -m pytest tests/test_wanwu_routes.py::test_route_contract_is_anchored_in_platform_documentation -v
-```
-
-Expected: PASS because method-level interfaces are recorded in `接口.md` and the
-MinIO download route is recorded in `08-接口与通信架构.md`.
-
-- [ ] **Step 3: Run the full route test**
-
-```powershell
-Set-Location zhiyin-src/template
 python -m pytest tests/test_wanwu_routes.py -v
+python ../../scripts/verify_wanwu_routes.py
 ```
 
-Expected: PASS.
+Expected: 2 passed and CLI exit 0.
 
-- [ ] **Step 4: Commit the documentation contract**
+- [ ] **Step 7: Commit**
 
 ```powershell
-git add zhiyin-src/template/tests/test_wanwu_routes.py
-git commit -m "docs: align wanwu routes with interface catalog"
+git add ../../scripts/verify_wanwu_routes.py ../../deploy/wanwu-routes.json tests/test_wanwu_routes.py
+git commit -m "test: verify wanwu native route exposure"
+```
+
+---
+
+### Task 2: Verify Documentation Anchors and Host Isolation
+
+**Files:**
+- Modify: `zhiyin-src/template/tests/test_wanwu_routes.py`
+- Modify: `scripts/verify_wanwu_routes.py`
+- Modify: `deploy/wanwu-routes.json`
+
+**Interfaces:**
+- Extends the route contract with `documentation_anchor`
+- Adds `validate_documentation(manifest_path: Path, document_paths: list[Path]) -> list[str]`
+
+- [ ] **Step 1: Write RED tests**
+
+Add controlled tests proving that an absent documentation anchor returns
+`undocumented route: /minio/download/api/`. Add a checked-in-assets test that
+loads both `接口.md` and `08-接口与通信架构.md`.
+
+Add a repository behavior test that loads the merged Compose model as text and
+asserts the override resets ports for `mysql`, `redis`, `minio`, `kafka`,
+`es`, `bff-service`, `agentscope`, `rag`, and `agent`, while Nginx is
+bound to `127.0.0.1:8081`.
+
+- [ ] **Step 2: Run RED**
+
+Run `python -m pytest tests/test_wanwu_routes.py -v`.
+
+Expected: FAIL because `validate_documentation` is missing.
+
+- [ ] **Step 3: Implement documentation validation**
+
+For each manifest route, require its literal `documentation_anchor` to appear in
+at least one supplied document. Add these anchors:
+
+- `/user/api/v1/`;
+- `/use/model/api/`;
+- `/service/api/openapi/v1/`;
+- `/workflow/api/`;
+- `/minio/download/api/`.
+
+Return errors in manifest order and do not infer methods, fields, authentication,
+or success status.
+
+- [ ] **Step 4: Run GREEN**
+
+Run `python -m pytest tests/test_wanwu_routes.py -v`.
+
+Expected: all route tests pass.
+
+- [ ] **Step 5: Commit**
+
+```powershell
+git add ../../scripts/verify_wanwu_routes.py ../../deploy/wanwu-routes.json tests/test_wanwu_routes.py
+git commit -m "test: anchor wanwu routes to platform documentation"
 ```
 
 ---
@@ -305,115 +238,48 @@ git commit -m "docs: align wanwu routes with interface catalog"
 - Create: `zhiyin-src/template/tests/test_pami_boundary.py`
 
 **Interfaces:**
-- Consumes: `zhiyin_boot.settings.Settings`
-- Consumes: existing skeleton adapters in `zhiyin_infrastructure.pami.adapters`
-- Produces: executable evidence that the current task does not enable or implement real pami integration
+- Consumes: `Settings.from_env()`, `build_gateways(settings)`, and existing pami skeleton adapters
+- Produces: executable evidence that normal wiring remains local and pami skeletons fail explicitly
 
-- [ ] **Step 1: Add default-setting and package-boundary tests**
+- [ ] **Step 1: Write local-wiring characterization tests**
 
-Create:
+Clear `ZHIYIN_USE_PAMI_LLM`, `ZHIYIN_USE_PAMI_KNOWLEDGE`, and
+`ZHIYIN_USE_PAMI_AUTH` with `monkeypatch.delenv`. Build settings with
+`Settings.from_env()`, call `build_gateways(settings)`, and assert the concrete
+classes are `LocalOrMockLLM`, `LocalKnowledgeRepo`, and `DefaultPassAuth`.
 
-```python
-from __future__ import annotations
+- [ ] **Step 2: Add explicit-failure tests**
 
-import ast
-from pathlib import Path
+Use `pytest.mark.asyncio` and assert:
 
-import pytest
+- `PamiSearchGateway().keyword("career")` raises `NotImplementedError`
+  containing `尚未实现`;
+- `PamiAuthGateway("http://nginx:8081").authenticate({})` raises the same
+  explicit marker.
 
-from zhiyin_boot.settings import Settings
-from zhiyin_infrastructure.pami.adapters import PamiAuthGateway, PamiSearchGateway
+- [ ] **Step 3: Add the source-boundary test**
 
+Parse every Python file under the seven Zhiyin package roots with `ast`.
+Fail when an absolute import root is `wanwu` or `platform`. Separately assert
+that `pyproject.toml` contains neither `platform/wanwu` nor `platform.wanwu`.
 
-TEMPLATE_ROOT = Path(__file__).resolve().parents[1]
-REPO_ROOT = TEMPLATE_ROOT.parents[1]
+- [ ] **Step 4: Run the boundary file**
 
+Run `python -m pytest tests/test_pami_boundary.py -v`.
 
-def test_pami_adapters_are_disabled_by_default() -> None:
-    settings = Settings()
-    assert settings.use_pami_llm is False
-    assert settings.use_pami_knowledge is False
-    assert settings.use_pami_auth is False
+Expected: 5 passed. These tests characterize and lock the already approved
+boundary; they do not introduce real pami behavior.
 
-
-def test_wanwu_is_not_a_zhiyin_python_package() -> None:
-    pyproject = (TEMPLATE_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert "platform/wanwu" not in pyproject
-    assert "platform.wanwu" not in pyproject
-
-
-def test_zhiyin_packages_do_not_import_wanwu_source() -> None:
-    roots = (
-        "zhiyin-api",
-        "zhiyin-business",
-        "zhiyin-orchestration",
-        "zhiyin-data-sdk",
-        "zhiyin-infrastructure",
-        "zhiyin-boot",
-    )
-    violations: list[str] = []
-    for root_name in roots:
-        for source in (TEMPLATE_ROOT / root_name).rglob("*.py"):
-            tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
-            for node in ast.walk(tree):
-                if isinstance(node, ast.Import):
-                    names = [alias.name.split(".")[0] for alias in node.names]
-                elif isinstance(node, ast.ImportFrom) and node.module:
-                    names = [node.module.split(".")[0]]
-                else:
-                    names = []
-                if {"wanwu", "platform"} & set(names):
-                    violations.append(str(source.relative_to(REPO_ROOT)))
-    assert violations == []
-```
-
-- [ ] **Step 2: Run the boundary tests**
+- [ ] **Step 5: Commit**
 
 ```powershell
-Set-Location zhiyin-src/template
-python -m pytest tests/test_pami_boundary.py -v
-```
-
-Expected: PASS. These are characterization tests for already approved architecture.
-
-- [ ] **Step 3: Add explicit-failure tests for disabled skeleton behavior**
-
-Append:
-
-```python
-@pytest.mark.asyncio
-async def test_unimplemented_pami_search_fails_explicitly() -> None:
-    gateway = PamiSearchGateway()
-    with pytest.raises(NotImplementedError, match="尚未实现"):
-        await gateway.keyword("career")
-
-
-@pytest.mark.asyncio
-async def test_unimplemented_pami_auth_fails_explicitly() -> None:
-    gateway = PamiAuthGateway("http://nginx:8081")
-    with pytest.raises(NotImplementedError, match="尚未实现"):
-        await gateway.authenticate({})
-```
-
-- [ ] **Step 4: Run the complete boundary test**
-
-```powershell
-Set-Location zhiyin-src/template
-python -m pytest tests/test_pami_boundary.py -v
-```
-
-Expected: 5 passed.
-
-- [ ] **Step 5: Commit the boundary guard**
-
-```powershell
-git add zhiyin-src/template/tests/test_pami_boundary.py
+git add tests/test_pami_boundary.py
 git commit -m "test: enforce zhiyin wanwu integration boundary"
 ```
 
 ---
 
-### Task 4: Align CI and Operator Documentation
+### Task 4: Align CI and Documentation
 
 **Files:**
 - Modify: `.github/workflows/ci.yml`
@@ -421,69 +287,39 @@ git commit -m "test: enforce zhiyin wanwu integration boundary"
 - Modify: `docs/README.md`
 - Modify: `docs/superpowers/plans/2026-09-15-pami-wanwu-source-deployment-baseline.md`
 
-**Interfaces:**
-- Consumes: tests from Tasks 1–3
-- Produces: accurate CI coverage and user-facing completion language
+- [ ] **Step 1: Extend the CI Wanwu step**
 
-- [ ] **Step 1: Add the new contracts to CI**
+Run the vendor, container, deployment, route, and pami-boundary test files, then
+run `python scripts/verify_wanwu_routes.py` from the repository root.
 
-Change the Wanwu test step to:
+- [ ] **Step 2: Correct the README scope**
 
-```yaml
-      - name: Wanwu 源码、路由与架构边界
-        run: >-
-          python -m pytest
-          tests/test_wanwu_vendor.py
-          tests/test_container_assets.py
-          tests/test_deploy_assets.py
-          tests/test_wanwu_routes.py
-          tests/test_pami_boundary.py
-          -q
-```
+State that:
 
-- [ ] **Step 2: Correct the repository scope statement**
+- the current delivery contains the source snapshot, independent build, unified
+  Compose, and native route configuration;
+- native routes use `http://127.0.0.1:8081` and Wanwu authentication;
+- Zhiyin `/api/v1/*` does not proxy them;
+- pami switches remain off and real resources are not claimed as connected.
 
-Replace the final paragraph under `README.md` “内置 pami/Wanwu 部署基线” with:
+- [ ] **Step 3: Link plans and mark the retained baseline**
 
-```markdown
-当前交付包含 Wanwu 源码快照、独立构建、统一 Compose 和原生接口路由。
-Wanwu 原生接口从 `http://127.0.0.1:8081` 的 Nginx/BFF 入口访问，继续使用
-Wanwu 自身的 JWT、API Key 和权限规则。职引 `/api/v1/*` 不透明代理这些接口。
+Add this plan to `docs/README.md`. Add a status note to the earlier baseline plan
+that it represents stages 1–2 and that Wanwu is not re-imported.
 
-`ZHIYIN_USE_PAMI_*` 保持关闭，`zhiyin-infrastructure/pami/` 仅保留生产替换
-骨架；本交付不宣称真实账号、模型、知识库、Agent、RAG 或工作流已经联通。
-```
+- [ ] **Step 4: Run focused verification**
 
-- [ ] **Step 3: Mark the earlier implementation plan as the completed baseline**
-
-After the header of
-`docs/superpowers/plans/2026-09-15-pami-wanwu-source-deployment-baseline.md`,
-add:
-
-```markdown
-> **状态说明（2026-09-15）：** 本计划对应现行设计的阶段 1–2，源码快照与部署
-> 资产已经提交。后续路由、边界、CI 与文档收口由
-> `2026-09-15-pami-wanwu-route-boundary-delivery.md` 承接；不重新导入 Wanwu。
-```
-
-- [ ] **Step 4: Link the completion plan in the document index**
-
-Add below the existing baseline-plan row in `docs/README.md`:
-
-```markdown
-| [superpowers/plans/2026-09-15-pami-wanwu-route-boundary-delivery.md](superpowers/plans/2026-09-15-pami-wanwu-route-boundary-delivery.md) | pami/Wanwu 原生路由、职引边界与最终验收计划 |
-```
-
-- [ ] **Step 5: Run focused tests and documentation checks**
+Run:
 
 ```powershell
 Set-Location zhiyin-src/template
 python -m pytest tests/test_wanwu_routes.py tests/test_pami_boundary.py tests/test_docs_alignment.py -q
+python ../../scripts/verify_wanwu_routes.py
 ```
 
-Expected: all selected tests pass.
+Expected: zero failures and route verifier exit 0.
 
-- [ ] **Step 6: Commit CI and documentation**
+- [ ] **Step 5: Commit**
 
 ```powershell
 git add .github/workflows/ci.yml README.md docs/README.md docs/superpowers/plans
@@ -492,35 +328,23 @@ git commit -m "docs: finalize embedded wanwu delivery scope"
 
 ---
 
-### Task 5: Complete Static Acceptance
+### Task 5: Complete Acceptance
 
-**Files:**
-- Verify only
+**Files:** Verify only.
 
-**Interfaces:**
-- Consumes: all artifacts from Tasks 1–4
-- Produces: final evidence against the approved design
-
-- [ ] **Step 1: Run the backend suite**
+- [ ] **Step 1: Run backend verification**
 
 ```powershell
 Set-Location zhiyin-src/template
 python -m pytest -q
-```
-
-Expected: zero failures.
-
-- [ ] **Step 2: Run lint, OpenAPI, and assembly checks**
-
-```powershell
-python -m ruff check . ../../scripts/import_wanwu.py
+python -m ruff check . ../../scripts
 python scripts/export_openapi.py --check
 python -m zhiyin_boot --check --phase=1
 ```
 
-Expected: all commands exit zero; the phase-one gate reports `passed: true`.
+Expected: zero failures and phase-one `passed: true`.
 
-- [ ] **Step 3: Run frontend checks**
+- [ ] **Step 2: Run frontend verification**
 
 ```powershell
 Set-Location zhiyin-web
@@ -529,9 +353,9 @@ npm run typecheck
 npm run check:api
 ```
 
-Expected: typecheck passes and generated API types have no semantic diff.
+Expected: all commands exit zero and generated API types have no semantic diff.
 
-- [ ] **Step 4: Render the unified Compose model**
+- [ ] **Step 3: Render deployment configuration**
 
 ```powershell
 Set-Location ../../..
@@ -539,9 +363,9 @@ python deploy/init_env.py
 docker compose --project-directory platform/wanwu --env-file deploy/.env -f platform/wanwu/docker-compose.yaml -f deploy/compose.yaml config --quiet
 ```
 
-Expected: Compose exits zero.
+Expected: exit zero.
 
-- [ ] **Step 5: Verify provenance, secrets, and cleanliness**
+- [ ] **Step 4: Verify provenance and repository state**
 
 ```powershell
 git diff --check
@@ -550,20 +374,12 @@ git status --short
 git log -8 --oneline --decorate
 ```
 
-Expected:
+Expected: no whitespace errors, no tracked secret files, and a clean worktree with
+focused route, boundary, and documentation commits.
 
-- `git diff --check` prints nothing;
-- the secret-file query prints nothing;
-- the worktree is clean;
-- focused commits for routes, boundary guards, and documentation are present.
+- [ ] **Step 5: Record the scoped conclusion**
 
-- [ ] **Step 6: Record the completion statement**
-
-Use this exact scope:
-
-```text
-Wanwu source, independent build assets, unified Compose configuration, native
-Nginx/BFF route exposure, Zhiyin boundary guards, CI, and operator documentation
-are complete. Real Wanwu accounts, models, resources, and business requests were
-not configured or validated and are outside this delivery.
-```
+Report that source, independent build assets, unified deployment configuration,
+native route exposure, boundary guards, CI, and documentation are complete.
+Explicitly state that real Wanwu accounts, models, resources, and business
+requests were not configured or validated.
