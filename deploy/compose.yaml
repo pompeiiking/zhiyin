@@ -5,10 +5,14 @@ services:
     ports: !reset []
   redis:
     ports: !reset []
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${WANWU_REDIS_PASSWORD}", "ping"]
   minio:
     ports: !reset []
   kafka:
     ports: !reset []
+    environment:
+      KAFKA_CFG_ADVERTISED_LISTENERS: BROKER://${WANWU_KAFKA_HOST}:9092,CONTROLLER://${WANWU_KAFKA_HOST}:9093
   es:
     ports: !reset []
   bff-service:
@@ -25,12 +29,12 @@ services:
 
   zhiyin-api:
     build:
-      context: ../zhiyin-src/template
+      context: ../../zhiyin-src/template
       dockerfile: Dockerfile
     image: zhiyin/backend:dev
     restart: unless-stopped
     env_file:
-      - .env
+      - ../../deploy/.env
     environment:
       ZHIYIN_ENV: local
       ZHIYIN_PAMI_BASE_URL: http://nginx:8081

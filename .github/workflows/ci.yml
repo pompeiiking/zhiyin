@@ -71,4 +71,4 @@ jobs:
       - name: 生成一次性本地环境
         run: python deploy/init_env.py
       - name: 校验 Compose 模型
-        run: docker compose --project-directory . --env-file deploy/.env -f platform/wanwu/docker-compose.yaml -f deploy/compose.yaml config --quiet
+        run: docker compose --project-directory platform/wanwu --env-file deploy/.env -f platform/wanwu/docker-compose.yaml -f deploy/compose.yaml config --quiet
