@@ -339,8 +339,9 @@ class InMemoryAssetRepository(AssetRepository):
         for phase in plan.phases:
             for task in phase.tasks:
                 if _task_key(phase.name, task.text) == task_id or task.text == task_id:
-                    task.done = True
-                    task.done_at = _now()
+                    if not task.done:
+                        task.done = True
+                        task.done_at = _now()
                     return _snapshot(plan)
         raise LookupError(f"行动任务不存在：{task_id}")
 

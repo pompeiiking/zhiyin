@@ -47,6 +47,8 @@ class LocalKnowledgeRepo(KnowledgeGateway):
 
         for space in namespaces:
             for index, raw in enumerate(self._load(space)):
+                if raw.get("status", "enabled") != "enabled":
+                    continue
                 if filters and not _match_filters(raw, filters):
                     continue
                 score = _score(raw, terms)
@@ -109,11 +111,22 @@ class LocalKeywordSearch(SearchGateway):
 
 
 def _terms(query: str) -> list[str]:
-    """极简切分：按空白与常见标点断开，保留长度 >= 2 的片段。"""
+    """第一期本地切分：标点分段，并为连续中文补二元词。
+
+    这样“计算机专业”可以命中“计算机类专业”，无需引入分词依赖；英文或编码
+    仍使用原始分段，真实分词与向量召回留到 M3。
+    """
     normalized = query or ""
     for token in "，。！？、；：（）【】《》,.!?;:()[]\"'\n\t":
         normalized = normalized.replace(token, " ")
-    return [part for part in normalized.split(" ") if len(part) >= 2]
+    terms: list[str] = []
+    for part in normalized.split(" "):
+        if len(part) < 2:
+            continue
+        terms.append(part)
+        if len(part) > 2 and all("\u4e00" <= char <= "\u9fff" for char in part):
+            terms.extend(part[index : index + 2] for index in range(len(part) - 1))
+    return list(dict.fromkeys(terms))
 
 
 def _score(raw: dict[str, Any], terms: list[str]) -> float:

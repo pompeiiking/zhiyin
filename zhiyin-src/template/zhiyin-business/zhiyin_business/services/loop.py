@@ -283,7 +283,7 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
             if spec is not None and spec.json_schema:
                 return spec.json_schema
         except NotImplementedError:
-            # 第一期的 Registry 可能仍是骨架，回落到模型生成的 Schema。
+            # Registry 临时不可用时回落到业务模型生成的 Schema。
             pass
         return self._contracts[context.stage].model_json_schema()
 

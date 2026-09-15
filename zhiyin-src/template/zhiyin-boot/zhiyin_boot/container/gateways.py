@@ -56,6 +56,28 @@ def build_gateways(settings: Settings) -> dict[str, Any]:
         "raw_query": None,
     }
 
+    if settings.redis_url:
+        from zhiyin_infrastructure.redis import RedisCacheGateway, RedisClientFactory
+
+        redis_factory = RedisClientFactory(
+            settings.redis_url,
+            password=settings.redis_password,
+            ssl=settings.redis_ssl,
+            pool_size=settings.redis_pool_size,
+        )
+        gateways["cache"] = RedisCacheGateway(
+            redis_factory,
+            env=settings.env,
+            fallback=InMemoryCache(),
+        )
+        gateways["redis_factory"] = redis_factory
+        gateways["redis_session"] = redis_factory.domain_store(settings.env, "session")
+        gateways["redis_schedule"] = redis_factory.domain_store(settings.env, "schedule")
+        gateways["redis_guard"] = redis_factory.domain_store(settings.env, "guard")
+        gateways["redis_crawl"] = redis_factory.domain_store(settings.env, "crawl")
+        gateways["redis_knowledge"] = redis_factory.domain_store(settings.env, "knowledge")
+        gateways["redis_vector_sync"] = redis_factory.domain_store(settings.env, "vector-sync")
+
     # ---------- pami 替换点（§十） ----------
     # 未实现的分支在首次调用时抛 NotImplementedError，而不是静默回落本地 ——
     # 静默回落会让"已经切到 pami"变成假象，问题推迟到线上才暴露。

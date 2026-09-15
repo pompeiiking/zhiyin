@@ -63,13 +63,13 @@ class ApplicationFacade(ABC):
     # ---------- 启动 ----------
 
     @abstractmethod
-    def bootstrap(self, user_id: str) -> BootstrapView:
+    async def bootstrap(self, user_id: str) -> BootstrapView:
         """启动装配视图。"""
 
     # ---------- 对话 ----------
 
     @abstractmethod
-    def list_sessions(self, user_id: str) -> SessionListView:
+    async def list_sessions(self, user_id: str) -> SessionListView:
         """左栏会话列表。"""
 
     @abstractmethod
@@ -85,19 +85,19 @@ class ApplicationFacade(ABC):
     # ---------- 工作台 ----------
 
     @abstractmethod
-    def get_workspace(self, user_id: str) -> WorkspacePageView:
+    async def get_workspace(self, user_id: str) -> WorkspacePageView:
         """工作台聚合视图。"""
 
     # ---------- 资产 ----------
 
     @abstractmethod
-    def list_asset_versions(
+    async def list_asset_versions(
         self, user_id: str, asset_type: AssetType
     ) -> list[AssetVersionView]:
         """资产版本列表（含 diff 与依赖字段）。"""
 
     @abstractmethod
-    def get_report_full_text(
+    async def get_report_full_text(
         self, user_id: str, version: Optional[int] = None
     ) -> ReportFullTextView:
         """完整报告页正文。"""

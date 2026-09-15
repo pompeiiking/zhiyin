@@ -67,7 +67,8 @@ curl http://127.0.0.1:8000/api/v1/app/bootstrap          # 业务接口（Facade
 `tests/test_api_prefix.py` 会拦住"路由里再写一次 v1"和"重复嵌套版本段"。
 
 `/healthz` 返回 `status: ok|degraded` 与逐部件的装配状态。**degraded 不代表启动失败**，
-它表示有部件仍是骨架或未实现（第一期属预期），`assembly.missing` 会列出缺口与归属负责人。
+它表示有后续阶段部件仍是骨架或未实现，`assembly.missing` 会列出缺口与归属负责人；
+第一期 M2 门禁只检查本期所需能力。
 
 跑测试：
 
@@ -87,7 +88,7 @@ pytest
 | `zhiyin-business/` | `zhiyin_business` | `ports/`（接口，含 api 的两个取数出口）· `policies/`（规则）· `services/`（实现）· `workers/`（异步） | `zhiyin_orchestration`、`zhiyin_data_sdk`、`zhiyin_kernel` |
 | `zhiyin-orchestration/` | `zhiyin_orchestration` | Agent / Workflow / EventBus / Schedule / State / Notify | `zhiyin_data_sdk`、`zhiyin_kernel` |
 | `zhiyin-data-sdk/` | `zhiyin_data_sdk` | Repository / Gateway / Transaction 抽象（全部 async） | `zhiyin_kernel` |
-| `zhiyin-infrastructure/` | `zhiyin_infrastructure` | 第一期实现（`local/`）+ 替换点抽屉（`mysql/` `redis/` `pgvector/` `kafka/` `pami/` `workers/`，有清单无实现） | `zhiyin_data_sdk`、`zhiyin_kernel` |
+| `zhiyin-infrastructure/` | `zhiyin_infrastructure` | 第一期本地实现、Redis 分库与合规采集最小链路；另含 M3 替换点抽屉（MySQL/pgvector/Kafka/PAMI/VectorSync） | `zhiyin_data_sdk`、`zhiyin_kernel` |
 | `zhiyin-boot/` | `zhiyin_boot` | 装配（`container/`）、报告与门禁（`report.py`）、CLI | 全部 |
 | `zhiyin-web/` | — | Vue 3 + Vite 前端（第一期骨架） | — |
 | `data/` | — | 第一期动态资源与本地存储（JSON / 对象目录）。`registry/` 下每一类内容改一个 JSON 即可生效，不需要发版 | — |
@@ -118,20 +119,14 @@ pytest
 
 ## 第一期实现边界
 
-已实现：基础设施本地适配（内存 Repository、JSON 动态资源、本地事件总线 / 调度 / 通知 /
-对象存储 / 关键词检索）、编排层六个原语的默认实现、五环节 Loop 的参考实现、
-应用工厂与启动入口。
+已实现：基础设施本地适配（八类内存 Repository、JSON 动态资源、本地事件总线 / 调度 /
+通知 / 对象存储 / 关键词检索）、Redis DB 0–6/15 分库适配、合规采集最小链路、编排层
+六个原语、五环节 Loop 与 Orchestrator、黑板四件套、Workspace / Function、Identity /
+Registry、Application Facade，以及影响传播和停滞干预 Worker。第一期七项 E2E 已执行，
+`--check --phase=2` 通过。
 
-外壳已铺完整（**文件存在 ≠ 能力具备**）：Orchestrator、黑板四件套服务
-（Profile / Behavior / ConversationMemory / Asset）、Workspace / Function Service、
-Identity / Registry Service、Application Facade、两个业务 Worker（影响面传播 / 停滞干预）
-与一个数据管道 Worker（向量同步）都已落为**类骨架**——
-签名按 `zhiyin_business/ports/` 冻结、方法体 `raise NotImplementedError`、
-类上自报 `IMPLEMENTATION_STATUS = "skeleton"`，且**不进装配表**。
-因此 `/healthz` 与 `--check` 仍把它们如实报成 `not_wired`（见 `assembly.missing`），
-不会因为文件存在就假装装好了。规则落位在 `policies/`，规则的**参数**在
-`data/registry/policy_params.json`。实现填完后在
-`zhiyin-boot/zhiyin_boot/container/services.py` 接上一行，`--check --phase=2` 随即转绿。
+M3 仍保留真实 Embedding、`raw_query`、事务管理器和 VectorSync 等替换点；它们会继续在
+全量 `/healthz` 中显示为 skeleton/not_wired，但不阻塞第一期 M2 验收。
 
 `--check` 的输出里有两个不同的缺口清单：`missing` 是"能力位没人管"，
 `skeletons` 是"外壳就位、实现待补"——本期进度看后者。

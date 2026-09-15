@@ -1,32 +1,317 @@
-"""Redis 实现目录（**空抽屉**，尚未实现）。
+"""第一期 Redis 基础能力。
 
-一个目录 = 一套实现。本目录是 M3「真实存储」里**缓存与调度**的落点：
-把第一期进程内的 `local/` 实现换成 Redis 实现，业务层、编排层、接入层
-**一行都不用改**（换实现只改 `zhiyin_boot/container/gateways.py` 的装配表）。
-
-为什么要先建空目录而不是"等实现时再说"
---------------------------------------
-`local/` 是"内存实现"的家。没有本目录时，Redis 实现只有两个去处：
-写进 `local/`（名字与内容不符，后来者找不到），或临时新建目录（命名各写一套）。
-空抽屉的成本是一个文件，收益是"实现放哪"这个决定**在实现之前就定了**。
-
-待实现的 Port 清单（唯一事实来源是 `zhiyin_data_sdk/gateways/`，本文件只是索引）
---------------------------------------------------------------------------------
-| Port | 契约文件 | 第一期本地实现（对照语义） | 装配位 |
-| --- | --- | --- | --- |
-| `CacheGateway` | `gateways/cache.py` | `local/cache.py::InMemoryCache` | `gateways.cache` |
-| `RateLimitGateway` | `gateways/security.py` | `local/security.py::NoopRateLimit` | `gateways.rate_limit` |
-| `SchedulerGateway` | `gateways/messaging.py` | `local/messaging.py::LocalScheduler` | `gateways.scheduler` |
-
-开工前必须满足的条件
---------------------
-1. **契约测试通过**：新实现要过 `tests/contracts/test_gateway_contract.py` 的同一套
-   语义断言（缓存 TTL 与命名空间隔离、限流窗口、调度冷却期与次数上限）。
-   在 `tests/contracts/conftest.py` 的 `GATEWAY_FACTORIES` 里加一行即可自动纳入。
-2. **语义不许漂移**：Redis 版与内存版的**可观察行为**必须一致——
-   TTL 过期、命名空间互不串扰、冷却期与次数上限的边界，都由契约测试锁住。
-
-不要把这些实现写回 `local/`：那是内存实现的家（`local/` 的实现必须能在
-无任何外部依赖的情况下单机跑通，这是第一期"本地可启动"的前提）。
+单实例使用逻辑 DB 隔离数据域，同时始终保留环境与业务域 Key 前缀。业务层只依赖
+Data SDK 的 Port；Redis Client、DB 编号、序列化和降级全部留在 Infrastructure。
 """
 
+from __future__ import annotations
+
+import json
+import logging
+from enum import IntEnum
+from typing import Any, Mapping, Optional, Sequence
+
+from zhiyin_data_sdk.gateways.cache import CacheGateway
+
+logger = logging.getLogger(__name__)
+
+
+class RedisLogicalDatabase(IntEnum):
+    CACHE = 0
+    SESSION = 1
+    SCHEDULE = 2
+    GUARD = 3
+    CRAWL = 4
+    KNOWLEDGE = 5
+    VECTOR_SYNC = 6
+    TEST = 15
+
+
+DOMAIN_DATABASES: dict[str, RedisLogicalDatabase] = {
+    "cache": RedisLogicalDatabase.CACHE,
+    "session": RedisLogicalDatabase.SESSION,
+    "schedule": RedisLogicalDatabase.SCHEDULE,
+    "guard": RedisLogicalDatabase.GUARD,
+    "crawl": RedisLogicalDatabase.CRAWL,
+    "knowledge": RedisLogicalDatabase.KNOWLEDGE,
+    "vector-sync": RedisLogicalDatabase.VECTOR_SYNC,
+    "test": RedisLogicalDatabase.TEST,
+}
+
+_CACHE_NAMESPACES = {"cache", "profile", "workspace", "registry", "bootstrap"}
+_NAMESPACE_DOMAINS = {
+    **{namespace: "cache" for namespace in _CACHE_NAMESPACES},
+    "session": "session",
+    "schedule": "schedule",
+    "rate-limit": "guard",
+    "idempotency": "guard",
+    "dedup": "guard",
+    "guard": "guard",
+    "crawl": "crawl",
+    "knowledge": "knowledge",
+    "retrieval": "knowledge",
+    "vector-sync": "vector-sync",
+    "test": "test",
+}
+
+
+def build_redis_key(env: str, domain: str, entity: str, identifier: str) -> str:
+    """构造 ``zhiyin:{env}:{domain}:{entity}:{identifier}``，拒绝空段。"""
+    parts = (env, domain, entity, identifier)
+    if any(not str(part).strip() for part in parts):
+        raise ValueError("Redis Key 的 env/domain/entity/identifier 均不能为空")
+    if any(":" in str(part) for part in (env, domain, entity)):
+        raise ValueError("Redis Key 的 env/domain/entity 不得包含冒号")
+    if domain not in DOMAIN_DATABASES:
+        raise ValueError(f"未登记的 Redis 数据域：{domain}")
+    return ":".join(("zhiyin", *(str(part).strip() for part in parts)))
+
+
+class RedisClientFactory:
+    """为每个逻辑 DB 创建并复用固定客户端，运行中不执行 ``SELECT``。"""
+
+    def __init__(
+        self,
+        url: str,
+        *,
+        password: str = "",
+        ssl: bool = False,
+        pool_size: int = 20,
+        clients: Optional[Mapping[int, Any]] = None,
+    ) -> None:
+        self._url = url
+        self._password = password
+        self._ssl = ssl
+        self._pool_size = pool_size
+        self._clients: dict[int, Any] = dict(clients or {})
+
+    def client(self, database: int | RedisLogicalDatabase) -> Any:
+        db = int(database)
+        if db not in {int(item) for item in RedisLogicalDatabase}:
+            raise ValueError(f"未登记的 Redis 逻辑库：DB {db}")
+        if db not in self._clients:
+            self._clients[db] = self._create(db)
+        return self._clients[db]
+
+    def domain_store(self, env: str, domain: str) -> "RedisDomainStore":
+        try:
+            database = DOMAIN_DATABASES[domain]
+        except KeyError as exc:
+            raise ValueError(f"未登记的 Redis 数据域：{domain}") from exc
+        return RedisDomainStore(self.client(database), env=env, domain=domain)
+
+    def _create(self, database: int) -> Any:
+        try:
+            import redis.asyncio as redis
+        except ImportError as exc:  # pragma: no cover - 取决于部署环境
+            raise RuntimeError("Redis 已启用，但未安装 redis 依赖；请重新安装项目依赖") from exc
+
+        url = self._url
+        if self._ssl and url.startswith("redis://"):
+            url = "rediss://" + url[len("redis://") :]
+        return redis.from_url(
+            url,
+            db=database,
+            password=self._password or None,
+            decode_responses=True,
+            max_connections=self._pool_size,
+        )
+
+    async def close(self) -> None:
+        for client in self._clients.values():
+            closer = getattr(client, "aclose", None) or getattr(client, "close", None)
+            if closer is not None:
+                result = closer()
+                if hasattr(result, "__await__"):
+                    await result
+
+
+class RedisCacheGateway(CacheGateway):
+    """Redis 缓存实现；不可用时可回退到进程内的可重建缓存。"""
+
+    IMPLEMENTATION_STATUS = "wired"
+
+    def __init__(
+        self,
+        factory: RedisClientFactory,
+        *,
+        env: str,
+        default_ttl_s: int = 300,
+        fallback: Optional[CacheGateway] = None,
+    ) -> None:
+        self._factory = factory
+        self._env = env
+        self._default_ttl_s = default_ttl_s
+        self._fallback = fallback
+
+    async def get(self, namespace: str, key: str) -> Optional[str]:
+        client, redis_key = self._resolve(namespace, key)
+        try:
+            return await client.get(redis_key)
+        except Exception as exc:
+            return await self._fallback_get(namespace, key, exc)
+
+    async def set(
+        self, namespace: str, key: str, value: str, *, ttl_s: Optional[int] = None
+    ) -> None:
+        client, redis_key = self._resolve(namespace, key)
+        effective = self._default_ttl_s if ttl_s is None else ttl_s
+        try:
+            if effective > 0:
+                await client.set(redis_key, value, ex=effective)
+            else:
+                raise ValueError("Redis 缓存必须设置正数 TTL")
+        except ValueError:
+            raise
+        except Exception as exc:
+            await self._fallback_set(namespace, key, value, effective, exc)
+
+    async def delete(self, namespace: str, key: str) -> None:
+        client, redis_key = self._resolve(namespace, key)
+        try:
+            await client.delete(redis_key)
+        except Exception as exc:
+            await self._fallback_delete(namespace, key, exc)
+
+    async def delete_many(self, namespace: str, keys: Sequence[str]) -> int:
+        if not keys:
+            return 0
+        resolved = [self._resolve(namespace, key) for key in keys]
+        client = resolved[0][0]
+        try:
+            return int(await client.delete(*(redis_key for _, redis_key in resolved)))
+        except Exception as exc:
+            if self._fallback is None:
+                raise
+            logger.warning("Redis 批量删除失败，使用本地缓存降级：namespace=%s error=%s", namespace, type(exc).__name__)
+            return await self._fallback.delete_many(namespace, keys)
+
+    async def clear_namespace(self, namespace: str) -> None:
+        client, prefix = self._resolve(namespace, "namespace-clear")
+        pattern = prefix.rsplit(":", 1)[0] + ":*"
+        try:
+            batch: list[str] = []
+            async for redis_key in client.scan_iter(match=pattern, count=200):
+                batch.append(redis_key)
+                if len(batch) == 200:
+                    await client.delete(*batch)
+                    batch.clear()
+            if batch:
+                await client.delete(*batch)
+        except Exception as exc:
+            if self._fallback is None:
+                raise
+            logger.warning("Redis 命名空间清理失败，使用本地缓存降级：namespace=%s error=%s", namespace, type(exc).__name__)
+            await self._fallback.clear_namespace(namespace)
+
+    def _resolve(self, namespace: str, key: str) -> tuple[Any, str]:
+        try:
+            domain = _NAMESPACE_DOMAINS[namespace]
+        except KeyError as exc:
+            raise ValueError(f"未登记的 Redis namespace：{namespace}") from exc
+        database = DOMAIN_DATABASES[domain]
+        redis_key = build_redis_key(self._env, domain, namespace, key)
+        return self._factory.client(database), redis_key
+
+    async def _fallback_get(self, namespace: str, key: str, exc: Exception) -> Optional[str]:
+        if self._fallback is None:
+            raise exc
+        logger.warning("Redis 读取失败，使用本地缓存降级：namespace=%s error=%s", namespace, type(exc).__name__)
+        return await self._fallback.get(namespace, key)
+
+    async def _fallback_set(
+        self, namespace: str, key: str, value: str, ttl_s: int, exc: Exception
+    ) -> None:
+        if self._fallback is None:
+            raise exc
+        logger.warning("Redis 写入失败，使用本地缓存降级：namespace=%s error=%s", namespace, type(exc).__name__)
+        await self._fallback.set(namespace, key, value, ttl_s=ttl_s)
+
+    async def _fallback_delete(self, namespace: str, key: str, exc: Exception) -> None:
+        if self._fallback is None:
+            raise exc
+        logger.warning("Redis 删除失败，使用本地缓存降级：namespace=%s error=%s", namespace, type(exc).__name__)
+        await self._fallback.delete(namespace, key)
+
+
+class RedisDomainStore:
+    """绑定单一数据域/逻辑 DB 的通用临时状态适配器。"""
+
+    IMPLEMENTATION_STATUS = "wired"
+
+    def __init__(self, client: Any, *, env: str, domain: str) -> None:
+        if domain not in DOMAIN_DATABASES:
+            raise ValueError(f"未登记的 Redis 数据域：{domain}")
+        self._client = client
+        self._env = env
+        self._domain = domain
+
+    def key(self, entity: str, identifier: str) -> str:
+        return build_redis_key(self._env, self._domain, entity, identifier)
+
+    async def get_text(self, entity: str, identifier: str) -> Optional[str]:
+        return await self._client.get(self.key(entity, identifier))
+
+    async def set_text(
+        self, entity: str, identifier: str, value: str, *, ttl_s: int
+    ) -> None:
+        if ttl_s <= 0:
+            raise ValueError("临时状态必须设置正数 TTL")
+        await self._client.set(self.key(entity, identifier), value, ex=ttl_s)
+
+    async def get_json(self, entity: str, identifier: str) -> Optional[Any]:
+        value = await self.get_text(entity, identifier)
+        return json.loads(value) if value is not None else None
+
+    async def set_json(
+        self, entity: str, identifier: str, value: Any, *, ttl_s: int
+    ) -> None:
+        payload = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        await self.set_text(entity, identifier, payload, ttl_s=ttl_s)
+
+    async def delete(self, entity: str, identifier: str) -> bool:
+        return bool(await self._client.delete(self.key(entity, identifier)))
+
+    async def set_once(
+        self, entity: str, identifier: str, value: str, *, ttl_s: int
+    ) -> bool:
+        if ttl_s <= 0:
+            raise ValueError("幂等/去重键必须设置正数 TTL")
+        return bool(
+            await self._client.set(
+                self.key(entity, identifier), value, nx=True, ex=ttl_s
+            )
+        )
+
+    async def increment(
+        self, entity: str, identifier: str, *, ttl_s: int, amount: int = 1
+    ) -> int:
+        if ttl_s <= 0:
+            raise ValueError("计数键必须设置正数 TTL")
+        key = self.key(entity, identifier)
+        value = int(await self._client.incrby(key, amount))
+        if value == amount:
+            await self._client.expire(key, ttl_s)
+        return value
+
+    async def acquire_lock(
+        self, entity: str, identifier: str, owner_token: str, *, ttl_s: int
+    ) -> bool:
+        return await self.set_once(entity, identifier, owner_token, ttl_s=ttl_s)
+
+    async def release_lock(self, entity: str, identifier: str, owner_token: str) -> bool:
+        script = (
+            "if redis.call('get', KEYS[1]) == ARGV[1] then "
+            "return redis.call('del', KEYS[1]) else return 0 end"
+        )
+        return bool(await self._client.eval(script, 1, self.key(entity, identifier), owner_token))
+
+
+__all__ = [
+    "DOMAIN_DATABASES",
+    "RedisCacheGateway",
+    "RedisClientFactory",
+    "RedisDomainStore",
+    "RedisLogicalDatabase",
+    "build_redis_key",
+]

@@ -13,7 +13,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 
 class InterventionPolicy(ABC):
@@ -34,3 +34,42 @@ class InterventionPolicy(ABC):
         （`last_notified_at`）、打扰上限（`notifications_in_window`）。
         任一不满足即返回 False，静默不打扰。
         """
+
+
+class ConfiguredInterventionPolicy(InterventionPolicy):
+    """使用动态资源注入的停滞、冷却和窗口上限参数。"""
+
+    IMPLEMENTATION_STATUS = "wired"
+
+    def __init__(self) -> None:
+        self.configure({})
+
+    def configure(self, values: dict) -> None:
+        self.stall_threshold_days = int(values.get("stall_threshold_days", 3))
+        self.cooldown_hours = float(values.get("cooldown_hours", 48))
+        self.max_notifications_per_window = int(
+            values.get("max_notifications_per_window", 2)
+        )
+
+    def should_intervene(
+        self,
+        *,
+        days_inactive: int,
+        last_notified_at: datetime | None,
+        notifications_in_window: int,
+        now: datetime,
+    ) -> bool:
+        if days_inactive < self.stall_threshold_days:
+            return False
+        if notifications_in_window >= self.max_notifications_per_window:
+            return False
+        if last_notified_at is None:
+            return True
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        if last_notified_at.tzinfo is None:
+            last_notified_at = last_notified_at.replace(tzinfo=timezone.utc)
+        return now - last_notified_at >= timedelta(hours=self.cooldown_hours)
+
+
+__all__ = ["ConfiguredInterventionPolicy", "InterventionPolicy"]

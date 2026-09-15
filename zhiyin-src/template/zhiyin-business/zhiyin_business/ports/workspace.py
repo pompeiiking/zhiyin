@@ -36,6 +36,8 @@ class StagePanel(BaseModel):
     diff_from_previous: Optional[str] = None
     updated_at: Optional[datetime] = None
     collapsed: bool = False
+    task_id: Optional[str] = Field(default=None, description="会话摘要使用的任务 id")
+    lead_agent: Optional[str] = Field(default=None, description="会话摘要使用的主理 id")
 
 
 class DependencyEdge(BaseModel):

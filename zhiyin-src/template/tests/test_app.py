@@ -1,4 +1,4 @@
-"""接口层测试：应用能起来、统一信封生效、未实现能力按约定降级。"""
+"""接口层测试：应用能起来、统一信封生效、第一期 Facade 返回真实数据。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 from zhiyin_api.app import API_PREFIX
 from zhiyin_boot import Settings, build_container, wire_application
 from zhiyin_api.app import create_app
-from zhiyin_api.dto.common import ErrorCode
 
 
 @pytest.fixture
@@ -41,8 +40,7 @@ def test_healthz_reports_assembly(client: TestClient) -> None:
     # 已实现的部件必须如实报 wired
     assert assembly["orchestration"]["agent_engine"] == "wired"
     assert assembly["services"]["loop"] == "wired"
-    # 未实现的部件必须如实报 not_wired，而不是装作装好了
-    assert assembly["services"]["facade"] == "not_wired"
+    assert assembly["services"]["facade"] == "wired"
     assert assembly["missing"]
 
 
@@ -57,15 +55,15 @@ def test_openapi_is_served(client: TestClient) -> None:
     assert "/healthz" in paths
 
 
-def test_unimplemented_capability_degrades_instead_of_500(client: TestClient) -> None:
-    """第一期 Facade 未实现：接口按 DEPENDENCY_UNAVAILABLE 降级，不返回 500（§6.2）。"""
+def test_bootstrap_returns_first_phase_data(client: TestClient) -> None:
+    """第一期 Facade 已实现：首页一次取得动态任务入口与文案资源。"""
     response = client.get(f"{API_PREFIX}/app/bootstrap")
-    assert response.status_code == 503
+    assert response.status_code == 200
 
     body = response.json()
-    assert body["code"] == ErrorCode.DEPENDENCY_UNAVAILABLE
-    assert body["message"]
-    # 统一信封字段齐备（R-API-006）
+    assert body["code"] == 0
+    assert body["data"]["app_name"]
+    assert body["data"]["task_entries"]
     assert set(body) >= {"code", "message", "data", "trace_id"}
 
 

@@ -1,4 +1,4 @@
-"""动态资源读侧服务实现（**骨架**，方法体未实现）。
+"""动态资源读侧服务实现。
 
 落位：`business/services/registry.py` —— 业务编排负责人。
 依赖：`RegistryRepository`（内容型动态资源）+ `FeatureFlagGateway`（配置型开关）。
@@ -36,13 +36,10 @@ from zhiyin_kernel.dynamic_content import (
 from zhiyin_kernel.registry import AgentDescriptor, TaskEntrySpec
 from zhiyin_kernel.registry import TrackEventSpec
 
-_TODO = "TODO(骨架): RegistryService 未实现"
-
-
 class DefaultRegistryService(RegistryService):
-    """动态资源读侧服务默认实现（骨架）。"""
+    """动态资源读侧服务默认实现。"""
 
-    IMPLEMENTATION_STATUS = "skeleton"
+    IMPLEMENTATION_STATUS = "wired"
 
     def __init__(
         self,
@@ -53,34 +50,34 @@ class DefaultRegistryService(RegistryService):
         self._feature_flags = feature_flags
 
     async def list_task_entries(self) -> list[TaskEntrySpec]:
-        raise NotImplementedError(f"{_TODO}：转发 RegistryRepository.list_task_entries")
+        return await self._registry.list_task_entries()
 
     async def get_agent(self, agent_id: str) -> Optional[AgentDescriptor]:
-        raise NotImplementedError(f"{_TODO}：转发 RegistryRepository.get_agent")
+        return await self._registry.get_agent(agent_id)
 
     async def list_menus(self) -> list[MenuSpec]:
-        raise NotImplementedError(f"{_TODO}：转发 RegistryRepository.list_menus")
+        return await self._registry.list_menus()
 
     async def list_routes(self) -> list[RouteSpec]:
-        raise NotImplementedError(f"{_TODO}：转发 RegistryRepository.list_routes")
+        return await self._registry.list_routes()
 
     async def get_copy_bundle(self, bundle: str = "zh-CN") -> dict[str, str]:
-        raise NotImplementedError(f"{_TODO}：转发 RegistryRepository.get_copy_bundle")
+        return await self._registry.get_copy_bundle(bundle)
 
     async def list_banners(self) -> list[BannerSpec]:
-        raise NotImplementedError(f"{_TODO}：转发 RegistryRepository.list_banners")
+        return await self._registry.list_banners()
 
     async def list_trust_blocks(self) -> list[TrustBlockSpec]:
-        raise NotImplementedError(f"{_TODO}：转发 RegistryRepository.list_trust_blocks")
+        return await self._registry.list_trust_blocks()
 
     async def list_faqs(self) -> list[FaqSpec]:
-        raise NotImplementedError(f"{_TODO}：转发 RegistryRepository.list_faqs")
+        return await self._registry.list_faqs()
 
     async def list_track_events(self) -> list[TrackEventSpec]:
-        raise NotImplementedError(f"{_TODO}：转发 RegistryRepository.list_track_events")
+        return await self._registry.list_track_events()
 
     async def feature_flags(self) -> dict[str, bool]:
-        raise NotImplementedError(f"{_TODO}：转发 FeatureFlagGateway.all")
+        return await self._feature_flags.all()
 
 
 __all__ = ["DefaultRegistryService"]

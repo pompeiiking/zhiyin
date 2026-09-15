@@ -15,7 +15,11 @@
       "source_url": "https://xz.chsi.com.cn/home.action",
       "fetched_at": "2026-09-14T00:00:00+00:00",
       "source": "学职平台",
-      "namespace": "occupation"
+      "source_id": "src-xuezhi-demo",
+      "namespace": "occupation",
+      "version": 1,
+      "status": "enabled",
+      "content_hash": "0db3b749c5f0fc3d99b95c1c508e768c74359787f249463e908ae441b1ac698e"
     },
     {
       "id": "occ-2-06-03-02",
@@ -31,18 +35,11 @@
       "source_url": "https://xz.chsi.com.cn/home.action",
       "fetched_at": "2026-09-14T00:00:00+00:00",
       "source": "学职平台",
-      "namespace": "occupation"
-    },
-    {
-      "id": "mj-0809",
-      "title": "计算机类专业",
-      "summary": "培养计算系统与软件设计能力，主干课程含程序设计、数据结构、操作系统、数据库与计算机网络。",
-      "tags": ["计算机", "专业", "课程"],
-      "major_code": "0809",
-      "source_url": "https://gk.chsi.com.cn",
-      "fetched_at": "2026-09-14T00:00:00+00:00",
-      "source": "阳光志愿信息服务系统",
-      "namespace": "profession"
+      "source_id": "src-xuezhi-demo",
+      "namespace": "occupation",
+      "version": 1,
+      "status": "enabled",
+      "content_hash": "95aacf27b5238143e8a699f1c8e2fd173a47b3117b03dc2d9de949c4a357e9e6"
     }
   ]
 }

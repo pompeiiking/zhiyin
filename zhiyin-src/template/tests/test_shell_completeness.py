@@ -145,7 +145,10 @@ def test_infrastructure_drawers_exist() -> None:
 # 已用**真实实现**交付、因此不应再有骨架文件的能力位。
 # 登记在这里等于明确声明"它不是待补的格子"；新增能力位时要么给骨架（文件 + 类名 + 签名），
 # 要么在此登记——两者都不做，下面的守卫会失败。
-WIRED_SERVICE_PORTS: frozenset[str] = frozenset({"loop"})
+WIRED_SERVICE_PORTS: frozenset[str] = frozenset(
+    {"loop", *SERVICE_SHELL}
+)
+WIRED_WORKER_PORTS: frozenset[str] = frozenset({"impact", "active_event"})
 
 
 def test_every_capability_slot_is_wired_or_shelled() -> None:
@@ -238,13 +241,13 @@ def test_worker_contract_stays_minimal() -> None:
     assert Worker.__abstractmethods__ == frozenset({"run_once"})
 
 
-@pytest.mark.parametrize("port", sorted(SERVICE_SHELL))
-def test_skeleton_declares_its_status(port: str) -> None:
-    module, class_name = SERVICE_SHELL[port]
-    assert getattr(_load(module, class_name), "IMPLEMENTATION_STATUS", None) == "skeleton"
+def test_remaining_service_skeletons_declare_their_status() -> None:
+    for port in sorted(set(SERVICE_SHELL) - WIRED_SERVICE_PORTS):
+        module, class_name = SERVICE_SHELL[port]
+        assert getattr(_load(module, class_name), "IMPLEMENTATION_STATUS", None) == "skeleton"
 
 
-@pytest.mark.parametrize("port", sorted(WORKER_SHELL))
+@pytest.mark.parametrize("port", sorted(set(WORKER_SHELL) - WIRED_WORKER_PORTS))
 def test_worker_skeleton_declares_its_status(port: str) -> None:
     module, class_name = WORKER_SHELL[port]
     assert getattr(_load(module, class_name), "IMPLEMENTATION_STATUS", None) == "skeleton"
@@ -263,28 +266,15 @@ def _test_settings():
     )
 
 
-def test_skeletons_are_not_wired_into_the_container() -> None:
-    """骨架只铺文件，不进装配表。
-
-    装配表一注册，`--check` 就会把它算成"这个能力位有人了"。本期没有实现，
-    所以必须保持 not_wired，让缺口如实可见（`missing` 会列出归属）。
-    """
+def test_first_phase_is_wired_and_later_worker_stays_pending() -> None:
+    """M2 能力全部装配；M3 向量同步仍如实保持未装配。"""
     from zhiyin_boot import build_container, describe_assembly
 
     report = describe_assembly(build_container(_test_settings()))
 
-    assert report.services["facade"] == "not_wired"
-    for port in (
-        "orchestrator",
-        "profile_service",
-        "asset_service",
-        "function_service",
-        "identity_service",
-        "registry_service",
-    ):
-        assert report.services[port] == "not_wired"
-    for port in ("impact", "active_event", "vector_sync"):
-        assert report.workers[port] == "not_wired"
+    assert all(report.services[port] == "wired" for port in WIRED_SERVICE_PORTS)
+    assert report.workers["active_event"] == "wired"
+    assert report.workers["vector_sync"] == "not_wired"
 
 
 def test_wired_skeleton_is_reported_as_skeleton() -> None:
@@ -295,7 +285,6 @@ def test_wired_skeleton_is_reported_as_skeleton() -> None:
     from zhiyin_api.runtime import SKELETON
     from zhiyin_boot import describe_assembly
     from zhiyin_boot.container import Container
-    from zhiyin_business.services import DefaultOrchestrator
 
     container = Container(
         settings=_test_settings(),
@@ -323,7 +312,6 @@ def test_wired_skeleton_is_reported_as_skeleton() -> None:
     report = describe_assembly(container)
 
     assert report.services["orchestrator"] == SKELETON
-    assert DefaultOrchestrator.IMPLEMENTATION_STATUS == "skeleton"
 
 
 # --------------------------------------------------------------------------

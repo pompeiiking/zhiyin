@@ -30,3 +30,27 @@ class ImpactPolicy(ABC):
         `candidates` 是各资产类型的最新版本；未命中的资产必须原样保留，
         既不重算也不升版本。
         """
+
+
+class DependencyImpactPolicy(ImpactPolicy):
+    """按 ``depends_on_profile_keys`` 做精确集合匹配的第一期规则。"""
+
+    IMPLEMENTATION_STATUS = "wired"
+
+    def select_affected(
+        self,
+        *,
+        changed_profile_keys: Sequence[str],
+        candidates: Sequence[AssetVersion],
+    ) -> list[AssetVersion]:
+        changed = {key.strip() for key in changed_profile_keys if key.strip()}
+        if not changed:
+            return []
+        return [
+            candidate
+            for candidate in candidates
+            if changed.intersection(candidate.depends_on_profile_keys)
+        ]
+
+
+__all__ = ["DependencyImpactPolicy", "ImpactPolicy"]

@@ -112,20 +112,38 @@ class Container:
 def build_container(settings: Optional[Settings] = None) -> Container:
     """构造完整容器：Gateways → Repositories → 编排原语 → 服务 → Worker。"""
     settings = settings or Settings.from_env()
+    gateway_values = build_gateways(settings)
+    redis_extras = {
+        key: gateway_values.pop(key)
+        for key in list(gateway_values)
+        if key.startswith("redis_")
+    }
     container = Container(
         settings=settings,
         transactions=build_transactions(settings),
         feature_flags=build_feature_flags(settings),
-        **build_gateways(settings),
+        **gateway_values,
         **build_repositories(settings),
     )
+    container.extra.update(redis_extras)
     build_orchestration(container)
     build_services(container)
     build_workers(container)
 
-    # 前端联调（决策 15 = A）：`ZHIYIN_MOCK=1` 时用 Mock Facade 走真实路由。
-    # MockApplicationFacade 目前是骨架（方法体 NotImplementedError），实现完成后
-    # 取消下面注释即可；未实现时保持未装配，/app/* 仍按约定返回 503 而非 500。
+    from zhiyin_api.facade.application import DefaultApplicationFacade
+
+    container.facade = DefaultApplicationFacade(
+        identity=container.identity_service,
+        registry=container.registry_service,
+        loop=container.loop,
+        orchestrator=container.orchestrator,
+        workspace=container.workspace_service,
+        assets=container.asset_service,
+        functions=container.function_service,
+        memories=container.memory_service,
+    )
+
+    # 前端联调的 Mock Facade 扩展点仍保留；第一期默认始终使用上面的真实 Facade。
     #
     # if settings.mock_facade:
     #     from zhiyin_api.facade.mock import MockApplicationFacade
@@ -199,6 +217,9 @@ def wire_application(container: Optional[Container] = None) -> Any:
             stop_polling = getattr(scheduler, "stop_polling", None)
             if callable(stop_polling):
                 await stop_polling()
+            redis_factory = container.extra.get("redis_factory")
+            if redis_factory is not None:
+                await redis_factory.close()
 
     return create_app(
         title=f"{container.settings.app_name} API",

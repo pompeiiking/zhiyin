@@ -1,4 +1,4 @@
-"""Application Facade 实现（**骨架**，方法体未实现）。
+"""Application Facade 实现。
 
 落位：`api/facade/application.py` —— 接口/前端联调负责人。
 依赖：业务层的服务 Port（只调不实现）+ `api/dto/mappers.py`。
@@ -6,8 +6,8 @@
 为什么它决定前端能否并行开工
 ----------------------------
 前端只需要这一个实现：它把业务模型翻成 `dto/` 的 View，前端就拿到稳定的 JSON 形状。
-本文件未实现时，所有 `/app/*` 接口按约定返回 503（code 1007），前端连不上——
-这也是当前 `--check` 里 `services.facade=not_wired` 的含义。
+第一期实现已经装配，`/app/*` 通过稳定 DTO 返回业务数据；若未来装配缺失，接口仍按
+约定返回 503（code 1007）。
 
 三条不越界的要求：
 - 不写业务规则（规则在 `business/policies/`，调用在 `business/services/`）；
@@ -30,6 +30,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Optional
 
 from fastapi import Request
@@ -51,19 +52,37 @@ from zhiyin_api.dto.conversation import (
 from zhiyin_api.dto.workspace import WorkspacePageView
 from zhiyin_api.dto.track import TrackEventAck, TrackEventRequest
 from zhiyin_api.facade.facade import ApplicationFacade
+from zhiyin_api.dto import mappers
+from zhiyin_business.ports.blackboard import (
+    AssetService,
+    ConversationMemoryService,
+)
+from zhiyin_business.ports.function import FunctionService
 from zhiyin_business.ports.identity import IdentityService
+from zhiyin_business.ports.loop import EntrySource, LoopCoordinator, LoopEntry
+from zhiyin_business.ports.orchestrator import Orchestrator, TurnRequest
 from zhiyin_business.ports.registry import RegistryService
-from zhiyin_kernel.enums import AssetType
-
-_TODO = "TODO(骨架): ApplicationFacade 未实现"
+from zhiyin_business.ports.workspace import WorkspaceService
+from zhiyin_kernel.enums import AssetType, LoopStage
 
 
 class DefaultApplicationFacade(ApplicationFacade):
-    """BFF 门面默认实现（骨架）。"""
+    """BFF 门面默认实现。"""
 
-    IMPLEMENTATION_STATUS = "skeleton"
+    IMPLEMENTATION_STATUS = "wired"
 
-    def __init__(self, *, identity: IdentityService, registry: RegistryService) -> None:
+    def __init__(
+        self,
+        *,
+        identity: IdentityService,
+        registry: RegistryService,
+        loop: LoopCoordinator,
+        orchestrator: Orchestrator,
+        workspace: WorkspaceService,
+        assets: AssetService,
+        functions: FunctionService,
+        memories: ConversationMemoryService,
+    ) -> None:
         """构造依赖由 boot 注入。
 
         身份解析走业务 Port：api 被禁止 import `zhiyin_data_sdk`，拿不到
@@ -78,63 +97,176 @@ class DefaultApplicationFacade(ApplicationFacade):
         """
         self._identity = identity
         self._registry = registry
+        self._loop = loop
+        self._orchestrator = orchestrator
+        self._workspace = workspace
+        self._assets = assets
+        self._functions = functions
+        self._memories = memories
 
     # ---------- 身份 ----------
 
     async def resolve_user_id(self, request: Request) -> str:
-        raise NotImplementedError(
-            f"{_TODO}：从 Request 取 token → IdentityService.current_user() → 返回 user_id"
-        )
+        authorization = request.headers.get("authorization", "")
+        token = authorization[7:].strip() if authorization.lower().startswith("bearer ") else None
+        return (await self._identity.current_user(token=token)).id
 
     # ---------- 启动 ----------
 
-    def bootstrap(self, user_id: str) -> BootstrapView:
-        raise NotImplementedError(
-            f"{_TODO}：RegistryService 取数（菜单 / 路由 / 任务入口 / 文案 / "
-            "横幅 / 信任块 / FAQ / 开关）→ mappers.bootstrap_view"
+    async def bootstrap(self, user_id: str) -> BootstrapView:
+        (
+            identity,
+            copies,
+            menus,
+            routes,
+            entries,
+            trust,
+            banners,
+            faqs,
+            flags,
+        ) = await asyncio.gather(
+            self._identity.current_user(),
+            self._registry.get_copy_bundle(),
+            self._registry.list_menus(),
+            self._registry.list_routes(),
+            self._registry.list_task_entries(),
+            self._registry.list_trust_blocks(),
+            self._registry.list_banners(),
+            self._registry.list_faqs(),
+            self._registry.feature_flags(),
+        )
+        agent_ids = {entry.lead_agent for entry in entries if entry.lead_agent}
+        descriptors = await asyncio.gather(
+            *(self._registry.get_agent(agent_id) for agent_id in agent_ids)
+        )
+        agents = {
+            item.id: item for item in descriptors if item is not None
+        }
+        return mappers.bootstrap_view(
+            copy_bundle=copies,
+            menus=menus,
+            routes=routes,
+            task_entries=entries,
+            agents=agents,
+            trust_blocks=trust,
+            banners=banners,
+            faqs=faqs,
+            feature_flags=flags,
+            identity=identity if identity.id == user_id else None,
         )
 
     # ---------- 对话 ----------
 
-    def list_sessions(self, user_id: str) -> SessionListView:
-        raise NotImplementedError(f"{_TODO}：左栏会话列表")
+    async def list_sessions(self, user_id: str) -> SessionListView:
+        panels = await self._workspace.list_sessions_summary(user_id)
+        agent_ids = {panel.lead_agent for panel in panels if panel.lead_agent}
+        descriptors = await asyncio.gather(
+            *(self._registry.get_agent(agent_id) for agent_id in agent_ids)
+        )
+        names = {item.id: item.name for item in descriptors if item is not None}
+        return mappers.session_list_view(
+            [
+                mappers.session_summary_view(
+                    panel, lead_agent_name=names.get(panel.lead_agent or "", "")
+                )
+                for panel in panels
+            ]
+        )
 
     async def enter_task(self, user_id: str, body: TaskEnterRequest) -> TaskSessionView:
-        raise NotImplementedError(f"{_TODO}：判环节 → 选主理 → 建会话或续接")
+        entries = await self._registry.list_task_entries()
+        entry = next((item for item in entries if item.code == body.task_code), None)
+        if entry is None:
+            raise LookupError(f"任务入口不存在：{body.task_code}")
+        stage = entry.target_stage or LoopStage.COLLECT
+        lead_agent = entry.lead_agent
+        if lead_agent is None:
+            decision = await self._orchestrator.select_lead(
+                user_id,
+                body.task_code,
+                await self._orchestrator.infer_axis_a(user_id, body.task_code),
+                stage,
+                await self._orchestrator.detect_intent(user_id, entry.label),
+            )
+            lead_agent = decision.lead_agent
+        context = await self._loop.start(
+            LoopEntry(
+                user_id=user_id,
+                task_code=entry.code,
+                stage=stage,
+                lead_agent=lead_agent,
+                source=EntrySource.FREE_CHAT if entry.target_stage is None else EntrySource.HOME_TASK,
+            )
+        )
+        await self._memories.upsert(
+            user_id,
+            context.session.id,
+            loop_stage=context.stage,
+            lead_agent=context.lead_agent,
+        )
+        descriptor = await self._registry.get_agent(context.lead_agent)
+        return mappers.task_session_view(
+            context.session,
+            task_name=entry.label,
+            lead_agent_name=descriptor.name if descriptor else context.lead_agent,
+            progress=(list(LoopStage).index(context.stage) + 1) / len(LoopStage),
+        )
 
     async def send_message(
         self, user_id: str, body: MessageRequest
     ) -> ConversationTurnView:
-        raise NotImplementedError(f"{_TODO}：一轮消息 → 结论 + 告知 + 引导 + 管线卡")
+        turn = await self._orchestrator.handle_message(
+            TurnRequest(
+                user_id=user_id,
+                task_id=body.task_id,
+                message=body.message,
+                client_msg_id=body.client_msg_id,
+            )
+        )
+        return mappers.conversation_turn_view(turn)
 
     # ---------- 工作台 ----------
 
-    def get_workspace(self, user_id: str) -> WorkspacePageView:
-        raise NotImplementedError(f"{_TODO}：工作台聚合视图")
+    async def get_workspace(self, user_id: str) -> WorkspacePageView:
+        return mappers.workspace_page_view(await self._workspace.build_view(user_id))
 
     # ---------- 资产 ----------
 
-    def list_asset_versions(
+    async def list_asset_versions(
         self, user_id: str, asset_type: AssetType
     ) -> list[AssetVersionView]:
-        raise NotImplementedError(f"{_TODO}：资产版本列表（含 diff 与依赖字段）")
+        versions = await self._assets.list_versions(user_id, asset_type)
+        return [
+            mappers.asset_version_view(
+                version, previous=versions[index - 1] if index else None
+            )
+            for index, version in enumerate(versions)
+        ]
 
-    def get_report_full_text(
+    async def get_report_full_text(
         self, user_id: str, version: Optional[int] = None
     ) -> ReportFullTextView:
-        raise NotImplementedError(f"{_TODO}：完整报告页正文（只读，不重新生成）")
+        report = await self._assets.get_report(user_id, version)
+        if report is None:
+            raise LookupError("尚未生成诊断报告")
+        return mappers.report_full_text_view(report)
 
     async def export_asset(self, user_id: str, body: ExportRequest) -> ExportResultView:
-        raise NotImplementedError(f"{_TODO}：导出（第一期占位）")
+        result = await self._functions.export_asset(
+            user_id, body.asset_type.value, body.format
+        )
+        return mappers.export_result_view(result)
 
     # ---------- 埋点 ----------
 
     async def track_event(
         self, user_id: str, body: TrackEventRequest
     ) -> TrackEventAck:
-        raise NotImplementedError(
-            f"{_TODO}：RegistryService 校验 frontend 事件 → 落库（口径待定）"
-        )
+        specs = await self._registry.list_track_events()
+        spec = next((item for item in specs if item.code == body.event), None)
+        if spec is None or spec.channel != "frontend":
+            raise ValueError(f"不接受该前端事件：{body.event}")
+        return TrackEventAck(accepted=True, event=body.event)
 
 
 __all__ = ["DefaultApplicationFacade"]
