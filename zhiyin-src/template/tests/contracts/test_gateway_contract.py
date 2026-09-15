@@ -117,10 +117,23 @@ async def test_object_store_contract(gateways) -> None:
     key = store.build_key("u1", "report", 1, ".pdf")
 
     assert await store.stat(key) is None
-    await store.put(key, b"hello", content_type="application/pdf")
+    created = await store.compare_and_swap(
+        key,
+        b"hello",
+        expected_etag=None,
+        content_type="application/pdf",
+    )
+    assert created is not None and created.etag
     assert await store.get(key) == b"hello"
     stat = await store.stat(key)
     assert stat is not None and stat.size == 5
+    assert await store.compare_and_swap(
+        key, b"stale", expected_etag="stale-etag"
+    ) is None
+    updated = await store.compare_and_swap(
+        key, b"updated", expected_etag=stat.etag
+    )
+    assert updated is not None and await store.get(key) == b"updated"
 
     await store.delete(key)
     assert await store.stat(key) is None

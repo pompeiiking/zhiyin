@@ -60,16 +60,15 @@ class DefaultAssetService(AssetService):
         for current in affected:
             matched = [key for key in changed if key in current.depends_on_profile_keys]
             changed_text = "、".join(matched)
-            version = await self.save_version(
-                    user_id,
-                    AssetUpdateDraft(
-                        asset_type=current.asset_type,
-                        depends_on_profile_keys=current.depends_on_profile_keys,
-                        diff_from_previous=f"画像字段更新：{changed_text}；仅重算受影响片段",
-                        reason=f"画像字段 {changed_text} 发生变化",
-                    ),
-                )
-            await self._snapshot_current_content(user_id, version)
+            version = await self._save_propagated_snapshot(
+                user_id,
+                AssetUpdateDraft(
+                    asset_type=current.asset_type,
+                    depends_on_profile_keys=current.depends_on_profile_keys,
+                    diff_from_previous=f"画像字段更新：{changed_text}；仅重算受影响片段",
+                    reason=f"画像字段 {changed_text} 发生变化",
+                ),
+            )
             updated.append(version)
         return updated
 
@@ -77,25 +76,37 @@ class DefaultAssetService(AssetService):
         lock = self._locks.setdefault((user_id, draft.asset_type), asyncio.Lock())
         async with lock:
             latest = await self._assets.get_latest_version(user_id, draft.asset_type)
-            next_version = (latest.version if latest is not None else 0) + 1
-            dependencies = list(dict.fromkeys(draft.depends_on_profile_keys))
-            diff = None
-            if latest is not None:
-                diff = draft.diff_from_previous or draft.reason or "资产内容更新"
-
             saved = await self._assets.save_version(
-                AssetVersion(
-                    id=f"av_{uuid4().hex[:12]}",
-                    user_id=user_id,
-                    asset_type=draft.asset_type,
-                    version=next_version,
-                    created_at=datetime.now(timezone.utc),
-                    depends_on_profile_keys=dependencies,
-                    diff_from_previous=diff,
-                )
+                self._build_version(user_id, draft, latest)
             )
-        payload = AssetVersionChangedPayload(
+        await self._publish_version(saved, latest)
+        return saved
+
+    def _build_version(
+        self,
+        user_id: str,
+        draft: AssetUpdateDraft,
+        latest: Optional[AssetVersion],
+    ) -> AssetVersion:
+        return AssetVersion(
+            id=f"av_{uuid4().hex[:12]}",
             user_id=user_id,
+            asset_type=draft.asset_type,
+            version=(latest.version if latest is not None else 0) + 1,
+            created_at=datetime.now(timezone.utc),
+            depends_on_profile_keys=list(dict.fromkeys(draft.depends_on_profile_keys)),
+            diff_from_previous=(
+                draft.diff_from_previous or draft.reason or "资产内容更新"
+                if latest is not None
+                else None
+            ),
+        )
+
+    async def _publish_version(
+        self, saved: AssetVersion, latest: Optional[AssetVersion]
+    ) -> None:
+        payload = AssetVersionChangedPayload(
+            user_id=saved.user_id,
             asset_type=saved.asset_type.value,
             asset_id=saved.id,
             from_version=latest.version if latest is not None else None,
@@ -111,7 +122,6 @@ class DefaultAssetService(AssetService):
                 idempotency_key=f"asset-version:{saved.id}:{saved.version}",
             )
         )
-        return saved
 
     async def save_report(
         self,
@@ -123,23 +133,15 @@ class DefaultAssetService(AssetService):
     ) -> AssetVersion:
         if report.user_id != user_id:
             raise PermissionError("不能为其他用户保存诊断报告")
-        version = await self.save_version(
+        return await self._save_snapshot(
             user_id,
             AssetUpdateDraft(
                 asset_type=AssetType.REPORT,
                 depends_on_profile_keys=list(depends_on_profile_keys),
                 reason=reason or "诊断报告更新",
             ),
+            report=report,
         )
-        await self._assets.save_report(
-            report.model_copy(
-                update={
-                    "version": version.version,
-                    "generated_at": version.created_at,
-                }
-            )
-        )
-        return version
 
     async def save_direction_plans(
         self,
@@ -151,14 +153,14 @@ class DefaultAssetService(AssetService):
     ) -> AssetVersion:
         if not plans:
             raise ValueError("方向方案组不能为空")
-        await self._assets.save_direction_plans(user_id, plans)
-        return await self.save_version(
+        return await self._save_snapshot(
             user_id,
             AssetUpdateDraft(
                 asset_type=AssetType.DIRECTION_PLAN,
                 depends_on_profile_keys=list(depends_on_profile_keys),
                 reason=reason or "方向方案更新",
             ),
+            direction_plans=plans,
         )
 
     async def select_direction_plan(self, user_id: str, plan_id: str) -> DirectionPlan:
@@ -172,14 +174,14 @@ class DefaultAssetService(AssetService):
         depends_on_profile_keys: Sequence[str] = (),
         reason: str = "",
     ) -> AssetVersion:
-        await self._assets.save_action_plan(user_id, plan)
-        return await self.save_version(
+        return await self._save_snapshot(
             user_id,
             AssetUpdateDraft(
                 asset_type=AssetType.ACTION_PLAN,
                 depends_on_profile_keys=list(depends_on_profile_keys),
                 reason=reason or "行动计划更新",
             ),
+            action_plan=plan,
         )
 
     async def mark_task_done(self, user_id: str, task_id: str) -> ActionPlan:
@@ -194,33 +196,47 @@ class DefaultAssetService(AssetService):
     async def get_action_plan(self, user_id: str) -> Optional[ActionPlan]:
         return await self._assets.get_action_plan(user_id)
 
-    async def _snapshot_current_content(
-        self, user_id: str, version: AssetVersion
-    ) -> None:
-        """使受影响资产的正文快照与新版本号保持一致。
+    async def _save_snapshot(
+        self,
+        user_id: str,
+        draft: AssetUpdateDraft,
+        *,
+        report: Optional[Report] = None,
+        direction_plans: Optional[list[DirectionPlan]] = None,
+        action_plan: Optional[ActionPlan] = None,
+    ) -> AssetVersion:
+        lock = self._locks.setdefault((user_id, draft.asset_type), asyncio.Lock())
+        async with lock:
+            latest = await self._assets.get_latest_version(user_id, draft.asset_type)
+            saved = await self._assets.save_snapshot(
+                self._build_version(user_id, draft, latest),
+                report=report,
+                direction_plans=direction_plans,
+                action_plan=action_plan,
+            )
+        await self._publish_version(saved, latest)
+        return saved
 
-        具体片段如何重新生成属于编排/Agent；数据层在第一期负责保存一份新的、
-        可追溯的内容快照，避免出现版本元数据已到 v2 而正文仍停在 v1。
-        """
-        if version.asset_type is AssetType.REPORT:
+    async def _save_propagated_snapshot(
+        self, user_id: str, draft: AssetUpdateDraft
+    ) -> AssetVersion:
+        """把传播产生的版本和当前正文副本作为一个 Repository 操作提交。"""
+        report = None
+        direction_plans = None
+        action_plan = None
+        if draft.asset_type is AssetType.REPORT:
             report = await self._assets.get_report(user_id)
-            if report is not None:
-                await self._assets.save_report(
-                    report.model_copy(
-                        update={
-                            "version": version.version,
-                            "generated_at": version.created_at,
-                        }
-                    )
-                )
-        elif version.asset_type is AssetType.DIRECTION_PLAN:
-            plans = await self._assets.list_direction_plans(user_id)
-            if plans:
-                await self._assets.save_direction_plans(user_id, plans)
-        elif version.asset_type is AssetType.ACTION_PLAN:
-            plan = await self._assets.get_action_plan(user_id)
-            if plan is not None:
-                await self._assets.save_action_plan(user_id, plan)
+        elif draft.asset_type is AssetType.DIRECTION_PLAN:
+            direction_plans = await self._assets.list_direction_plans(user_id)
+        elif draft.asset_type is AssetType.ACTION_PLAN:
+            action_plan = await self._assets.get_action_plan(user_id)
+        return await self._save_snapshot(
+            user_id,
+            draft,
+            report=report,
+            direction_plans=direction_plans,
+            action_plan=action_plan,
+        )
 
 
 __all__ = ["DefaultAssetService"]

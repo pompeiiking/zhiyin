@@ -87,21 +87,28 @@ class DefaultFunctionService(FunctionService):
         stored = node.model_copy(update={"user_id": user_id})
         lock = self._calendar_locks.setdefault(user_id, asyncio.Lock())
         async with lock:
-            nodes = await self.list_calendar_nodes(user_id)
-            by_id = {item.node_id: item for item in nodes}
-            by_id[stored.node_id] = stored
-            payload = {
-                "items": [
-                    item.model_dump(mode="json")
-                    for item in sorted(by_id.values(), key=lambda item: item.node_id)
-                ]
-            }
-            await self._object_store.put(
-                self._calendar_key(user_id),
-                json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-                content_type="application/json",
-            )
-        return stored
+            key = self._calendar_key(user_id)
+            for _ in range(32):
+                metadata = await self._object_store.stat(key)
+                nodes = await self.list_calendar_nodes(user_id)
+                by_id = {item.node_id: item for item in nodes}
+                by_id[stored.node_id] = stored
+                payload = {
+                    "items": [
+                        item.model_dump(mode="json")
+                        for item in sorted(by_id.values(), key=lambda item: item.node_id)
+                    ]
+                }
+                saved = await self._object_store.compare_and_swap(
+                    key,
+                    json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                    expected_etag=metadata.etag if metadata is not None else None,
+                    content_type="application/json",
+                )
+                if saved is not None:
+                    return stored
+                await asyncio.sleep(0)
+        raise RuntimeError("日历并发写入冲突，请重试")
 
     async def list_achievements(self, user_id: str) -> list[Achievement]:
         logs = await self._behaviors.recent(user_id, limit=1000)

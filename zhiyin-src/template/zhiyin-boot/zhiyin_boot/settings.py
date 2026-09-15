@@ -38,6 +38,7 @@ class Settings:
     redis_password: str = ""
     redis_ssl: bool = False
     redis_pool_size: int = 20
+    redis_socket_timeout_s: float = 2.0
 
     # ---------- 能力开关：决定装配 local 还是 pami ----------
     use_pami_llm: bool = False
@@ -82,6 +83,9 @@ class Settings:
             redis_password=_env("ZHIYIN_REDIS_PASSWORD"),
             redis_ssl=_env_bool("ZHIYIN_REDIS_SSL"),
             redis_pool_size=int(_env("ZHIYIN_REDIS_POOL_SIZE", "20")),
+            redis_socket_timeout_s=float(
+                _env("ZHIYIN_REDIS_SOCKET_TIMEOUT_S", "2.0")
+            ),
             use_pami_llm=_env_bool("ZHIYIN_USE_PAMI_LLM"),
             use_pami_knowledge=_env_bool("ZHIYIN_USE_PAMI_KNOWLEDGE"),
             use_pami_auth=_env_bool("ZHIYIN_USE_PAMI_AUTH"),

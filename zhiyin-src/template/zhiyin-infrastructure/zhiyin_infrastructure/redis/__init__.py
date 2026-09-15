@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from enum import IntEnum
 from typing import Any, Mapping, Optional, Sequence
 
@@ -77,12 +78,16 @@ class RedisClientFactory:
         password: str = "",
         ssl: bool = False,
         pool_size: int = 20,
+        socket_timeout_s: float = 2.0,
         clients: Optional[Mapping[int, Any]] = None,
     ) -> None:
         self._url = url
         self._password = password
         self._ssl = ssl
         self._pool_size = pool_size
+        if socket_timeout_s <= 0:
+            raise ValueError("Redis socket_timeout_s 必须为正数")
+        self._socket_timeout_s = socket_timeout_s
         self._clients: dict[int, Any] = dict(clients or {})
 
     def client(self, database: int | RedisLogicalDatabase) -> Any:
@@ -115,6 +120,9 @@ class RedisClientFactory:
             password=self._password or None,
             decode_responses=True,
             max_connections=self._pool_size,
+            socket_connect_timeout=self._socket_timeout_s,
+            socket_timeout=self._socket_timeout_s,
+            health_check_interval=30,
         )
 
     async def close(self) -> None:
@@ -239,12 +247,22 @@ class RedisDomainStore:
 
     IMPLEMENTATION_STATUS = "wired"
 
-    def __init__(self, client: Any, *, env: str, domain: str) -> None:
+    def __init__(
+        self,
+        client: Any,
+        *,
+        env: str,
+        domain: str,
+        max_value_bytes: int = 1_048_576,
+    ) -> None:
         if domain not in DOMAIN_DATABASES:
             raise ValueError(f"未登记的 Redis 数据域：{domain}")
         self._client = client
         self._env = env
         self._domain = domain
+        if max_value_bytes <= 0:
+            raise ValueError("Redis 单值容量上限必须为正数")
+        self._max_value_bytes = max_value_bytes
 
     def key(self, entity: str, identifier: str) -> str:
         return build_redis_key(self._env, self._domain, entity, identifier)
@@ -257,16 +275,33 @@ class RedisDomainStore:
     ) -> None:
         if ttl_s <= 0:
             raise ValueError("临时状态必须设置正数 TTL")
+        if len(value.encode("utf-8")) > self._max_value_bytes:
+            raise ValueError("Redis 临时状态超过单值容量上限")
         await self._client.set(self.key(entity, identifier), value, ex=ttl_s)
 
     async def get_json(self, entity: str, identifier: str) -> Optional[Any]:
         value = await self.get_text(entity, identifier)
-        return json.loads(value) if value is not None else None
+        if value is None:
+            return None
+        try:
+            envelope = json.loads(value)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("Redis JSON 数据格式无效") from exc
+        if not isinstance(envelope, dict) or envelope.get("schema_version") != 1:
+            raise ValueError("Redis JSON 缺少受支持的 schema_version")
+        if "value" not in envelope:
+            raise ValueError("Redis JSON 缺少 value 字段")
+        return envelope["value"]
 
     async def set_json(
         self, entity: str, identifier: str, value: Any, *, ttl_s: int
     ) -> None:
-        payload = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        payload = json.dumps(
+            {"schema_version": 1, "value": value},
+            ensure_ascii=False,
+            separators=(",", ":"),
+            default=_json_default,
+        )
         await self.set_text(entity, identifier, payload, ttl_s=ttl_s)
 
     async def delete(self, entity: str, identifier: str) -> bool:
@@ -305,6 +340,14 @@ class RedisDomainStore:
             "return redis.call('del', KEYS[1]) else return 0 end"
         )
         return bool(await self._client.eval(script, 1, self.key(entity, identifier), owner_token))
+
+
+def _json_default(value: Any) -> str:
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            raise ValueError("Redis JSON 时间必须带时区")
+        return value.astimezone(timezone.utc).isoformat()
+    raise TypeError(f"不支持的 Redis JSON 类型：{type(value).__name__}")
 
 
 __all__ = [

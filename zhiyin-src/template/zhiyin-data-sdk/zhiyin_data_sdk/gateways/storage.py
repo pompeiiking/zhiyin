@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class StoredObject(BaseModel):
@@ -22,6 +22,7 @@ class StoredObject(BaseModel):
     size: int = 0
     content_type: str = "application/octet-stream"
     updated_at: Optional[datetime] = None
+    etag: Optional[str] = Field(default=None, description="内容版本标识，用于条件写")
 
 
 class ObjectStoreGateway(ABC):
@@ -32,6 +33,17 @@ class ObjectStoreGateway(ABC):
         self, key: str, data: bytes, *, content_type: str = "application/octet-stream"
     ) -> StoredObject:
         """写入对象，返回元数据。"""
+
+    @abstractmethod
+    async def compare_and_swap(
+        self,
+        key: str,
+        data: bytes,
+        *,
+        expected_etag: Optional[str],
+        content_type: str = "application/octet-stream",
+    ) -> Optional[StoredObject]:
+        """仅当当前 ETag 与预期一致时原子写入；冲突返回 ``None``。"""
 
     @abstractmethod
     async def get(self, key: str) -> bytes:

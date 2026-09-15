@@ -64,6 +64,7 @@ def build_gateways(settings: Settings) -> dict[str, Any]:
             password=settings.redis_password,
             ssl=settings.redis_ssl,
             pool_size=settings.redis_pool_size,
+            socket_timeout_s=settings.redis_socket_timeout_s,
         )
         gateways["cache"] = RedisCacheGateway(
             redis_factory,

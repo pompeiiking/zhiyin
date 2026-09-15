@@ -49,6 +49,9 @@ class LocalKnowledgeRepo(KnowledgeGateway):
             for index, raw in enumerate(self._load(space)):
                 if raw.get("status", "enabled") != "enabled":
                     continue
+                review_status = raw.get("review_status")
+                if review_status is not None and review_status != "approved":
+                    continue
                 if filters and not _match_filters(raw, filters):
                     continue
                 score = _score(raw, terms)

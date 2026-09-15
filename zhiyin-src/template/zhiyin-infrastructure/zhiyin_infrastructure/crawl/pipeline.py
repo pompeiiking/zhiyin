@@ -12,13 +12,33 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Literal
+from typing import Any, Awaitable, Callable, Literal, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
 Fetcher = Callable[["KnowledgeSource"], Any | Awaitable[Any]]
+Reviewer = Callable[
+    ["KnowledgeSource", dict[str, Any]],
+    "ReviewDecision | Awaitable[ReviewDecision]",
+]
+
+
+@dataclass(frozen=True)
+class KnowledgeSourceAdapter:
+    """把 Fetcher 明确绑定到一个来源，防止跨来源误用采集逻辑。"""
+
+    source_id: str
+    fetcher: Fetcher
+
+    def __call__(self, source: "KnowledgeSource") -> Any | Awaitable[Any]:
+        if source.source_id != self.source_id:
+            raise ValueError(
+                f"采集适配器绑定来源 {self.source_id}，不能处理 {source.source_id}"
+            )
+        return self.fetcher(source)
 
 
 class KnowledgeSource(BaseModel):
@@ -31,6 +51,7 @@ class KnowledgeSource(BaseModel):
     source_url: str
     namespace: str
     acquisition: Literal["open_api", "open_data", "allowed_page", "manual_import"]
+    access_basis: str
     allowed: bool = False
     allowed_scope: str
     owner: str
@@ -53,6 +74,8 @@ class CrawlReport(BaseModel):
     fetched: int = 0
     stored: int = 0
     unchanged: int = 0
+    pending_review: int = 0
+    rejected: int = 0
     fetched_at: datetime
     content_hashes: list[str] = Field(default_factory=list)
 
@@ -65,6 +88,7 @@ class KnowledgeIngestionPipeline:
     on_index_updated: Callable[[str], None] | None = None
     raw_store: Any | None = None
     raw_ttl_s: int = 3_600
+    reviewer: Optional[Reviewer] = None
 
     async def run(
         self,
@@ -87,8 +111,9 @@ class KnowledgeIngestionPipeline:
             self._normalize(source, item, fetched_at, batch_id, trace_id)
             for item in items
         ]
-        stored, unchanged = self._store(source.namespace, normalized)
-        if stored and self.on_index_updated is not None:
+        reviewed = [await self._review(source, item) for item in normalized]
+        stored, unchanged, published = self._store(source.namespace, reviewed)
+        if published and self.on_index_updated is not None:
             self.on_index_updated(source.namespace)
         return CrawlReport(
             source_id=source.source_id,
@@ -98,6 +123,10 @@ class KnowledgeIngestionPipeline:
             fetched=len(items),
             stored=stored,
             unchanged=unchanged,
+            pending_review=sum(
+                item["review_status"] == "pending_review" for item in reviewed
+            ),
+            rejected=sum(item["review_status"] == "rejected" for item in reviewed),
             fetched_at=fetched_at,
             content_hashes=[item["content_hash"] for item in normalized],
         )
@@ -174,6 +203,7 @@ class KnowledgeIngestionPipeline:
             raise PermissionError(f"知识来源缺少来源地址：{source.source_id}")
         required = {
             "owner": source.owner,
+            "access_basis": source.access_basis,
             "refresh_interval": source.refresh_interval,
             "removal_method": source.removal_method,
             "retention": source.retention,
@@ -186,10 +216,20 @@ class KnowledgeIngestionPipeline:
 
     @staticmethod
     def _parse(raw: Any) -> list[dict[str, Any]]:
+        if isinstance(raw, Path):
+            if not raw.is_file():
+                raise FileNotFoundError(f"采集输入文件不存在：{raw}")
+            raw = raw.read_text(encoding="utf-8")
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8")
         if isinstance(raw, str):
-            raw = json.loads(raw)
+            stripped = raw.lstrip()
+            if stripped.startswith("<"):
+                parser = _KnowledgeHTMLParser()
+                parser.feed(raw)
+                raw = parser.items
+            else:
+                raw = json.loads(raw)
         if isinstance(raw, dict):
             raw = raw.get("items", [])
         if not isinstance(raw, list) or not all(isinstance(item, dict) for item in raw):
@@ -220,8 +260,8 @@ class KnowledgeIngestionPipeline:
         item["fetched_at"] = fetched_at.isoformat()
         item["batch_id"] = batch_id
         item["trace_id"] = trace_id
-        item["review_status"] = "approved"
-        item["status"] = "enabled"
+        item["review_status"] = "pending_review"
+        item["status"] = "pending_review"
         for field in ("city", "education", "experience"):
             if field in item:
                 item[field] = " ".join(str(item[field]).split())
@@ -255,6 +295,28 @@ class KnowledgeIngestionPipeline:
         item["content_hash"] = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
         return item
 
+    async def _review(
+        self, source: KnowledgeSource, item: dict[str, Any]
+    ) -> dict[str, Any]:
+        if self.reviewer is None:
+            decision = ReviewDecision(
+                status="pending_review",
+                reviewer="unassigned",
+                reason="未配置审核器，禁止自动发布",
+            )
+        else:
+            decision = self.reviewer(source, dict(item))
+            if inspect.isawaitable(decision):
+                decision = await decision
+            decision = ReviewDecision.model_validate(decision)
+        reviewed = dict(item)
+        reviewed["review_status"] = decision.status
+        reviewed["reviewed_by"] = decision.reviewer
+        reviewed["review_reason"] = decision.reason
+        reviewed["reviewed_at"] = datetime.now(timezone.utc).isoformat()
+        reviewed["status"] = "enabled" if decision.status == "approved" else decision.status
+        return reviewed
+
     async def _cache_raw(
         self,
         source: KnowledgeSource,
@@ -283,25 +345,44 @@ class KnowledgeIngestionPipeline:
             ttl_s=self.raw_ttl_s,
         )
 
-    def _store(self, namespace: str, incoming: list[dict[str, Any]]) -> tuple[int, int]:
+    def _store(
+        self, namespace: str, incoming: list[dict[str, Any]]
+    ) -> tuple[int, int, int]:
         path = self._namespace_path(namespace)
         payload = self._load_payload(path)
         by_id = {str(item.get("id")): item for item in payload["items"]}
         stored = 0
         unchanged = 0
+        published = 0
         for item in incoming:
             current = by_id.get(item["id"])
-            if current is not None and current.get("content_hash") == item["content_hash"]:
+            same_content = (
+                current is not None
+                and current.get("content_hash") == item["content_hash"]
+            )
+            same_review = (
+                current is not None
+                and current.get("review_status") == item.get("review_status")
+                and current.get("status") == item.get("status")
+            )
+            if same_content:
                 item["version"] = int(current.get("version", 1))
                 item["fetched_at"] = current.get("fetched_at", item["fetched_at"])
-                unchanged += 1
+                if same_review:
+                    unchanged += 1
+                else:
+                    stored += 1
+                    if item.get("review_status") == "approved":
+                        published += 1
             else:
                 item["version"] = int(current.get("version", 0)) + 1 if current else 1
                 stored += 1
+                if item.get("review_status") == "approved":
+                    published += 1
             by_id[item["id"]] = item
         payload["items"] = sorted(by_id.values(), key=lambda item: str(item.get("id", "")))
         self._write_payload(path, payload)
-        return stored, unchanged
+        return stored, unchanged, published
 
     def _namespace_path(self, namespace: str) -> Path:
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", namespace):
@@ -334,4 +415,52 @@ class KnowledgeIngestionPipeline:
         temporary.replace(path)
 
 
-__all__ = ["CrawlReport", "KnowledgeIngestionPipeline", "KnowledgeSource"]
+class ReviewDecision(BaseModel):
+    """采集条目的显式审核结论；未通过的条目不会进入可检索状态。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["approved", "pending_review", "rejected"]
+    reviewer: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
+
+class _KnowledgeHTMLParser(HTMLParser):
+    """解析带 ``data-id`` 与 ``data-title`` 的第一期开放 HTML 卡片。"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.items: list[dict[str, Any]] = []
+        self._current: Optional[dict[str, Any]] = None
+        self._tag: Optional[str] = None
+        self._text: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
+        values = dict(attrs)
+        identifier = values.get("data-id")
+        title = values.get("data-title") or values.get("data-name")
+        if identifier and title:
+            self._current = {"id": identifier, "title": title}
+            self._tag = tag
+            self._text = []
+
+    def handle_data(self, data: str) -> None:
+        if self._current is not None and data.strip():
+            self._text.append(data.strip())
+
+    def handle_endtag(self, tag: str) -> None:
+        if self._current is not None and tag == self._tag:
+            self._current["summary"] = " ".join(self._text)
+            self.items.append(self._current)
+            self._current = None
+            self._tag = None
+            self._text = []
+
+
+__all__ = [
+    "CrawlReport",
+    "KnowledgeIngestionPipeline",
+    "KnowledgeSourceAdapter",
+    "KnowledgeSource",
+    "ReviewDecision",
+]

@@ -4,6 +4,14 @@ from zhiyin_infrastructure.crawl.pipeline import (
     CrawlReport,
     KnowledgeIngestionPipeline,
     KnowledgeSource,
+    KnowledgeSourceAdapter,
+    ReviewDecision,
 )
 
-__all__ = ["CrawlReport", "KnowledgeIngestionPipeline", "KnowledgeSource"]
+__all__ = [
+    "CrawlReport",
+    "KnowledgeIngestionPipeline",
+    "KnowledgeSource",
+    "KnowledgeSourceAdapter",
+    "ReviewDecision",
+]

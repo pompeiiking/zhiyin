@@ -24,7 +24,13 @@ from zhiyin_business.services import (
     DefaultWorkspaceService,
 )
 from zhiyin_business.workers import ImpactPropagationWorker
-from zhiyin_infrastructure.crawl import KnowledgeIngestionPipeline, KnowledgeSource
+from zhiyin_infrastructure.crawl import (
+    KnowledgeIngestionPipeline,
+    KnowledgeSource,
+    KnowledgeSourceAdapter,
+    ReviewDecision,
+)
+from zhiyin_infrastructure.local.cache import InMemoryCache
 from zhiyin_infrastructure.local.messaging import InMemoryEventBus
 from zhiyin_infrastructure.local.knowledge import LocalKnowledgeRepo
 from zhiyin_infrastructure.local.object_store import LocalFileStore
@@ -102,6 +108,27 @@ async def test_memory_deduplicates_retries_and_bounds_long_term_summary() -> Non
     assert memory.summary == "开始方向诊断\n准备行动"
     assert memory.summary.count("已确认专业") == 0
     assert len(memory.summary) <= 12
+
+
+async def test_memory_concurrent_appends_do_not_lose_fragments() -> None:
+    service = DefaultConversationMemoryService(InMemoryConversationMemoryRepository())
+    await asyncio.gather(
+        *[
+            service.upsert(
+                "u1",
+                "task-1",
+                loop_stage=LoopStage.COLLECT,
+                lead_agent="profile_analyst",
+                summary_delta=f"并发摘要-{index}",
+            )
+            for index in range(20)
+        ]
+    )
+    memory = await service.get("u1", "task-1")
+    assert memory is not None
+    assert set(memory.summary.splitlines()) == {
+        f"并发摘要-{index}" for index in range(20)
+    }
 
 
 async def test_asset_versions_events_and_affected_scope() -> None:
@@ -182,6 +209,33 @@ async def test_asset_does_not_publish_when_save_fails() -> None:
     assert received == []
 
 
+async def test_asset_snapshot_failure_rolls_back_version_content_and_event() -> None:
+    class BrokenSnapshotAssets(InMemoryAssetRepository):
+        async def save_snapshot(self, version, **kwargs):
+            raise RuntimeError("snapshot unavailable")
+
+    repo = BrokenSnapshotAssets()
+    bus = _event_bus()
+    received: list[DomainEvent] = []
+    bus.subscribe(ASSET_VERSION_CHANGED, received.append)
+    service = DefaultAssetService(repo, bus, DependencyImpactPolicy())
+    with pytest.raises(RuntimeError, match="snapshot unavailable"):
+        await service.save_report(
+            "u1",
+            Report(
+                id="report-u1",
+                user_id="u1",
+                version=1,
+                generated_at=_now(),
+                verdict=Verdict(title="测试", summary="测试"),
+                swot=Swot(),
+            ),
+        )
+    assert await repo.list_versions("u1", AssetType.REPORT) == []
+    assert await repo.get_report("u1") is None
+    assert received == []
+
+
 async def test_impact_worker_is_semantically_idempotent() -> None:
     repo = InMemoryAssetRepository()
     bus = _event_bus()
@@ -218,11 +272,11 @@ async def test_impact_worker_keeps_failed_event_for_retry() -> None:
     class FailOnceAssets(InMemoryAssetRepository):
         fail_next = False
 
-        async def save_version(self, version):
+        async def save_snapshot(self, version, **kwargs):
             if self.fail_next:
                 self.fail_next = False
                 raise RuntimeError("temporary storage failure")
-            return await super().save_version(version)
+            return await super().save_snapshot(version, **kwargs)
 
     repo = FailOnceAssets()
     bus = _event_bus()
@@ -258,6 +312,53 @@ async def test_impact_worker_keeps_failed_event_for_retry() -> None:
         item.version
         for item in await service.list_versions("u1", AssetType.REPORT)
     ] == [1, 2]
+
+
+async def test_impact_worker_idempotency_survives_worker_restart() -> None:
+    repo = InMemoryAssetRepository()
+    cache = InMemoryCache()
+    service = DefaultAssetService(repo, _event_bus(), DependencyImpactPolicy())
+    await service.save_version(
+        "u1",
+        AssetUpdateDraft(
+            asset_type=AssetType.REPORT, depends_on_profile_keys=["major"]
+        ),
+    )
+    payload = ProfileFieldUpdatedPayload(
+        user_id="u1",
+        field_key="major",
+        confidence=0.9,
+        source="conversation",
+        profile_version=2,
+        updated_at=_now(),
+    ).model_dump(mode="json")
+
+    first_bus = _event_bus()
+    first_worker = ImpactPropagationWorker(service, first_bus, cache)
+    await first_bus.publish(
+        DomainEvent(
+            event_id="evt-first",
+            event_type=PROFILE_FIELD_UPDATED,
+            occurred_at=_now(),
+            payload=payload,
+            idempotency_key="profile:u1:major:2",
+        )
+    )
+    assert await first_worker.run_once() == 1
+
+    restarted_bus = _event_bus()
+    restarted_worker = ImpactPropagationWorker(service, restarted_bus, cache)
+    await restarted_bus.publish(
+        DomainEvent(
+            event_id="evt-redelivery",
+            event_type=PROFILE_FIELD_UPDATED,
+            occurred_at=_now(),
+            payload=payload,
+            idempotency_key="profile:u1:major:2",
+        )
+    )
+    assert await restarted_worker.run_once() == 0
+    assert len(await service.list_versions("u1", AssetType.REPORT)) == 2
 
 
 class _EmptyProfiles:
@@ -340,6 +441,32 @@ async def test_function_calendar_achievement_track_and_export(tmp_path: Path) ->
     assert (await service.get_demo_script()).read_only is True
 
 
+async def test_calendar_concurrent_writes_across_service_instances(tmp_path: Path) -> None:
+    root = tmp_path / "objects"
+    assets = DefaultAssetService(
+        InMemoryAssetRepository(), _event_bus(), DependencyImpactPolicy()
+    )
+    first = DefaultFunctionService(
+        assets=assets,
+        behaviors=_Behaviors(),
+        object_store=LocalFileStore(str(root)),
+    )
+    second = DefaultFunctionService(
+        assets=assets,
+        behaviors=_Behaviors(),
+        object_store=LocalFileStore(str(root)),
+    )
+    await asyncio.gather(
+        *[
+            (first if index % 2 == 0 else second).write_calendar_node(
+                "u1", CalendarNode(node_id=f"n-{index}", title=f"节点 {index}")
+            )
+            for index in range(20)
+        ]
+    )
+    assert len(await first.list_calendar_nodes("u1")) == 20
+
+
 async def test_compliant_ingestion_is_idempotent_traceable_and_removable(
     tmp_path: Path,
 ) -> None:
@@ -353,7 +480,13 @@ async def test_compliant_ingestion_is_idempotent_traceable_and_removable(
     refreshed: list[str] = []
     raw_store = RawStore()
     pipeline = KnowledgeIngestionPipeline(
-        tmp_path, refreshed.append, raw_store=raw_store, raw_ttl_s=900
+        tmp_path,
+        refreshed.append,
+        raw_store=raw_store,
+        raw_ttl_s=900,
+        reviewer=lambda source, item: ReviewDecision(
+            status="approved", reviewer="reviewer-1", reason="字段与来源已核验"
+        ),
     )
     source = KnowledgeSource(
         source_id="src-open",
@@ -361,6 +494,7 @@ async def test_compliant_ingestion_is_idempotent_traceable_and_removable(
         source_url="https://example.test/open-data",
         namespace="occupation",
         acquisition="open_data",
+        access_basis="官方开放数据许可",
         allowed=True,
         allowed_scope="公开职业名称与简介",
         owner="data-owner",
@@ -401,6 +535,7 @@ async def test_ingestion_rejects_unapproved_source(tmp_path: Path) -> None:
         source_url="https://example.test",
         namespace="jd",
         acquisition="allowed_page",
+        access_basis="待确认",
         allowed=False,
         allowed_scope="待确认",
         owner="data-owner",
@@ -416,7 +551,12 @@ async def test_ingestion_rejects_unapproved_source(tmp_path: Path) -> None:
 async def test_ingestion_isolates_sources_and_rejects_namespace_traversal(
     tmp_path: Path,
 ) -> None:
-    pipeline = KnowledgeIngestionPipeline(tmp_path)
+    pipeline = KnowledgeIngestionPipeline(
+        tmp_path,
+        reviewer=lambda source, item: ReviewDecision(
+            status="approved", reviewer="reviewer-1", reason="测试审核通过"
+        ),
+    )
 
     def source(source_id: str, namespace: str = "occupation") -> KnowledgeSource:
         return KnowledgeSource(
@@ -425,6 +565,7 @@ async def test_ingestion_isolates_sources_and_rejects_namespace_traversal(
             source_url="https://example.test/open",
             namespace=namespace,
             acquisition="open_data",
+            access_basis="官方开放数据许可",
             allowed=True,
             allowed_scope="公开职业字段",
             owner="data-owner",
@@ -451,6 +592,60 @@ async def test_ingestion_isolates_sources_and_rejects_namespace_traversal(
 
     with pytest.raises(ValueError):
         await pipeline.run(source("bad", "../outside"), same_id)
+
+
+async def test_ingestion_requires_review_and_parses_html_file(tmp_path: Path) -> None:
+    source = KnowledgeSource(
+        source_id="source-html",
+        name="开放 HTML 卡片",
+        source_url="https://example.test/open",
+        namespace="occupation",
+        acquisition="allowed_page",
+        access_basis="页面条款明确允许复用公开职业卡片",
+        allowed=True,
+        allowed_scope="data-id、data-title 与公开摘要",
+        owner="data-owner",
+        refresh_interval="daily",
+        removal_method="source_id",
+        retention="30 days",
+        status="enabled",
+    )
+    html = tmp_path / "items.html"
+    html.write_text(
+        '<article data-id="occ-1" data-title="数据分析师">分析公开数据</article>',
+        encoding="utf-8",
+    )
+    pending = KnowledgeIngestionPipeline(tmp_path / "pending")
+    pending_report = await pending.run(source, lambda _: html)
+    pending_item = json.loads(
+        (tmp_path / "pending" / "occupation.json").read_text(encoding="utf-8")
+    )["items"][0]
+    assert pending_report.pending_review == 1
+    assert pending_item["status"] == "pending_review"
+    assert not await LocalKnowledgeRepo(str(tmp_path / "pending")).search(
+        "数据分析师", namespace="occupation"
+    )
+
+    refreshed: list[str] = []
+    approved = KnowledgeIngestionPipeline(
+        tmp_path / "pending",
+        refreshed.append,
+        reviewer=lambda source, item: ReviewDecision(
+            status="approved", reviewer="reviewer-2", reason="人工复核通过"
+        ),
+    )
+    adapter = KnowledgeSourceAdapter(source.source_id, lambda _: html)
+    approved_report = await approved.run(source, adapter)
+    assert approved_report.stored == 1 and approved_report.pending_review == 0
+    assert refreshed == ["occupation"]
+    hits = await LocalKnowledgeRepo(str(tmp_path / "pending")).search(
+        "数据分析师", namespace="occupation"
+    )
+    assert hits and hits[0].metadata["reviewed_by"] == "reviewer-2"
+    with pytest.raises(ValueError, match="不能处理"):
+        await approved.run(
+            source.model_copy(update={"source_id": "other-source"}), adapter
+        )
 
 
 async def test_demo_knowledge_is_traceable_hash_valid_and_searchable() -> None:

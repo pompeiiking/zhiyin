@@ -30,6 +30,7 @@ def _container(tmp_path: Path):
             local_registry_dir=str(DATA_DIR / "registry"),
             local_knowledge_dir=str(DATA_DIR / "knowledge"),
             local_object_dir=str(tmp_path / "objects"),
+            redis_url="",
         )
     )
 

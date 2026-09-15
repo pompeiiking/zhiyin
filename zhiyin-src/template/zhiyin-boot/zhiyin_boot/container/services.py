@@ -149,7 +149,11 @@ def build_workers(container: "Container") -> None:
     container.workers = []
     if container.asset_service is not None and container.event_bus_primitive is not None:
         container.workers.append(
-            ImpactPropagationWorker(container.asset_service, container.event_bus_primitive)
+            ImpactPropagationWorker(
+                container.asset_service,
+                container.event_bus_primitive,
+                container.cache,
+            )
         )
     if container.behavior_service is not None:
         container.workers.append(

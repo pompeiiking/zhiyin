@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
@@ -46,26 +47,34 @@ class DefaultConversationMemoryService(ConversationMemoryService):
         lead_agent: str,
         summary_delta: str = "",
     ) -> ConversationMemory:
-        current = await self._memories.get(user_id, task_id)
-        summary = current.summary if current is not None else ""
         delta = summary_delta.strip()
-        # Orchestrator 传入的是“本轮已确认摘要”，这里负责稳定追加、去重与限长，
-        # 避免把同一轮重试或完整聊天原文无限复制进长期记忆。
-        fragments = [item for item in summary.splitlines() if item.strip()]
-        if delta and (not fragments or fragments[-1] != delta):
-            fragments.append(delta)
-        summary = self._trim_summary(fragments)
-
-        memory = ConversationMemory(
-            id=current.id if current is not None else f"mem_{uuid4().hex[:12]}",
-            user_id=user_id,
-            task_id=task_id,
-            loop_stage=loop_stage,
-            lead_agent=lead_agent,
-            summary=summary,
-            last_active_at=datetime.now(timezone.utc),
-        )
-        return await self._memories.upsert(memory)
+        for _ in range(32):
+            current = await self._memories.get(user_id, task_id)
+            summary = current.summary if current is not None else ""
+            # Orchestrator 传入的是“本轮已确认摘要”，这里负责稳定追加、去重与限长，
+            # 避免把同一轮重试或完整聊天原文无限复制进长期记忆。
+            fragments = [item for item in summary.splitlines() if item.strip()]
+            if delta and delta not in fragments:
+                fragments.append(delta)
+            memory = ConversationMemory(
+                id=current.id if current is not None else f"mem_{uuid4().hex[:12]}",
+                user_id=user_id,
+                task_id=task_id,
+                loop_stage=loop_stage,
+                lead_agent=lead_agent,
+                summary=self._trim_summary(fragments),
+                last_active_at=datetime.now(timezone.utc),
+            )
+            saved = await self._memories.compare_and_swap(
+                memory,
+                expected_last_active_at=(
+                    current.last_active_at if current is not None else None
+                ),
+            )
+            if saved is not None:
+                return saved
+            await asyncio.sleep(0)
+        raise RuntimeError("会话记忆并发更新冲突，请重试")
 
     async def list_by_user(self, user_id: str) -> list[ConversationMemory]:
         return await self._memories.list_by_user(user_id)

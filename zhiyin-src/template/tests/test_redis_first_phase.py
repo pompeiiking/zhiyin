@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 import os
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -19,27 +20,48 @@ from zhiyin_infrastructure.redis import (
 
 
 class FakeRedis:
-    def __init__(self, database: int, *, broken: bool = False) -> None:
+    def __init__(
+        self,
+        database: int,
+        *,
+        broken: bool = False,
+        error_type: type[Exception] = ConnectionError,
+    ) -> None:
         self.database = database
         self.broken = broken
+        self.error_type = error_type
         self.values: dict[str, str] = {}
         self.ttls: dict[str, int] = {}
+        self.expires_at: dict[str, int] = {}
+        self.now = 0
 
     def _check(self) -> None:
         if self.broken:
-            raise ConnectionError("redis unavailable")
+            raise self.error_type("redis unavailable")
+
+    def advance(self, seconds: int) -> None:
+        self.now += seconds
+
+    def _purge(self, key: str) -> None:
+        if self.expires_at.get(key, self.now + 1) <= self.now:
+            self.values.pop(key, None)
+            self.ttls.pop(key, None)
+            self.expires_at.pop(key, None)
 
     async def get(self, key: str):
         self._check()
+        self._purge(key)
         return self.values.get(key)
 
     async def set(self, key: str, value: str, *, ex=None, nx=False):
         self._check()
+        self._purge(key)
         if nx and key in self.values:
             return False
         self.values[key] = value
         if ex is not None:
             self.ttls[key] = ex
+            self.expires_at[key] = self.now + ex
         return True
 
     async def delete(self, *keys: str):
@@ -50,10 +72,12 @@ class FakeRedis:
                 removed += 1
                 self.values.pop(key)
                 self.ttls.pop(key, None)
+                self.expires_at.pop(key, None)
         return removed
 
     async def incrby(self, key: str, amount: int):
         self._check()
+        self._purge(key)
         value = int(self.values.get(key, "0")) + amount
         self.values[key] = str(value)
         return value
@@ -61,10 +85,12 @@ class FakeRedis:
     async def expire(self, key: str, ttl_s: int):
         self._check()
         self.ttls[key] = ttl_s
+        self.expires_at[key] = self.now + ttl_s
         return True
 
     async def eval(self, script: str, number_of_keys: int, key: str, token: str):
         self._check()
+        self._purge(key)
         if self.values.get(key) != token:
             return 0
         return await self.delete(key)
@@ -72,12 +98,23 @@ class FakeRedis:
     async def scan_iter(self, *, match: str, count: int):
         self._check()
         for key in list(self.values):
+            self._purge(key)
             if fnmatch.fnmatch(key, match):
                 yield key
 
+    async def ttl(self, key: str):
+        self._check()
+        self._purge(key)
+        if key not in self.values:
+            return -2
+        return self.expires_at[key] - self.now
 
-def _factory(*, broken: bool = False):
-    clients = {db.value: FakeRedis(db.value, broken=broken) for db in RedisLogicalDatabase}
+
+def _factory(*, broken: bool = False, error_type: type[Exception] = ConnectionError):
+    clients = {
+        db.value: FakeRedis(db.value, broken=broken, error_type=error_type)
+        for db in RedisLogicalDatabase
+    }
     return RedisClientFactory("redis://unused", clients=clients), clients
 
 
@@ -133,10 +170,14 @@ async def test_domain_stores_bind_db_and_support_guard_primitives() -> None:
     await crawl.set_text("snapshot", "c1", "raw", ttl_s=3600)
     await knowledge.set_text("query", "q1", "hits", ttl_s=300)
     await vector.set_text("checkpoint", "v1", "42", ttl_s=1800)
+    await schedule.set_text("same", "id", "schedule", ttl_s=60)
+    await crawl.set_text("same", "id", "crawl", ttl_s=60)
     assert "zhiyin:dev:schedule:task:s1" in clients[2].values
     assert "zhiyin:dev:crawl:snapshot:c1" in clients[4].values
     assert "zhiyin:dev:knowledge:query:q1" in clients[5].values
     assert "zhiyin:dev:vector-sync:checkpoint:v1" in clients[6].values
+    assert clients[2].values["zhiyin:dev:schedule:same:id"] == "schedule"
+    assert clients[4].values["zhiyin:dev:crawl:same:id"] == "crawl"
 
     assert await guard.set_once("idempotency", "evt-1", "1", ttl_s=3600)
     assert not await guard.set_once("idempotency", "evt-1", "1", ttl_s=3600)
@@ -145,6 +186,44 @@ async def test_domain_stores_bind_db_and_support_guard_primitives() -> None:
     assert await guard.acquire_lock("lock", "asset-u1", "owner-a", ttl_s=30)
     assert not await guard.release_lock("lock", "asset-u1", "owner-b")
     assert await guard.release_lock("lock", "asset-u1", "owner-a")
+
+
+async def test_ttl_expiry_renewal_idempotency_retry_and_lock_timeout() -> None:
+    factory, clients = _factory()
+    guard = factory.domain_store("test", "guard")
+    assert await guard.set_once("idempotency", "evt", "1", ttl_s=2)
+    assert not await guard.set_once("idempotency", "evt", "1", ttl_s=2)
+    clients[3].advance(3)
+    assert await guard.set_once("idempotency", "evt", "2", ttl_s=5)
+    assert await clients[3].ttl("zhiyin:test:guard:idempotency:evt") == 5
+
+    assert await guard.acquire_lock("lock", "asset", "owner-a", ttl_s=2)
+    clients[3].advance(3)
+    assert await guard.acquire_lock("lock", "asset", "owner-b", ttl_s=4)
+    assert not await guard.release_lock("lock", "asset", "owner-a")
+    assert await guard.release_lock("lock", "asset", "owner-b")
+
+
+async def test_json_schema_time_invalid_data_and_capacity_limit() -> None:
+    factory, clients = _factory()
+    store = factory.domain_store("test", "test")
+    occurred_at = datetime(2026, 9, 15, tzinfo=timezone.utc)
+    await store.set_json("payload", "one", {"occurred_at": occurred_at}, ttl_s=60)
+    assert await store.get_json("payload", "one") == {
+        "occurred_at": "2026-09-15T00:00:00+00:00"
+    }
+
+    key = store.key("payload", "bad")
+    clients[15].values[key] = "not-json"
+    with pytest.raises(ValueError, match="格式无效"):
+        await store.get_json("payload", "bad")
+    clients[15].values[key] = '{"value": 1}'
+    with pytest.raises(ValueError, match="schema_version"):
+        await store.get_json("payload", "bad")
+    with pytest.raises(TypeError):
+        await store.set_json("payload", "unsupported", {"value": object()}, ttl_s=60)
+    with pytest.raises(ValueError, match="容量上限"):
+        await store.set_text("payload", "large", "x" * 1_048_577, ttl_s=60)
 
 
 async def test_temporary_domain_store_rejects_missing_ttl() -> None:
@@ -167,6 +246,41 @@ async def test_cache_connection_failure_falls_back_to_rebuildable_memory() -> No
     assert await cache.get("workspace", "u1") == "payload"
     await cache.delete("workspace", "u1")
     assert await cache.get("workspace", "u1") is None
+
+
+async def test_cache_timeout_falls_back_and_recovers() -> None:
+    factory, clients = _factory(broken=True, error_type=TimeoutError)
+    fallback = InMemoryCache()
+    cache = RedisCacheGateway(factory, env="dev", fallback=fallback)
+    await cache.set("workspace", "u1", "fallback", ttl_s=60)
+    assert await cache.get("workspace", "u1") == "fallback"
+    clients[0].broken = False
+    await cache.set("workspace", "u1", "rebuilt", ttl_s=120)
+    assert await cache.get("workspace", "u1") == "rebuilt"
+    assert clients[0].ttls["zhiyin:dev:cache:workspace:u1"] == 120
+
+
+async def test_non_cache_domain_fails_closed_and_can_retry_after_recovery() -> None:
+    factory, clients = _factory(broken=True, error_type=TimeoutError)
+    guard = factory.domain_store("dev", "guard")
+    with pytest.raises(TimeoutError):
+        await guard.set_once("idempotency", "evt", "1", ttl_s=60)
+    clients[3].broken = False
+    assert await guard.set_once("idempotency", "evt", "1", ttl_s=60)
+
+
+async def test_invalidated_cache_can_be_rebuilt_from_authoritative_data() -> None:
+    factory, _ = _factory()
+    cache = RedisCacheGateway(factory, env="dev")
+    authoritative = {"u1": "current-profile"}
+    await cache.set("profile", "u1", "stale-profile", ttl_s=60)
+    await cache.delete("profile", "u1")
+    value = await cache.get("profile", "u1")
+    if value is None:
+        value = authoritative["u1"]
+        await cache.set("profile", "u1", value, ttl_s=60)
+    assert value == "current-profile"
+    assert await cache.get("profile", "u1") == "current-profile"
 
 
 def test_unknown_namespace_and_database_fail_closed() -> None:
