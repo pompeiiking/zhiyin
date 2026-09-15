@@ -35,4 +35,5 @@ project
 
 # Required source markers retained by the zhiyin vendor snapshot.
 !project/
+project/*
 !project/blank

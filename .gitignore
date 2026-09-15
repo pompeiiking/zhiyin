@@ -77,6 +77,8 @@ deploy/.env
 !platform/wanwu/web/.env.development
 !platform/wanwu/web/.env.production
 !platform/wanwu/web/build/
+platform/wanwu/web/build/*
 !platform/wanwu/web/build/version-plugin.js
 !platform/wanwu/project/
+platform/wanwu/project/*
 !platform/wanwu/project/blank
