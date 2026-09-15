@@ -70,3 +70,13 @@ platform/wanwu/runtime/
 platform/wanwu/**/*.log
 platform/wanwu/**/*.pid
 deploy/.env
+
+# These upstream files are required by the Wanwu frontend build despite
+# repository-wide generated-file and environment-file ignore rules.
+!platform/wanwu/web/
+!platform/wanwu/web/.env.development
+!platform/wanwu/web/.env.production
+!platform/wanwu/web/build/
+!platform/wanwu/web/build/version-plugin.js
+!platform/wanwu/project/
+!platform/wanwu/project/blank

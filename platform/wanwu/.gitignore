@@ -32,3 +32,7 @@ cmd/*-client
 configs/microservice/bff-service/configs/wanwu-i18n.xlsx
 frontend
 project
+
+# Required source markers retained by the zhiyin vendor snapshot.
+!project/
+!project/blank
