@@ -69,6 +69,11 @@ def test_checked_in_wanwu_snapshot_is_sanitized() -> None:
     assert (VENDOR_ROOT / "LICENSE").is_file()
     assert (VENDOR_ROOT / "go.mod").is_file()
     assert (VENDOR_ROOT / "docker-compose.yaml").is_file()
+    assert (VENDOR_ROOT / "project" / "blank").is_file()
+    assert (VENDOR_ROOT / "web" / ".env.development").is_file()
+    assert (VENDOR_ROOT / "web" / ".env.production").is_file()
+    assert (VENDOR_ROOT / "web" / "build" / "version-plugin.js").is_file()
+    assert "require('./build/version-plugin')" in (VENDOR_ROOT / "web" / "vue.config.js").read_text(encoding="utf-8")
     manifest = json.loads((VENDOR_ROOT / ".zhiyin-vendor.json").read_text(encoding="utf-8"))
     assert manifest["revision"] == "969a74c7c376169d2a88c72891807d35bb40861b"
     forbidden = [
