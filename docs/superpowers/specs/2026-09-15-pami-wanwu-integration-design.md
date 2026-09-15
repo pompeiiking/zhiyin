@@ -1,20 +1,20 @@
-# 职引内置 pami/Wanwu 源码与接口暴露设计
+# 职引内置 pami/zhiyinbase 源码与接口暴露设计
 
 | 项 | 内容 |
 | --- | --- |
 | 状态 | 已批准设计，作为后续实施计划的依据 |
 | 日期 | 2026-09-15 |
-| 目标 | 将 Wanwu 源码纳入职引仓库与统一部署体系，并通过 Wanwu 自身 Nginx/BFF 暴露原生接口 |
-| 依据 | 《职引技术架构文档》《职引技术架构文档-第一期》《职引技术架构-分层详细设计》及 Wanwu 平台接口与安全文档 |
+| 目标 | 将 zhiyinbase 源码纳入职引仓库与统一部署体系，并通过 zhiyinbase 自身 Nginx/BFF 暴露原生接口 |
+| 依据 | 《职引技术架构文档》《职引技术架构文档-第一期》《职引技术架构-分层详细设计》及 zhiyinbase 平台接口与安全文档 |
 
 ## 1. 结论
 
 本任务采用“同仓库、统一部署、双入口、边界不变”的方案：
 
-- Wanwu 完整源码作为职引内置基础平台源码放在 `platform/wanwu/`；
-- Wanwu 保持自身 Go、Python、Vue、Nginx、BFF 和微服务边界，独立构建与运行；
+- zhiyinbase 完整源码作为职引内置基础平台源码放在 `platform/wanwu/`；
+- zhiyinbase 保持自身 Go、Python、Vue、Nginx、BFF 和微服务边界，独立构建与运行；
 - 职引 API 继续只提供 `/api/v1/*` 产品接口；
-- Wanwu 原生接口由 Wanwu 的 Nginx/BFF 入口提供，不经过职引 FastAPI 透明代理；
+- zhiyinbase 原生接口由 zhiyinbase 的 Nginx/BFF 入口提供，不经过职引 FastAPI 透明代理；
 - 本任务不实现真实 pami Client，不配置真实账号、模型或应用，不要求真实业务响应联调；
 - `zhiyin-infrastructure/pami/` 保留生产替换点和显式未实现行为，所有 pami 开关默认关闭。
 
@@ -24,27 +24,27 @@
 
 ### 2.1 本次包含
 
-1. 导入可追溯、可重复更新的 Wanwu 源码快照；
-2. 提供 Wanwu 与职引后端的容器构建资产；
+1. 导入可追溯、可重复更新的 zhiyinbase 源码快照；
+2. 提供 zhiyinbase 与职引后端的容器构建资产；
 3. 提供统一 Docker Compose 网络、环境初始化、启停和配置验证；
-4. 通过 Wanwu 自身 Nginx/BFF 暴露已有 HTTP 接口；
-5. 保持 Wanwu 中间件和内部微服务端口不对宿主机公开；
+4. 通过 zhiyinbase 自身 Nginx/BFF 暴露已有 HTTP 接口；
+5. 保持 zhiyinbase 中间件和内部微服务端口不对宿主机公开；
 6. 保留职引 pami Adapter 骨架、配置开关和架构守卫；
-7. 将现有 Wanwu 接口清单和已知问题文档纳入交付索引；
+7. 将现有 zhiyinbase 接口清单和已知问题文档纳入交付索引；
 8. 建立源码边界、容器资产、Compose 渲染、路由暴露和文档一致性测试；
 9. 提供 CI 与运维说明。
 
 ### 2.2 本次不包含
 
-- 不实现真实 Wanwu HTTP Client 或职引侧运行/控制 Adapter；
-- 不创建、配置或发布真实 Wanwu 资源；
-- 不维护职引资源代码与 Wanwu 资源 ID/API Key 的运行映射；
+- 不实现真实 zhiyinbase HTTP Client 或职引侧运行/控制 Adapter；
+- 不创建、配置或发布真实 zhiyinbase 资源；
+- 不维护职引资源代码与 zhiyinbase 资源 ID/API Key 的运行映射；
 - 不配置真实用户、JWT、API Key、模型密钥或外部模型；
-- 不要求真实 Wanwu 业务请求成功；
-- 不在职引 FastAPI 中增加 Wanwu 全接口透明代理；
-- 不把 Wanwu 改造成 Python 包或合入职引进程；
-- 不直接读写 Wanwu MySQL 业务表；
-- 不绕过 Wanwu 既有认证、组织、权限或资源归属检查；
+- 不要求真实 zhiyinbase 业务请求成功；
+- 不在职引 FastAPI 中增加 zhiyinbase 全接口透明代理；
+- 不把 zhiyinbase 改造成 Python 包或合入职引进程；
+- 不直接读写 zhiyinbase MySQL 业务表；
+- 不绕过 zhiyinbase 既有认证、组织、权限或资源归属检查；
 - 不建设 Kubernetes 或生产高可用部署。
 
 ## 3. 架构与边界
@@ -57,10 +57,10 @@
 |       `-- /api/v1/*                  职引产品接口
 |
 |-- platform/wanwu/
-|   |-- web/                           Wanwu 前端
-|   |-- internal/ + cmd/               Wanwu Go 服务
-|   |-- agent/                         Wanwu Python 能力
-|   `-- Nginx -> BFF/AgentScope        Wanwu 原生 HTTP 入口
+|   |-- web/                           zhiyinbase 前端
+|   |-- internal/ + cmd/               zhiyinbase Go 服务
+|   |-- agent/                         zhiyinbase Python 能力
+|   `-- Nginx -> BFF/AgentScope        zhiyinbase 原生 HTTP 入口
 |       |-- /user/api/*
 |       |-- /use/model/api/*
 |       |-- /service/api/*
@@ -80,24 +80,24 @@ zhiyin-business / zhiyin-orchestration
              Port / Gateway
                   ^
                   |
-zhiyin-infrastructure/pami  --HTTP（后续生产替换）--> Wanwu Nginx/BFF
+zhiyin-infrastructure/pami  --HTTP（后续生产替换）--> zhiyinbase Nginx/BFF
 ```
 
-本次只交付 Wanwu 源码、部署和原生接口入口。真实 HTTP 调用仍是后续生产替换工作。
+本次只交付 zhiyinbase 源码、部署和原生接口入口。真实 HTTP 调用仍是后续生产替换工作。
 
 ### 3.1 不增加职引透明代理
 
-职引 API 是产品/BFF 接入层，Wanwu 是基础设施平台。在职引 FastAPI 中透传全部 Wanwu 接口会产生第二套网关、鉴权、SSE、上传和错误语义，破坏既有边界。
+职引 API 是产品/BFF 接入层，zhiyinbase 是基础设施平台。在职引 FastAPI 中透传全部 zhiyinbase 接口会产生第二套网关、鉴权、SSE、上传和错误语义，破坏既有边界。
 
 因此：
 
 - 职引产品接口继续使用职引 DTO、Facade 和 OpenAPI；
-- Wanwu 原生接口继续使用 Wanwu 请求模型、错误码、JWT、API Key 和流式协议；
+- zhiyinbase 原生接口继续使用 zhiyinbase 请求模型、错误码、JWT、API Key 和流式协议；
 - 两套入口可以由部署环境使用不同域名或端口发布，但应用代码不互相代理。
 
 ## 4. 源码纳入
 
-Wanwu 快照固定在 `platform/wanwu/`，保存上游地址、完整提交哈希、导入日期和排除项。本地补丁通过职引 Git 历史单独追溯。
+zhiyinbase 快照固定在 `platform/wanwu/`，保存上游地址、完整提交哈希、导入日期和排除项。本地补丁通过职引 Git 历史单独追溯。
 
 `scripts/import_wanwu.py` 只从已提交的 Git 对象导出源码，不复制上游脏工作区。重复导入同一提交应产生相同源码内容与元数据。
 
@@ -114,29 +114,29 @@ Wanwu 快照固定在 `platform/wanwu/`，保存上游地址、完整提交哈�
 ## 5. 构建与统一部署
 
 - `platform/wanwu` 是独立构建单元，不加入职引 `pyproject.toml`；
-- Wanwu 沿用自身 Dockerfile/Compose 模型；
+- zhiyinbase 沿用自身 Dockerfile/Compose 模型；
 - 职引后端使用 `zhiyin-src/template/Dockerfile`，以非 root 用户运行；
-- Wanwu 与职引共享 `wanwu-net`；
+- zhiyinbase 与职引共享 `wanwu-net`；
 - MySQL、Redis、Kafka、Elasticsearch、MinIO、BFF、Agent、RAG、AgentScope 等内部端口不映射到宿主机；
-- Wanwu HTTP 流量只从 Wanwu Nginx 进入；
+- zhiyinbase HTTP 流量只从 zhiyinbase Nginx 进入；
 - 本地开发默认绑定 `127.0.0.1:8081`，不是公网监听；
 - 生产域名、TLS 和公网策略由部署环境外层网关负责。
 
 `deploy/.env.example` 只保存非秘密默认值和空秘密字段。`deploy/init_env.py` 生成被 Git 忽略的 `deploy/.env`，不得覆盖已有文件或打印秘密。
 
-## 6. Wanwu 原生接口暴露
+## 6. zhiyinbase 原生接口暴露
 
-Wanwu Nginx 保持上游路由：
+zhiyinbase Nginx 保持上游路由：
 
 | 路径 | 用途 | 信任面 |
 | --- | --- | --- |
-| `/user/api/*` | 登录、用户、组织、资源管理 | Wanwu JWT、组织与权限规则 |
-| `/use/model/api/*` | 模型调用与相关能力 | Wanwu 对应中间件规则 |
+| `/user/api/*` | 登录、用户、组织、资源管理 | zhiyinbase JWT、组织与权限规则 |
+| `/use/model/api/*` | 模型调用与相关能力 | zhiyinbase 对应中间件规则 |
 | `/service/api/*` | 通用服务与 OpenAPI | 按接口使用 JWT、API Key 或开放规则 |
 | `/workflow/api/*` | AgentScope 工作流能力 | 工作流协议与平台身份透传 |
 | `/minio/download/api/*` | 受控文件下载 | Wanwu/MinIO 既有规则 |
 
-“暴露接口”只表示路由能从 Wanwu Nginx 到达目标服务，不表示接口免认证、业务数据已配置或真实调用成功。
+“暴露接口”只表示路由能从 zhiyinbase Nginx 到达目标服务，不表示接口免认证、业务数据已配置或真实调用成功。
 
 ### 6.1 静态验收
 
@@ -153,7 +153,7 @@ Wanwu Nginx 保持上游路由：
 
 ### 6.2 不改变信任面
 
-统一部署不得删除 Wanwu 认证中间件、注入固定管理员身份、泄露秘密、把 Callback 改成匿名公网接口，或把“路由存在”描述成“业务已联通”。
+统一部署不得删除 zhiyinbase 认证中间件、注入固定管理员身份、泄露秘密、把 Callback 改成匿名公网接口，或把“路由存在”描述成“业务已联通”。
 
 ## 7. 职引侧 pami 替换点
 
@@ -165,8 +165,8 @@ Wanwu Nginx 保持上游路由：
 
 - 业务层不 import `zhiyin_infrastructure`；
 - 基础设施层不 import 业务层或编排层；
-- Wanwu 源码不进入职引 Python 包；
-- API 层不直接引用 Wanwu DTO。
+- zhiyinbase 源码不进入职引 Python 包；
+- API 层不直接引用 zhiyinbase DTO。
 
 ## 8. 文档与测试
 
@@ -176,7 +176,7 @@ Wanwu Nginx 保持上游路由：
 | --- | --- |
 | `外部平台/pami-Wanwu/接口.md` | 字段级接口、方法、路径、认证和验证状态 |
 | `外部平台/pami-Wanwu/平台报错和未连通接口.md` | 已实际确认的问题 |
-| `外部平台/pami-Wanwu/架构文档/` | Wanwu 路由、服务、安全和部署事实 |
+| `外部平台/pami-Wanwu/架构文档/` | zhiyinbase 路由、服务、安全和部署事实 |
 | 本设计 | 职引纳入源码与暴露原生接口的工程边界 |
 
 测试分为：
@@ -193,18 +193,18 @@ Wanwu Nginx 保持上游路由：
 ### 阶段 1：源码快照
 
 - 安全、可重复的导入工具；
-- 固定 Wanwu 提交及追溯元数据；
+- 固定 zhiyinbase 提交及追溯元数据；
 - 秘密与运行文件排除。
 
 ### 阶段 2：构建与统一部署
 
 - 职引后端容器化；
-- Wanwu 独立构建资产；
+- zhiyinbase 独立构建资产；
 - 统一 Compose 网络、环境初始化、启停和配置验证。
 
 ### 阶段 3：原生接口路由暴露
 
-- 核对 Wanwu Nginx/BFF 原生路由；
+- 核对 zhiyinbase Nginx/BFF 原生路由；
 - 增加路由静态契约测试；
 - 确认内部端口隔离；
 - 与《接口.md》交叉校验。
@@ -213,7 +213,7 @@ Wanwu Nginx 保持上游路由：
 
 - 保留 pami Adapter 骨架和关闭状态；
 - 增加误开启时显式失败测试；
-- 增加 Wanwu 源码不得被职引包引用的架构守卫；
+- 增加 zhiyinbase 源码不得被职引包引用的架构守卫；
 - 确认职引产品 API 与行为不变。
 
 ### 阶段 5：CI、文档与验收
@@ -226,15 +226,15 @@ Wanwu Nginx 保持上游路由：
 
 同时满足以下条件才算完成：
 
-1. Wanwu 快照、上游提交和本地补丁可追溯；
+1. zhiyinbase 快照、上游提交和本地补丁可追溯；
 2. 重复导入不会带入秘密或运行状态；
-3. Wanwu 与职引拥有独立构建单元和统一 Compose 网络；
+3. zhiyinbase 与职引拥有独立构建单元和统一 Compose 网络；
 4. Compose 合并配置可成功渲染；
-5. Wanwu 原生路由通过 Nginx/BFF 暴露并通过静态契约测试；
-6. Wanwu 内部微服务和中间件端口不映射到宿主机；
-7. 职引 `/api/v1/*` 不承担 Wanwu 全接口透明代理；
+5. zhiyinbase 原生路由通过 Nginx/BFF 暴露并通过静态契约测试；
+6. zhiyinbase 内部微服务和中间件端口不映射到宿主机；
+7. 职引 `/api/v1/*` 不承担 zhiyinbase 全接口透明代理；
 8. pami 开关默认关闭，误开启未实现能力时显式失败；
 9. 接口清单准确标记认证方式和实际验证状态；
 10. 后端测试、静态检查、OpenAPI 快照、前端类型和 CI 配置通过；
-11. 文档明确说明未完成真实 Wanwu 业务接入；
+11. 文档明确说明未完成真实 zhiyinbase 业务接入；
 12. 工作树无意外修改，密钥文件未被 Git 跟踪。

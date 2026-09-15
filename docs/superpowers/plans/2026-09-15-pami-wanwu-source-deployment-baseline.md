@@ -1,29 +1,29 @@
-# pami/Wanwu Source and Deployment Baseline Implementation Plan
+# pami/zhiyinbase Source and Deployment Baseline Implementation Plan
 
 > **状态说明（2026-09-15）：** 本计划对应现行设计的阶段 1–2，源码快照与部署
 > 资产已经提交。后续路由、边界、CI 与文档收口由
-> `2026-09-15-pami-wanwu-route-boundary-delivery.md` 承接；不重新导入 Wanwu。
+> `2026-09-15-pami-wanwu-route-boundary-delivery.md` 承接；不重新导入 zhiyinbase。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Import a clean, traceable Wanwu source snapshot into the zhiyin repository and provide a repeatable container build and unified Compose baseline that starts Wanwu and the zhiyin backend on one internal network.
+**Goal:** Import a clean, traceable zhiyinbase source snapshot into the zhiyin repository and provide a repeatable container build and unified Compose baseline that starts zhiyinbase and the zhiyin backend on one internal network.
 
-**Architecture:** Wanwu remains an independently built platform under `platform/wanwu`; the zhiyin Python packages never import it. A cross-platform import tool records provenance and filters sensitive runtime files. The deployment layer applies a security override to Wanwu's Compose model and adds a containerized `zhiyin-api`, with stateful and engine services reachable only through the shared internal network.
+**Architecture:** zhiyinbase remains an independently built platform under `platform/wanwu`; the zhiyin Python packages never import it. A cross-platform import tool records provenance and filters sensitive runtime files. The deployment layer applies a security override to zhiyinbase's Compose model and adds a containerized `zhiyin-api`, with stateful and engine services reachable only through the shared internal network.
 
-**Tech Stack:** Python 3.11, pytest, Git archive, Docker Engine, Docker Compose v2.24+, FastAPI/Uvicorn, Wanwu Go/Python/Vue containers.
+**Tech Stack:** Python 3.11, pytest, Git archive, Docker Engine, Docker Compose v2.24+, FastAPI/Uvicorn, zhiyinbase Go/Python/Vue containers.
 
 **Spec:** `docs/superpowers/specs/2026-09-15-pami-wanwu-integration-design.md`
 
 ## Global Constraints
 
 - This plan implements only design Phase 1: source and deployment baseline. It does not implement pami runtime or control-plane adapters.
-- Import Wanwu commit `969a74c7c376169d2a88c72891807d35bb40861b` from `D:/kaixuexiangmu/ceshi/wanwu` as the initial baseline.
+- Import zhiyinbase commit `969a74c7c376169d2a88c72891807d35bb40861b` from `D:/kaixuexiangmu/ceshi/wanwu` as the initial baseline.
 - Import committed content only. Leave all uncommitted source-worktree changes untouched and outside the snapshot until they receive a separate patch review.
 - Exclude `.git`, `.env.bak`, `.env.image.amd64`, `.env.image.arm64`, logs, PID files, caches, generated output, and local test state.
-- Preserve Wanwu's Apache 2.0 `LICENSE` and record the source revision and remote URL in a machine-readable manifest and `UPSTREAM.md`.
+- Preserve zhiyinbase's Apache 2.0 `LICENSE` and record the source revision and remote URL in a machine-readable manifest and `UPSTREAM.md`.
 - `platform/wanwu` is not a Python package and must not be added to `pyproject.toml`.
 - The zhiyin backend must run as a non-root container user and expose only port `8000` inside the Compose network.
-- Wanwu's Nginx is the only Wanwu HTTP entry used by later adapters; individual Wanwu microservice ports remain internal.
+- zhiyinbase's Nginx is the only zhiyinbase HTTP entry used by later adapters; individual zhiyinbase microservice ports remain internal.
 - Secrets are generated into ignored `deploy/.env`; they are not committed to source control or printed by verification scripts.
 - Existing architecture, contract, lint, OpenAPI, and phase-one checks must remain green.
 
@@ -31,15 +31,15 @@
 
 | File | Responsibility |
 | --- | --- |
-| `scripts/import_wanwu.py` | Export one committed Wanwu revision, reject unsafe destinations, filter forbidden files, and write provenance |
+| `scripts/import_wanwu.py` | Export one committed zhiyinbase revision, reject unsafe destinations, filter forbidden files, and write provenance |
 | `zhiyin-src/template/tests/test_wanwu_vendor.py` | Test importer safety and assert that the checked-in snapshot is complete and sanitized |
-| `platform/wanwu/**` | Imported Wanwu source snapshot |
+| `platform/wanwu/**` | Imported zhiyinbase source snapshot |
 | `platform/wanwu/.zhiyin-vendor.json` | Machine-readable revision, remote, import date, and exclusion record |
 | `platform/wanwu/UPSTREAM.md` | Human-readable provenance and update policy |
 | `zhiyin-src/template/Dockerfile` | Production-like zhiyin backend image |
 | `zhiyin-src/template/.dockerignore` | Small, secret-free backend build context |
 | `zhiyin-src/template/tests/test_container_assets.py` | Static container contract tests |
-| `deploy/compose.yaml` | Override Wanwu host ports and add the zhiyin backend service |
+| `deploy/compose.yaml` | Override zhiyinbase host ports and add the zhiyin backend service |
 | `deploy/.env.example` | Non-secret deployment defaults and empty secret slots |
 | `deploy/init_env.py` | Create `deploy/.env` with generated local secrets |
 | `deploy/up.ps1` | Validate environment/network and start the unified stack |
@@ -51,7 +51,7 @@
 
 ---
 
-### Task 1: Safe and Reproducible Wanwu Importer
+### Task 1: Safe and Reproducible zhiyinbase Importer
 
 **Files:**
 - Create: `scripts/import_wanwu.py`
@@ -294,7 +294,7 @@ git commit -m "build: add reproducible wanwu source importer"
 
 ---
 
-### Task 2: Import and Verify the Wanwu Source Snapshot
+### Task 2: Import and Verify the zhiyinbase Source Snapshot
 
 **Files:**
 - Create: `platform/wanwu/**`
@@ -305,7 +305,7 @@ git commit -m "build: add reproducible wanwu source importer"
 
 **Interfaces:**
 - Consumes: `scripts/import_wanwu.py::import_snapshot` from Task 1 and committed source revision `969a74c7c376169d2a88c72891807d35bb40861b`.
-- Produces: a sanitized, buildable Wanwu tree at `platform/wanwu` with immutable provenance.
+- Produces: a sanitized, buildable zhiyinbase tree at `platform/wanwu` with immutable provenance.
 
 - [ ] **Step 1: Confirm the source revision without touching its dirty worktree**
 
@@ -510,7 +510,7 @@ git commit -m "build: containerize zhiyin backend"
 
 ---
 
-### Task 4: Unified Wanwu and zhiyin Compose Baseline
+### Task 4: Unified zhiyinbase and zhiyin Compose Baseline
 
 **Files:**
 - Create: `deploy/compose.yaml`
@@ -811,7 +811,7 @@ pwsh deploy/up.ps1
 pwsh deploy/verify.ps1
 ```
 
-Expected: Wanwu's public base endpoint responds, the zhiyin container reports `/healthz`, and verification prints `unified deployment baseline is ready`.
+Expected: zhiyinbase's public base endpoint responds, the zhiyin container reports `/healthz`, and verification prints `unified deployment baseline is ready`.
 
 - [ ] **Step 9: Stop without deleting data**
 
@@ -878,12 +878,12 @@ Add a repository-root job for Compose rendering because its paths are relative t
 
 - [ ] **Step 2: Document the operator workflow**
 
-Add a “内置 pami/Wanwu 部署基线” section to `README.md` with these commands and an explicit phase statement:
+Add a “内置 pami/zhiyinbase 部署基线” section to `README.md` with these commands and an explicit phase statement:
 
 ```markdown
-## 内置 pami/Wanwu 部署基线
+## 内置 pami/zhiyinbase 部署基线
 
-Wanwu 源码位于 `platform/wanwu/`，职引后端与 Wanwu 通过 `wanwu-net` 内部网络运行。
+zhiyinbase 源码位于 `platform/wanwu/`，职引后端与 zhiyinbase 通过 `wanwu-net` 内部网络运行。
 
 ```powershell
 python deploy/init_env.py

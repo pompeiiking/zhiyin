@@ -1,10 +1,10 @@
-# pami/Wanwu Route and Boundary Delivery Implementation Plan
+# pami/zhiyinbase Route and Boundary Delivery Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Complete stages 3–5 of the approved Wanwu source-and-interface exposure design without re-importing the existing Wanwu snapshot.
+**Goal:** Complete stages 3–5 of the approved zhiyinbase source-and-interface exposure design without re-importing the existing zhiyinbase snapshot.
 
-**Architecture:** Wanwu remains independent under `platform/wanwu` and exposes native routes through its own Nginx/BFF. Zhiyin keeps its `/api/v1/*` product API and disabled pami skeletons; executable checks enforce route configuration and package boundaries.
+**Architecture:** zhiyinbase remains independent under `platform/wanwu` and exposes native routes through its own Nginx/BFF. Zhiyin keeps its `/api/v1/*` product API and disabled pami skeletons; executable checks enforce route configuration and package boundaries.
 
 **Tech Stack:** Python 3.10+, pytest, JSON, Nginx configuration, Docker Compose, GitHub Actions
 
@@ -13,10 +13,10 @@
 ## Global Constraints
 
 - Keep imported revision `969a74c7c376169d2a88c72891807d35bb40861b`; do not re-import it.
-- Do not add a Wanwu proxy route to `zhiyin-api`.
+- Do not add a zhiyinbase proxy route to `zhiyin-api`.
 - Do not implement real pami HTTP calls or enable `ZHIYIN_USE_PAMI_*`.
-- Keep Wanwu authentication, permission, API Key, callback, and streaming behavior unchanged.
-- Keep Wanwu internal service ports removed by the Compose override.
+- Keep zhiyinbase authentication, permission, API Key, callback, and streaming behavior unchanged.
+- Keep zhiyinbase internal service ports removed by the Compose override.
 - Treat route presence as configuration evidence, not proof of a successful business request.
 - Preserve all existing Zhiyin tests, lint, OpenAPI, frontend, and phase-one checks.
 
@@ -44,7 +44,7 @@ Stages 1 and 2 are already represented by:
 
 ---
 
-### Task 1: Build an Executable Wanwu Route Contract
+### Task 1: Build an Executable zhiyinbase Route Contract
 
 **Files:**
 - Create: `scripts/verify_wanwu_routes.py`
@@ -287,7 +287,7 @@ git commit -m "test: enforce zhiyin wanwu integration boundary"
 - Modify: `docs/README.md`
 - Modify: `docs/superpowers/plans/2026-09-15-pami-wanwu-source-deployment-baseline.md`
 
-- [ ] **Step 1: Extend the CI Wanwu step**
+- [ ] **Step 1: Extend the CI zhiyinbase step**
 
 Run the vendor, container, deployment, route, and pami-boundary test files, then
 run `python scripts/verify_wanwu_routes.py` from the repository root.
@@ -298,14 +298,14 @@ State that:
 
 - the current delivery contains the source snapshot, independent build, unified
   Compose, and native route configuration;
-- native routes use `http://127.0.0.1:8081` and Wanwu authentication;
+- native routes use `http://127.0.0.1:8081` and zhiyinbase authentication;
 - Zhiyin `/api/v1/*` does not proxy them;
 - pami switches remain off and real resources are not claimed as connected.
 
 - [ ] **Step 3: Link plans and mark the retained baseline**
 
 Add this plan to `docs/README.md`. Add a status note to the earlier baseline plan
-that it represents stages 1–2 and that Wanwu is not re-imported.
+that it represents stages 1–2 and that zhiyinbase is not re-imported.
 
 - [ ] **Step 4: Run focused verification**
 
@@ -381,5 +381,5 @@ focused route, boundary, and documentation commits.
 
 Report that source, independent build assets, unified deployment configuration,
 native route exposure, boundary guards, CI, and documentation are complete.
-Explicitly state that real Wanwu accounts, models, resources, and business
+Explicitly state that real zhiyinbase accounts, models, resources, and business
 requests were not configured or validated.
