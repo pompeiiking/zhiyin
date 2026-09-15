@@ -145,14 +145,7 @@ def test_infrastructure_drawers_exist() -> None:
 # 已用**真实实现**交付、因此不应再有骨架文件的能力位。
 # 登记在这里等于明确声明"它不是待补的格子"；新增能力位时要么给骨架（文件 + 类名 + 签名），
 # 要么在此登记——两者都不做，下面的守卫会失败。
-# TODO(第一期未闭合): OPEN-5 —— 下面的 `{"loop", *SERVICE_SHELL}` 让
-# `test_remaining_service_skeletons_declare_their_status` 的迭代集合变成**空集**，
-# 该守卫已空转（Worker 侧守卫仍有效）。建议恢复非空集守卫，或改为断言
-# WIRED_SERVICE_PORTS 与装配报告的 wired 集合一致。
-# 清单：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-5）。
-WIRED_SERVICE_PORTS: frozenset[str] = frozenset(
-    {"loop", *SERVICE_SHELL}
-)
+WIRED_SERVICE_PORTS: frozenset[str] = frozenset({"loop", *SERVICE_SHELL})
 WIRED_WORKER_PORTS: frozenset[str] = frozenset({"impact", "active_event"})
 
 
@@ -246,10 +239,13 @@ def test_worker_contract_stays_minimal() -> None:
     assert Worker.__abstractmethods__ == frozenset({"run_once"})
 
 
-def test_remaining_service_skeletons_declare_their_status() -> None:
-    for port in sorted(set(SERVICE_SHELL) - WIRED_SERVICE_PORTS):
-        module, class_name = SERVICE_SHELL[port]
-        assert getattr(_load(module, class_name), "IMPLEMENTATION_STATUS", None) == "skeleton"
+@pytest.mark.parametrize("port", sorted(SERVICE_SHELL))
+def test_service_declares_valid_status(port: str) -> None:
+    module, class_name = SERVICE_SHELL[port]
+    status = getattr(_load(module, class_name), "IMPLEMENTATION_STATUS", None)
+    assert status in {"skeleton", "wired"}, (
+        f"{class_name}.IMPLEMENTATION_STATUS 必须如实声明为 skeleton 或 wired"
+    )
 
 
 @pytest.mark.parametrize("port", sorted(set(WORKER_SHELL) - WIRED_WORKER_PORTS))
@@ -278,7 +274,7 @@ def test_first_phase_is_wired_and_later_worker_stays_pending() -> None:
     report = describe_assembly(build_container(_test_settings()))
 
     assert all(report.services[port] == "wired" for port in WIRED_SERVICE_PORTS)
-    assert report.workers["active_event"] == "wired"
+    assert all(report.workers[port] == "wired" for port in WIRED_WORKER_PORTS)
     assert report.workers["vector_sync"] == "not_wired"
 
 

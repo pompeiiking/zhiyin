@@ -77,6 +77,8 @@ def test_assembly_report_marks_first_phase_services_wired(settings: Settings) ->
     # 已实现的部分必须是 wired
     assert report.orchestration["agent_engine"] == WIRED
     assert report.services["loop"] == WIRED
+    assert report.services["profile_service"] == WIRED
+    assert report.services["behavior_service"] == WIRED
     assert report.gateways["llm"] == WIRED
 
     # 第一期业务主链路和 BFF 已完整装配。

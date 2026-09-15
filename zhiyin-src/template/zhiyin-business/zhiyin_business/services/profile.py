@@ -1,7 +1,7 @@
 """画像服务实现。
 
 落位：`business/services/profile.py` —— 业务编排负责人。
-依赖：`ProfileRepository` + `EventBus`。
+依赖：`ProfileRepository` + `RegistryRepository` + `EventBus`。
 
 本类只做"画像活状态的读写与事件发布"，**不含**采集话术与置信度算法：
 - 字段结构与置信度取值 → `zhiyin_kernel.blackboard.ProfileField` + 业务规则；
@@ -16,13 +16,18 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Optional, Sequence
-from uuid import uuid4
 
-from zhiyin_business.events import PROFILE_FIELD_UPDATED, ProfileFieldUpdatedPayload
+from zhiyin_business.events import (
+    PROFILE_FIELD_UPDATED,
+    ProfileFieldUpdatedPayload,
+)
+from zhiyin_business.policies.profile import (
+    PROFILE_COLLECTION_POLICY,
+    calculate_overall_confidence,
+)
 from zhiyin_business.ports.blackboard import ProfileService
-from zhiyin_data_sdk.repositories import ProfileRepository
+from zhiyin_data_sdk.repositories import ProfileRepository, RegistryRepository
 from zhiyin_kernel.blackboard import Profile, ProfileField, ProfileGap
-from zhiyin_kernel.enums import ProfileSource
 from zhiyin_orchestration import DomainEvent, EventBus
 
 
@@ -31,8 +36,14 @@ class DefaultProfileService(ProfileService):
 
     IMPLEMENTATION_STATUS = "wired"
 
-    def __init__(self, profiles: ProfileRepository, event_bus: EventBus) -> None:
+    def __init__(
+        self,
+        profiles: ProfileRepository,
+        registry: RegistryRepository,
+        event_bus: EventBus,
+    ) -> None:
         self._profiles = profiles
+        self._registry = registry
         self._event_bus = event_bus
 
     async def get(self, user_id: str) -> Optional[Profile]:
@@ -56,49 +67,51 @@ class DefaultProfileService(ProfileService):
         source: str,
         evidence: Optional[list[str]] = None,
     ) -> ProfileField:
-        try:
-            parsed_source = ProfileSource(source)
-        except ValueError as exc:
-            raise ValueError(f"未知画像来源：{source}") from exc
-        field = await self._profiles.upsert_field(
-            user_id,
-            ProfileField(
-                key=key,
-                value=value,
-                confidence=confidence,
-                source=parsed_source,
-                updated_at=datetime.now(timezone.utc),
-                evidence=evidence or [],
-            ),
+        field = ProfileField(
+            key=key,
+            value=value,
+            confidence=confidence,
+            source=source,
+            evidence=list(evidence or ()),
+            updated_at=datetime.now(timezone.utc),
         )
+        stored = await self._profiles.upsert_field(user_id, field)
+
         profile = await self._profiles.get(user_id)
+        if profile is None:
+            raise RuntimeError("画像字段写入成功后无法读取画像版本")
+
+        event_key = (
+            f"{PROFILE_FIELD_UPDATED}:{profile.id}:{profile.version}:{stored.key}"
+        )
         payload = ProfileFieldUpdatedPayload(
             user_id=user_id,
-            field_key=key,
-            confidence=field.confidence,
-            source=field.source.value,
-            profile_version=profile.version if profile is not None else 1,
-            updated_at=field.updated_at,
+            field_key=stored.key,
+            confidence=stored.confidence,
+            source=stored.source.value,
+            profile_version=profile.version,
+            updated_at=stored.updated_at,
         )
         await self._event_bus.publish(
             DomainEvent(
-                event_id=f"evt_{uuid4().hex}",
+                event_id=event_key,
                 event_type=PROFILE_FIELD_UPDATED,
-                occurred_at=datetime.now(timezone.utc),
+                occurred_at=stored.updated_at,
                 payload=payload.model_dump(mode="json"),
-                idempotency_key=f"profile:{user_id}:{key}:{payload.profile_version}",
+                idempotency_key=event_key,
             )
         )
-        return field
+        return stored
 
     async def replace_gaps(self, user_id: str, gaps: list[ProfileGap]) -> None:
         await self._profiles.replace_gaps(user_id, gaps)
 
     async def overall_confidence(self, user_id: str) -> float:
+        params = await self._registry.get_policy_params(PROFILE_COLLECTION_POLICY)
+        if params is None:
+            raise ValueError("缺少动态规则参数：profile_collection")
         fields = await self._profiles.list_fields(user_id)
-        if not fields:
-            return 0.0
-        return sum(field.confidence for field in fields) / len(fields)
+        return calculate_overall_confidence(fields, params)
 
 
 __all__ = ["DefaultProfileService"]
