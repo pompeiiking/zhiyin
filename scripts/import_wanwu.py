@@ -12,7 +12,7 @@ from typing import Sequence
 
 BLOCKED_ROOT_FILES = frozenset({".env.bak", ".env.image.amd64", ".env.image.arm64"})
 BLOCKED_SUFFIXES = frozenset({".log", ".pid"})
-BLOCKED_PARTS = frozenset({".git", ".cache", "output", "__pycache__"})
+BLOCKED_PARTS = frozenset({".git", ".cache", ".pytest_cache", "output", "__pycache__"})
 
 
 def run_git(source: Path, args: Sequence[str]) -> str:

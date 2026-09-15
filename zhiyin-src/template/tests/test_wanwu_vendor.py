@@ -38,6 +38,9 @@ def test_import_snapshot_filters_sensitive_files_and_records_revision(tmp_path: 
     (source / "LICENSE").write_text("Apache License 2.0", encoding="utf-8")
     (source / "README.md").write_text("wanwu", encoding="utf-8")
     (source / ".env.bak").write_text("PASSWORD=secret", encoding="utf-8")
+    cache = source / ".pytest_cache"
+    cache.mkdir()
+    (cache / "state").write_text("local test state", encoding="utf-8")
     (source / "asset.bin").write_bytes(b"\x00\x01")
     git(source, "add", ".")
     git(source, "commit", "-m", "fixture")
@@ -50,6 +53,7 @@ def test_import_snapshot_filters_sensitive_files_and_records_revision(tmp_path: 
     assert (destination / "README.md").read_text(encoding="utf-8") == "wanwu"
     assert (destination / "asset.bin").read_bytes() == b"\x00\x01"
     assert not (destination / ".env.bak").exists()
+    assert not (destination / ".pytest_cache").exists()
     assert manifest["revision"] == revision
     assert json.loads((destination / ".zhiyin-vendor.json").read_text(encoding="utf-8"))["revision"] == revision
 
