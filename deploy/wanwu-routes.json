@@ -1,0 +1,32 @@
+{
+  "entrypoint": "wanwu-nginx",
+  "local_url": "http://127.0.0.1:8081",
+  "claim": "route-configured",
+  "routes": [
+    {
+      "prefix": "/user/api/",
+      "upstream": "http://bff-service:6668/",
+      "trust_surface": "wanwu-jwt-and-permissions"
+    },
+    {
+      "prefix": "/use/model/api/",
+      "upstream": "http://bff-service:6668/",
+      "trust_surface": "wanwu-model-middleware"
+    },
+    {
+      "prefix": "/service/api/",
+      "upstream": "http://bff-service:6668/",
+      "trust_surface": "per-route-jwt-api-key-or-open-rule"
+    },
+    {
+      "prefix": "/workflow/api/",
+      "upstream": "http://agentscope-wanwu:6672/",
+      "trust_surface": "wanwu-workflow-protocol"
+    },
+    {
+      "prefix": "/minio/download/api/",
+      "upstream": "http://minio-wanwu:9000/",
+      "trust_surface": "wanwu-minio-download-rule"
+    }
+  ]
+}
