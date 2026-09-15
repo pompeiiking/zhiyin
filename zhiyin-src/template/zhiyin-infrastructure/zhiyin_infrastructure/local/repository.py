@@ -169,15 +169,20 @@ class InMemoryBehaviorRepository(BehaviorRepository):
     ) -> list[BehaviorLog]:
         wanted = set(event_types) if event_types else None
         matched = [
-            item
-            for item in self._logs
+            (index, item)
+            for index, item in enumerate(self._logs)
             if item.user_id == user_id
             and (wanted is None or item.event_type in wanted)
             and (since is None or item.occurred_at >= since)
             and (until is None or item.occurred_at <= until)
         ]
-        matched.sort(key=lambda item: item.occurred_at, reverse=True)
-        return [_snapshot(item) for item in matched[:limit]]
+        # 同刻并列用「追加序」定次序：系统时钟粒度有限（实测 Windows 约 15.6ms），
+        # 同一刻连续写入的多条日志 occurred_at 会完全相同。只按 occurred_at 排序时，
+        # 稳定排序会把并列组保留为插入顺序，结果变成"最早优先"，与"最新优先"契约相反，
+        # 并让 recent(limit=1) / 成就首次解锁 / 工作台时间线取到旧记录。
+        # 换成真实数据库实现时，同一职责应由自增序列或 rowid 承担。
+        matched.sort(key=lambda pair: (pair[1].occurred_at, pair[0]), reverse=True)
+        return [_snapshot(item) for _, item in matched[:limit]]
 
     async def last_occurred_at(
         self, user_id: str, event_type: BehaviorEventType
