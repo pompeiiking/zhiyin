@@ -4,7 +4,7 @@
 
 **Goal:** Import a clean, traceable Wanwu source snapshot into the zhiyin repository and provide a repeatable container build and unified Compose baseline that starts Wanwu and the zhiyin backend on one internal network.
 
-**Architecture:** Wanwu remains an independently built platform under `platform/wanwu`; the zhiyin Python packages never import it. A cross-platform import tool records provenance and filters sensitive runtime files. The deployment layer includes Wanwu's Compose model and adds a containerized `zhiyin-api`, with Wanwu reachable only through the shared internal network.
+**Architecture:** Wanwu remains an independently built platform under `platform/wanwu`; the zhiyin Python packages never import it. A cross-platform import tool records provenance and filters sensitive runtime files. The deployment layer applies a security override to Wanwu's Compose model and adds a containerized `zhiyin-api`, with stateful and engine services reachable only through the shared internal network.
 
 **Tech Stack:** Python 3.11, pytest, Git archive, Docker Engine, Docker Compose v2.24+, FastAPI/Uvicorn, Wanwu Go/Python/Vue containers.
 
@@ -35,7 +35,7 @@
 | `zhiyin-src/template/Dockerfile` | Production-like zhiyin backend image |
 | `zhiyin-src/template/.dockerignore` | Small, secret-free backend build context |
 | `zhiyin-src/template/tests/test_container_assets.py` | Static container contract tests |
-| `deploy/compose.yaml` | Include Wanwu Compose and add the zhiyin backend service |
+| `deploy/compose.yaml` | Override Wanwu host ports and add the zhiyin backend service |
 | `deploy/.env.example` | Non-secret deployment defaults and empty secret slots |
 | `deploy/init_env.py` | Create `deploy/.env` with generated local secrets |
 | `deploy/up.ps1` | Validate environment/network and start the unified stack |
@@ -534,12 +534,13 @@ DEPLOY = REPO_ROOT / "deploy"
 
 def test_compose_includes_wanwu_and_keeps_zhiyin_internal() -> None:
     text = (DEPLOY / "compose.yaml").read_text(encoding="utf-8")
-    assert "../platform/wanwu/docker-compose.yaml" in text
     assert "zhiyin-api:" in text
     assert "expose:" in text and '"8000"' in text
-    assert "ports:" not in text
     assert "wanwu-net" in text
     assert "condition: service_healthy" in text
+    for service in ("mysql", "redis", "minio", "kafka", "es", "bff-service", "agentscope", "rag", "agent"):
+        assert f"  {service}:\n    ports: !reset []" in text
+    assert '"127.0.0.1:8081:8081"' in text
 
 
 def test_env_example_has_no_committed_secrets() -> None:
@@ -578,11 +579,29 @@ Create `deploy/compose.yaml`:
 ```yaml
 name: zhiyin
 
-include:
-  - path: ../platform/wanwu/docker-compose.yaml
-    env_file: .env
-
 services:
+  mysql:
+    ports: !reset []
+  redis:
+    ports: !reset []
+  minio:
+    ports: !reset []
+  kafka:
+    ports: !reset []
+  es:
+    ports: !reset []
+  bff-service:
+    ports: !reset []
+  agentscope:
+    ports: !reset []
+  rag:
+    ports: !reset []
+  agent:
+    ports: !reset []
+  nginx:
+    ports: !override
+      - "127.0.0.1:8081:8081"
+
   zhiyin-api:
     build:
       context: ../zhiyin-src/template
@@ -611,7 +630,7 @@ Create `deploy/.env.example` with the public image and topology values below, fo
 
 ```dotenv
 WANWU_ARCH=amd64
-WANWU_PROJECT_DIR=./runtime/wanwu
+WANWU_PROJECT_DIR=./platform/wanwu/runtime
 WANWU_EXTERNAL_IP=127.0.0.1
 WANWU_EXTERNAL_PORT=8081
 WANWU_WEB_BASE_URL=http://127.0.0.1:8081
@@ -723,14 +742,17 @@ Create `deploy/up.ps1`:
 ```powershell
 $ErrorActionPreference = 'Stop'
 $DeployRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepoRoot = Split-Path -Parent $DeployRoot
 $EnvFile = Join-Path $DeployRoot '.env'
+$WanwuCompose = Join-Path $RepoRoot 'platform\wanwu\docker-compose.yaml'
+$OverrideCompose = Join-Path $DeployRoot 'compose.yaml'
 if (-not (Test-Path -LiteralPath $EnvFile)) {
     throw 'deploy/.env is missing; run python deploy/init_env.py first'
 }
 if (-not (docker network ls --format '{{.Name}}' | Select-String -SimpleMatch 'wanwu-net')) {
     docker network create wanwu-net | Out-Null
 }
-docker compose --env-file $EnvFile -f (Join-Path $DeployRoot 'compose.yaml') up -d --build
+docker compose --project-directory $RepoRoot --env-file $EnvFile -f $WanwuCompose -f $OverrideCompose up -d --build
 ```
 
 Create `deploy/down.ps1`:
@@ -738,8 +760,11 @@ Create `deploy/down.ps1`:
 ```powershell
 $ErrorActionPreference = 'Stop'
 $DeployRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepoRoot = Split-Path -Parent $DeployRoot
 $EnvFile = Join-Path $DeployRoot '.env'
-docker compose --env-file $EnvFile -f (Join-Path $DeployRoot 'compose.yaml') down
+$WanwuCompose = Join-Path $RepoRoot 'platform\wanwu\docker-compose.yaml'
+$OverrideCompose = Join-Path $DeployRoot 'compose.yaml'
+docker compose --project-directory $RepoRoot --env-file $EnvFile -f $WanwuCompose -f $OverrideCompose down
 ```
 
 Create `deploy/verify.ps1`:
@@ -747,11 +772,13 @@ Create `deploy/verify.ps1`:
 ```powershell
 $ErrorActionPreference = 'Stop'
 $DeployRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RepoRoot = Split-Path -Parent $DeployRoot
 $EnvFile = Join-Path $DeployRoot '.env'
-$ComposeFile = Join-Path $DeployRoot 'compose.yaml'
-docker compose --env-file $EnvFile -f $ComposeFile config --quiet
+$WanwuCompose = Join-Path $RepoRoot 'platform\wanwu\docker-compose.yaml'
+$OverrideCompose = Join-Path $DeployRoot 'compose.yaml'
+docker compose --project-directory $RepoRoot --env-file $EnvFile -f $WanwuCompose -f $OverrideCompose config --quiet
 $Wanwu = Invoke-RestMethod -Uri 'http://127.0.0.1:8081/user/api/v1/base/custom' -TimeoutSec 15
-$Zhiyin = docker compose --env-file $EnvFile -f $ComposeFile exec -T zhiyin-api python -c "import json,urllib.request; print(json.load(urllib.request.urlopen('http://127.0.0.1:8000/healthz')))"
+$Zhiyin = docker compose --project-directory $RepoRoot --env-file $EnvFile -f $WanwuCompose -f $OverrideCompose exec -T zhiyin-api python -c "import json,urllib.request; print(json.load(urllib.request.urlopen('http://127.0.0.1:8000/healthz')))"
 if (-not $Wanwu) { throw 'Wanwu business readiness failed' }
 if (-not $Zhiyin) { throw 'zhiyin health check failed' }
 Write-Output 'unified deployment baseline is ready'
@@ -764,9 +791,9 @@ Run:
 ```powershell
 Set-Location zhiyin-src/template
 python -m pytest tests/test_deploy_assets.py -v
-Set-Location ../../deploy
-python init_env.py
-docker compose --env-file .env -f compose.yaml config --quiet
+Set-Location ../..
+python deploy/init_env.py
+docker compose --project-directory . --env-file deploy/.env -f platform/wanwu/docker-compose.yaml -f deploy/compose.yaml config --quiet
 ```
 
 Expected: tests pass, `.env` is generated and ignored, and Compose configuration renders without interpolation or schema errors.
@@ -842,7 +869,7 @@ Add a repository-root job for Compose rendering because its paths are relative t
       - name: 生成一次性本地环境
         run: python deploy/init_env.py
       - name: 校验 Compose 模型
-        run: docker compose --env-file deploy/.env -f deploy/compose.yaml config --quiet
+        run: docker compose --project-directory . --env-file deploy/.env -f platform/wanwu/docker-compose.yaml -f deploy/compose.yaml config --quiet
 ```
 
 - [ ] **Step 2: Document the operator workflow**
@@ -881,8 +908,8 @@ Set-Location zhiyin-web
 npm ci --no-audit --no-fund
 npm run typecheck
 npm run check:api
-Set-Location ../../../deploy
-docker compose --env-file .env -f compose.yaml config --quiet
+Set-Location ../../..
+docker compose --project-directory . --env-file deploy/.env -f platform/wanwu/docker-compose.yaml -f deploy/compose.yaml config --quiet
 ```
 
 Expected: all commands exit zero. `npm run check:api` leaves no generated diff.
