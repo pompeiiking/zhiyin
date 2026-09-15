@@ -1,13 +1,12 @@
 <script setup lang="ts">
-// 主理徽章（§7 组件基线：角色徽章）。
-//
-// 作用：让用户随时知道"现在是谁在帮我、依据什么"。出现在顶栏与对话气泡上。
-// 数据来自后端 TurnResult.badge（agent_id / name / role_summary / theory_refs）。
-// TODO(骨架): 渲染徽章与理论标签
+import TheoryTag from './TheoryTag.vue'
+defineProps<{ badge: Record<string, unknown> }>()
 </script>
-
 <template>
-  <div class="agent-badge">
-    <!-- TODO(骨架): 主理名 + TheoryTag 列表 -->
-  </div>
+  <div v-if="badge.name" class="agent-badge"><span class="avatar" aria-hidden="true">{{ String(badge.name).slice(0, 1) }}</span><div><strong>{{ String(badge.name) }}</strong><small v-if="badge.role_summary">{{ String(badge.role_summary) }}</small><div class="theories"><TheoryTag v-for="(item, index) in (badge.theory_refs as Record<string, unknown>[] ?? [])" :key="String(item.theory_id ?? index)" :theory="item" /></div></div></div>
 </template>
+<style scoped>
+.agent-badge { display: flex; align-items: center; gap: var(--space-3); }
+.avatar { width: 40px; height: 40px; display: grid; place-items: center; border-radius: var(--radius-md); background: var(--color-role-soft); color: var(--color-role); font-weight: var(--font-weight-bold); }
+strong, small { display: block; } small { color: var(--color-text-secondary); margin-top: 2px; }.theories { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-2); }
+</style>

@@ -1,15 +1,23 @@
 <script setup lang="ts">
-// 登录 / 注册 #screen-auth（P0，Modal 或独立页）
-//
-// 口径（前端设计文档 §4.5）：
-//   - 手机号验证码表单 + 协议勾选
-//   - 游客在第 3 问触发拦截（后端返回 code=1005 GUEST_LIMIT）
-//   - 登录成功 → auth_login_success；游客合并完成 → auth_guest_merge
-// TODO(骨架): 实现表单与登录拦截拉起逻辑
+import { onActivated, onMounted } from 'vue'
+import { useSessionStore } from '@/stores/session'
+const session = useSessionStore()
+function open() { if (!session.isLoggedIn) session.openLogin() }
+onMounted(open)
+onActivated(open)
 </script>
 
 <template>
-  <div data-anchor="screen-auth">
-    <!-- TODO(骨架): 手机号验证码表单 / 协议勾选 -->
-  </div>
+  <section class="auth-page container">
+    <h1>{{ session.isLoggedIn ? '你已登录' : '继续你的职业探索' }}</h1>
+    <p>{{ session.isLoggedIn ? '从首页选择你现在想解决的事。' : '登录后，将你的每一次探索连接起来。' }}</p>
+    <button v-if="!session.isLoggedIn" @click="open">登录 / 注册</button>
+    <RouterLink :to="{ name: 'home' }">返回首页</RouterLink>
+  </section>
 </template>
+
+<style scoped>
+.auth-page { padding-block: var(--space-16); text-align: center; }
+p { color: var(--color-text-secondary); }
+button { min-height: 44px; margin: var(--space-4); padding: var(--space-3) var(--space-6); border: 0; border-radius: var(--radius-pill); background: var(--color-action-bg); color: var(--color-text-inverse); }
+</style>

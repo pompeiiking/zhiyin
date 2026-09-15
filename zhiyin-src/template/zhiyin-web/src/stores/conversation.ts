@@ -1,46 +1,56 @@
 import { defineStore } from 'pinia'
+import { enterTask as enterTaskApi, listSessions, sendMessage } from '@/api/endpoints'
+import type { ConversationMessageView, ConversationTurnView, PipelineCardView, TaskSessionView } from '@/api/schema'
 
-/**
- * 核心对话页状态（#screen-conv 三栏）。
- *
- * 三栏口径（前端设计文档 §4.2）：
- *   左栏 sessions    —— 并行任务会话（按"任务/环节"命名，不按 agent 名排布）
- *   中栏 turns       —— 当前主理对话 + 显式告知 + 行为引导
- *   右栏 pipeline    —— ①-⑤ 三态管线卡
- */
 export const useConversationStore = defineStore('conversation', {
   state: () => ({
-    sessions: [] as Array<Record<string, unknown>>,
-    currentTaskId: null as string | null,
-    turns: [] as Array<Record<string, unknown>>,
-    pipeline: [] as Array<Record<string, unknown>>,
-    /** 顶部主理徽章：现在是谁在帮我、依据什么 */
-    badge: {} as Record<string, unknown>,
-    /** 换主理 / 换理论 / 结论变化时的显式告知行 */
-    disclosure: null as Record<string, unknown> | null,
-    /** 行为引导（四选一），必须渲染出对应可点元素 */
-    guide: null as Record<string, unknown> | null,
+    sessions: [] as TaskSessionView[], currentTaskId: null as string | null,
+    turns: [] as ConversationMessageView[], pipeline: [] as PipelineCardView[],
+    badge: {} as Record<string, unknown>, disclosure: null as Record<string, unknown> | null,
+    guide: null as Record<string, unknown> | null, loadingSessions: false, sending: false, error: '',
   }),
-
+  getters: {
+    currentSession: state => state.sessions.find(item => item.task_id === state.currentTaskId),
+  },
   actions: {
     async loadSessions() {
-      // TODO(骨架): 调 listSessions()
-      throw new Error('TODO(骨架): conversation.loadSessions 尚未实现')
+      this.loadingSessions = true; this.error = ''
+      try {
+        const result = await listSessions()
+        this.sessions = result.sessions ?? []
+        this.currentTaskId = result.current_task_id ?? this.sessions[0]?.task_id ?? null
+      } finally { this.loadingSessions = false }
     },
     async enterTask(taskCode: string) {
-      // TODO(骨架): 调 enterTask()，切入 #screen-conv
-      // 参数写进错误信息：骨架期就把接口形状固定住，实现时不会改成别的入参
-      throw new Error(`TODO(骨架): conversation.enterTask 尚未实现（taskCode=${taskCode}）`)
+      const item = await enterTaskApi(taskCode)
+      this.sessions = [item, ...this.sessions.filter(x => x.task_id !== item.task_id)]
+      this.currentTaskId = item.task_id
+      return item
+    },
+    selectSession(taskId: string) { this.currentTaskId = taskId },
+    applyTurn(turn: ConversationTurnView) {
+      this.currentTaskId = turn.task_id
+      this.badge = turn.badge ?? {}
+      this.disclosure = turn.disclosure ?? null
+      this.guide = turn.guide ?? null
+      this.pipeline = turn.pipeline_cards ?? []
+      this.turns.push(...(turn.messages ?? []))
     },
     async send(message: string) {
-      // TODO(骨架): 调 sendMessage()，把 TurnResult 追加进 turns 并刷新 pipeline
-      throw new Error(`TODO(骨架): conversation.send 尚未实现（message=${message}）`)
+      const text = message.trim()
+      if (!text || !this.currentTaskId || this.sending) return
+      this.sending = true; this.error = ''
+      this.turns.push({ role: 'user', text, created_at: new Date().toISOString() })
+      try {
+        const turn = await sendMessage(this.currentTaskId, text, crypto.randomUUID())
+        this.applyTurn(turn)
+      } catch (error) {
+        this.turns.pop()
+        throw error
+      } finally { this.sending = false }
     },
     applyStageUncertain(clarifyQuestion: string) {
-      // TODO(骨架): code=1006 时渲染澄清追问，不报错（ERROR_HANDLING 口径）
-      throw new Error(
-        `TODO(骨架): conversation.applyStageUncertain 尚未实现（clarifyQuestion=${clarifyQuestion}）`,
-      )
+      this.guide = { kind: 'question', text: clarifyQuestion, question: clarifyQuestion }
     },
   },
 })

@@ -1,18 +1,13 @@
 <script setup lang="ts">
-// 全局 · Mock / 演示来源标注（架构评估 B5 的落点）。
-//
-// 第一期模型走 LocalOrMockLLM，产出文案是"（第一期 Mock 产出，未接真实模型）"。
-// 这类内容会**直接作为结论与主理标签流到 UI**：不加标注，演示会被误读成真实能力。
-//
-// 用法：包在结论、报告、方案、计划等"看起来像结论"的内容外层；
-// 文案取 bootstrap.copyBundle['mock.source_notice']，不在组件里写死。
-//
-// 第二期接真实模型后，由后端把来源标记为 real，本组件自动不渲染。
-// TODO(骨架): 按内容来源标记决定是否渲染
+import { useSessionStore } from '@/stores/session'
+defineProps<{ source?: 'mock' | 'demo' | 'real' }>()
+const session = useSessionStore()
 </script>
 
 <template>
-  <span class="mock-badge">
-    <!-- TODO(骨架): Mock / 演示来源标注 -->
-  </span>
+  <span v-if="source === 'mock' || source === 'demo'" class="mock-badge">{{ session.copyBundle[source === 'mock' ? 'mock.source_notice' : 'demo.data_notice'] || '演示内容' }}</span>
 </template>
+
+<style scoped>
+.mock-badge { display: inline-block; padding: var(--space-1) var(--space-3); border: 1px solid var(--color-warning-border); border-radius: var(--radius-pill); background: var(--color-warning-soft); color: var(--color-text-primary); font-size: var(--font-size-xs); }
+</style>

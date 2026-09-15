@@ -1,22 +1,26 @@
 <script setup lang="ts">
-// 核心对话页 #screen-conv（P0，登录用户，三栏编排）
-//
-// 三栏布局（前端设计文档 §4.2）：
-//   左栏 SessionList      并行任务会话管理
-//   中栏 ChatStream       当前主理对话 + 显式告知 + 行为引导
-//   右栏 PipelinePanel    ①-⑤ 三态管线卡
-//
-// 三条全局约束在本页强制成立：
-//   1. 长内容不进对话流 —— 中栏只说最短结论，全文落右栏卡与工作台
-//   2. 换主理必须显式告知 —— 中栏顶部出现 DisclosureRow
-//   3. 每轮以行为引导收尾 —— BehaviorGuide 必须渲染出可点元素
-//
-// 窄屏重排见 §6.2（右栏折叠为 Sheet）。
-// TODO(骨架): 组装三栏，绑定 conversation store
+import { onMounted, ref } from 'vue'
+import { useConversationStore } from '@/stores/conversation'
+import { useGuestGuard } from '@/composables'
+import ChatStream from '@/components/conversation/ChatStream.vue'
+import PipelinePanel from '@/components/conversation/PipelinePanel.vue'
+import SessionList from '@/components/conversation/SessionList.vue'
+const conversation = useConversationStore()
+const { handleGuestError } = useGuestGuard()
+const showSessions = ref(false)
+const showPipeline = ref(false)
+onMounted(async () => {
+  if (conversation.sessions.length) return
+  try { await conversation.loadSessions() } catch (error) {
+    if (!handleGuestError(error)) conversation.error = '会话列表加载失败，请稍后重试。'
+  }
+})
 </script>
-
 <template>
-  <main data-anchor="screen-conv" class="conv-page">
-    <!-- TODO(骨架): <SessionList /> <ChatStream /> <PipelinePanel /> -->
-  </main>
+  <main data-anchor="screen-conv" class="conv-page"><div class="mobile-tools"><button :aria-expanded="showSessions" @click="showSessions = !showSessions">任务会话</button><button :aria-expanded="showPipeline" @click="showPipeline = !showPipeline">微循环进度</button></div><SessionList :class="{ mobileOpen: showSessions }" /><ChatStream /><PipelinePanel :class="{ mobileOpen: showPipeline }" /></main>
 </template>
+<style scoped>
+.conv-page { height: calc(100dvh - 80px); display: grid; grid-template-columns: minmax(220px, 270px) minmax(420px, 1fr) minmax(250px, 320px); overflow: hidden; }.mobile-tools { display: none; }
+@media (max-width: 900px) { .conv-page { height: auto; min-height: calc(100dvh - 80px); grid-template-columns: 220px minmax(0, 1fr); }.pipeline-panel { display: none; grid-column: 1 / -1; }.pipeline-panel.mobileOpen { display: block; } }
+@media (max-width: 560px) { .conv-page { display: block; }.mobile-tools { position: sticky; top: 118px; z-index: 8; display: flex; gap: var(--space-2); padding: var(--space-2) var(--page-gutter); background: var(--color-bg); border-bottom: 1px solid var(--color-border); }.mobile-tools button { flex: 1; min-height: 40px; border: 1px solid var(--color-border); border-radius: var(--radius-pill); background: var(--color-surface); }.session-list, .pipeline-panel { display: none; max-height: 50dvh; border: 0; border-bottom: 1px solid var(--color-border); }.session-list.mobileOpen, .pipeline-panel.mobileOpen { display: block; }.chat-stream { min-height: calc(100dvh - 170px); } }
+</style>

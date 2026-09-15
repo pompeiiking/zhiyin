@@ -1,19 +1,33 @@
 <script setup lang="ts">
-// 首页 · 信任区（§4.1 / FR-HOME-005）。
-//
-// 口径：**只讲一条主线**——"你做的每步都基于职业咨询的成熟方法"，
-// 可点开看脱敏的方法论示例；不讲 15 维 / 3 套 / 5 分钟这类数字炫技。
-//
-// 数据来自 bootstrap.trustBlocks：第一条是主线（code=primary_methodology），
-// 其余为可展开块；expandableRef 非空时渲染为可点开入口。
-//
-// 演示数据必须显式标注（copy 里的 demo.data_notice），
-// 避免被误读为真实结论。
-// TODO(骨架): 渲染主线 + 可展开示例
+import { computed } from 'vue'
+import { useSessionStore } from '@/stores/session'
+import MockBadge from '@/components/common/MockBadge.vue'
+const session = useSessionStore()
+const primary = computed(() => session.trustBlocks.find(x => x.code === 'primary_methodology') ?? session.trustBlocks[0])
+const examples = computed(() => session.trustBlocks.filter(x => x !== primary.value))
 </script>
 
 <template>
-  <section class="trust-section">
-    <!-- TODO(骨架): 信任主线 + 方法论示例入口 -->
+  <section v-if="primary" class="trust-section" aria-labelledby="trust-title">
+    <div class="trust-intro"><span class="trust-mark" aria-hidden="true">✳</span><p class="eyebrow">基于职业咨询方法论</p><h2 id="trust-title">{{ primary.title }}</h2><p>{{ primary.body }}</p></div>
+    <div class="examples">
+      <details v-for="item in examples" :key="item.code"><summary>{{ item.title }}<span aria-hidden="true">＋</span></summary><div class="example-body"><MockBadge v-if="session.preview" source="demo" /><p>{{ item.body }}</p><p v-if="item.expandable_ref && !session.trustBlocks.some(x => x.code === item.expandable_ref)" class="pending">完整示例内容暂未提供，当前仅展示方法说明。</p></div></details>
+    </div>
   </section>
 </template>
+
+<style scoped>
+.trust-section { display: grid; grid-template-columns: 1.1fr 1fr; gap: var(--space-12); padding: var(--space-10); margin-bottom: var(--space-12); border: 1px solid var(--color-success-border); border-radius: var(--radius-lg); background: var(--color-success-soft); }
+.trust-mark { font-size: var(--font-size-2xl); color: var(--color-text-primary); }
+.eyebrow { font-size: 10px; letter-spacing: 0.12em; color: var(--color-text-secondary); }
+h2 { font-size: var(--font-size-xl); line-height: 1.5; }
+.trust-intro > p:last-child { color: var(--color-text-secondary); }
+.examples { align-self: center; }
+details { border-bottom: 1px solid var(--color-success-border); }
+summary { display: flex; justify-content: space-between; gap: var(--space-4); padding-block: var(--space-5); cursor: pointer; list-style: none; font-weight: var(--font-weight-semibold); }
+summary::-webkit-details-marker { display: none; }
+details[open] summary span { transform: rotate(45deg); }
+.example-body { padding-bottom: var(--space-4); }
+.pending { color: var(--color-text-secondary); font-size: var(--font-size-xs); }
+@media (max-width: 900px) { .trust-section { grid-template-columns: 1fr; gap: var(--space-4); padding: var(--space-6); } }
+</style>

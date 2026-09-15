@@ -1,3 +1,4 @@
+import { useSessionStore } from '@/stores/session'
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 /**
@@ -56,6 +57,16 @@ const router = createRouter({
   routes,
 })
 
-// TODO(骨架): 登录守卫。未登录访问 requireLogin 页面时拉起登录 Modal，
-// 而不是直接跳走——页面往返不销毁已生成资产（§3.2 返回与恢复）。
+// 取消受保护导航并打开弹窗，当前组件保持挂载。初次直达回首页承载弹窗。
+router.beforeEach(async (to, from) => {
+  const session = useSessionStore()
+  if (!to.meta.requireLogin) return true
+  if (!session.loaded) await session.loadBootstrap()
+  if (session.isLoggedIn) return true
+  session.pendingRoute = to.fullPath
+  session.pendingTaskCode = ''
+  session.openLogin('登录后继续，当前页面与输入会保留。')
+  return from.matched.length ? false : { name: 'home', replace: true }
+})
+
 export default router
