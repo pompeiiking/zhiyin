@@ -1,0 +1,20 @@
+{
+  "_note": "职引 · 公共专业知识示例（DEMO）。仅用于本地关键词检索与来源追溯。",
+  "items": [
+    {
+      "id": "mj-0809",
+      "title": "计算机类专业",
+      "summary": "培养计算系统与软件设计能力，主干课程含程序设计、数据结构、操作系统、数据库与计算机网络。",
+      "tags": ["计算机", "专业", "课程"],
+      "major_code": "0809",
+      "source_url": "https://gk.chsi.com.cn",
+      "fetched_at": "2026-09-14T00:00:00+00:00",
+      "source": "阳光志愿信息服务系统",
+      "source_id": "src-chsi-major-demo",
+      "namespace": "profession",
+      "version": 1,
+      "status": "enabled",
+      "content_hash": "fe00e29c3783ddcbf5dff891ab8ce29ca9d6b1f38579260f5f75fa63a97b8658"
+    }
+  ]
+}

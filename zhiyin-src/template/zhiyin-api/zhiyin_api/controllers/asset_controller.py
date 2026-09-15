@@ -30,7 +30,7 @@ async def list_asset_versions(
     """资产历史版本列表，含 depends_on 与 diff。"""
     facade = get_facade()
     user_id = await facade.resolve_user_id(request)
-    return ApiResponse(data=facade.list_asset_versions(user_id, asset_type))
+    return ApiResponse(data=await facade.list_asset_versions(user_id, asset_type))
 
 
 @router.get("/app/report/full-text", response_model=ApiResponse[ReportFullTextView])
@@ -40,7 +40,7 @@ async def get_report_full_text(
     """完整报告页正文。只读资产版本，不重新生成。"""
     facade = get_facade()
     user_id = await facade.resolve_user_id(request)
-    return ApiResponse(data=facade.get_report_full_text(user_id, version))
+    return ApiResponse(data=await facade.get_report_full_text(user_id, version))
 
 
 @router.post("/app/assets/export", response_model=ApiResponse[ExportResultView])

@@ -11,7 +11,7 @@ from zhiyin_boot import (
     describe_assembly,
     wire_application,
 )
-from zhiyin_api.runtime import NOT_WIRED, WIRED
+from zhiyin_api.runtime import WIRED
 
 
 @pytest.fixture
@@ -70,19 +70,25 @@ async def test_feature_flags_come_from_dynamic_resource(settings: Settings) -> N
     assert "mentor" in flags
 
 
-def test_assembly_report_marks_pending_services(settings: Settings) -> None:
+def test_assembly_report_marks_first_phase_services_wired(settings: Settings) -> None:
     container = build_container(settings)
     report = describe_assembly(container)
 
     # 已实现的部分必须是 wired
     assert report.orchestration["agent_engine"] == WIRED
     assert report.services["loop"] == WIRED
+    assert report.services["profile_service"] == WIRED
+    assert report.services["behavior_service"] == WIRED
     assert report.gateways["llm"] == WIRED
 
-    # 业务服务与 Facade 第一期未实现，必须如实报 not_wired 而不是假装装好
-    assert report.services["orchestrator"] == NOT_WIRED
-    assert report.services["facade"] == NOT_WIRED
-    assert report.missing, "装配报告必须列出缺口"
+    # 第一期业务主链路和 BFF 已完整装配。
+    assert report.services["orchestrator"] == WIRED
+    assert report.services["facade"] == WIRED
+    assert report.services["memory_service"] == WIRED
+    assert report.services["asset_service"] == WIRED
+    assert report.workers["impact"] == WIRED
+    # M3 的向量同步能力仍会如实列入全量装配缺口。
+    assert report.missing, "装配报告必须列出后续阶段缺口"
     assert not report.healthy
 
 

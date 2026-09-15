@@ -23,6 +23,11 @@ from zhiyin_data_sdk.gateways.ai import (
     SearchHit,
 )
 
+# TODO(第一期未闭合): OPEN-2 —— 本文件（知识库 + 关键词检索）与 data/knowledge/ 数据
+# 都已交付并有测试，但 `zhiyin-business` / `zhiyin-orchestration` 中**零处**引用
+# KnowledgeGateway / SearchGateway：② 诊断与 ③ 决策的 theory_refs 仍是模型占位串，
+# 未达成《工作清单》4.5「保证诊断与决策能通过关键词检索引用来源」。
+# 清单：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-2）。
 _DEFAULT_NAMESPACES = ("profession", "occupation", "jd", "theory")
 
 
@@ -47,6 +52,11 @@ class LocalKnowledgeRepo(KnowledgeGateway):
 
         for space in namespaces:
             for index, raw in enumerate(self._load(space)):
+                if raw.get("status", "enabled") != "enabled":
+                    continue
+                review_status = raw.get("review_status")
+                if review_status is not None and review_status != "approved":
+                    continue
                 if filters and not _match_filters(raw, filters):
                     continue
                 score = _score(raw, terms)
@@ -109,11 +119,22 @@ class LocalKeywordSearch(SearchGateway):
 
 
 def _terms(query: str) -> list[str]:
-    """极简切分：按空白与常见标点断开，保留长度 >= 2 的片段。"""
+    """第一期本地切分：标点分段，并为连续中文补二元词。
+
+    这样“计算机专业”可以命中“计算机类专业”，无需引入分词依赖；英文或编码
+    仍使用原始分段，真实分词与向量召回留到 M3。
+    """
     normalized = query or ""
     for token in "，。！？、；：（）【】《》,.!?;:()[]\"'\n\t":
         normalized = normalized.replace(token, " ")
-    return [part for part in normalized.split(" ") if len(part) >= 2]
+    terms: list[str] = []
+    for part in normalized.split(" "):
+        if len(part) < 2:
+            continue
+        terms.append(part)
+        if len(part) > 2 and all("\u4e00" <= char <= "\u9fff" for char in part):
+            terms.extend(part[index : index + 2] for index in range(len(part) - 1))
+    return list(dict.fromkeys(terms))
 
 
 def _score(raw: dict[str, Any], terms: list[str]) -> float:

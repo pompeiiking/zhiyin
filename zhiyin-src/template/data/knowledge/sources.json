@@ -1,0 +1,69 @@
+{
+  "_note": "第一期公共知识数据源台账。只有 allowed=true 且 status=enabled 的来源可进入自动/人工采集管线；授权不明的来源保持 pending_review。",
+  "items": [
+    {
+      "source_id": "src-xuezhi-demo",
+      "name": "学职平台公开信息（演示数据）",
+      "source_url": "https://xz.chsi.com.cn/home.action",
+      "namespace": "occupation",
+      "acquisition": "manual_import",
+      "access_basis": "公开页面信息经人工整理并完成第一期内部使用评审",
+      "allowed": true,
+      "allowed_scope": "仅使用已人工整理并确认可用于本地演示的职业名称、编码和公开概述；不自动抓取登录后页面",
+      "owner": "数据访问负责人",
+      "refresh_interval": "第一期按人工导入批次更新",
+      "removal_method": "按 source_id 下架或删除，并刷新 occupation 索引",
+      "retention": "公开结构化演示数据保留至来源撤回或版本替换；不保留原始受限页面",
+      "status": "enabled",
+      "removal_key": "source_id"
+    },
+    {
+      "source_id": "src-chsi-major-demo",
+      "name": "阳光志愿公开专业信息（演示数据）",
+      "source_url": "https://gk.chsi.com.cn",
+      "namespace": "profession",
+      "acquisition": "manual_import",
+      "access_basis": "公开专业目录经人工整理并完成第一期内部使用评审",
+      "allowed": true,
+      "allowed_scope": "仅使用人工整理的公开专业代码、名称和课程概述；不绕过访问限制",
+      "owner": "数据访问负责人",
+      "refresh_interval": "第一期按人工导入批次更新",
+      "removal_method": "按 source_id 下架或删除，并刷新 profession 索引",
+      "retention": "公开结构化演示数据保留至来源撤回或版本替换；不保留原始受限页面",
+      "status": "enabled",
+      "removal_key": "source_id"
+    },
+    {
+      "source_id": "src-theory-demo",
+      "name": "职业发展理论卡（演示数据）",
+      "source_url": "https://xz.chsi.com.cn/home.action",
+      "namespace": "theory",
+      "acquisition": "manual_import",
+      "access_basis": "公开理论名称与自编摘要，经人工评审用于演示",
+      "allowed": true,
+      "allowed_scope": "仅使用人工整理的理论名称与简要说明，用于本地演示；不作为学术原文",
+      "owner": "数据访问负责人",
+      "refresh_interval": "第一期按人工评审批次更新",
+      "removal_method": "按 source_id 下架或删除，并刷新 theory 索引",
+      "retention": "演示条目保留至评审替换或来源撤回",
+      "status": "enabled",
+      "removal_key": "source_id"
+    },
+    {
+      "source_id": "src-job-board-pending",
+      "name": "招聘站点岗位信息",
+      "source_url": "",
+      "namespace": "jd",
+      "acquisition": "allowed_page",
+      "access_basis": "待确认站点条款、robots 与书面授权，当前不得采集",
+      "allowed": false,
+      "allowed_scope": "待逐站确认 robots、服务条款、字段范围、频率与保存期限",
+      "owner": "数据访问负责人",
+      "refresh_interval": "未授权，不执行",
+      "removal_method": "保持 pending_review；误入库时按 source_id 立即删除",
+      "retention": "未授权，不留存",
+      "status": "pending_review",
+      "removal_key": "source_id"
+    }
+  ]
+}

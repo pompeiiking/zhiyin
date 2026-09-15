@@ -26,7 +26,7 @@ async def list_sessions(request: Request) -> ApiResponse[SessionListView]:
     """左栏会话列表（并行任务会话，按任务/环节命名）。"""
     facade = get_facade()
     user_id = await facade.resolve_user_id(request)
-    return ApiResponse(data=facade.list_sessions(user_id))
+    return ApiResponse(data=await facade.list_sessions(user_id))
 
 
 @router.post("/app/task/enter", response_model=ApiResponse[TaskSessionView])

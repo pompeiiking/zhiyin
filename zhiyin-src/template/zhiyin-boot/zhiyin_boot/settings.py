@@ -33,13 +33,19 @@ class Settings:
     database_url: str = ""                 # 为空则使用内存实现
     db_echo: bool = False
 
+    # ---------- Redis（第一期直接接入，逻辑 DB 由 Infrastructure 固定映射） ----------
+    redis_url: str = "redis://127.0.0.1:6379"
+    redis_password: str = ""
+    redis_ssl: bool = False
+    redis_pool_size: int = 20
+    redis_socket_timeout_s: float = 2.0
+
     # ---------- 能力开关：决定装配 local 还是 pami ----------
     use_pami_llm: bool = False
     use_pami_knowledge: bool = False
     use_pami_auth: bool = False
     use_mysql: bool = False
-    # 前端联调：决策 15 = A。为 True 时 boot 装配 Mock Facade（自报 skeleton），
-    # 让前端在真实 Facade 未实现前就能走真实路由联调。
+    # 前端联调预留：真实 Facade 已实现；Mock Facade 仍保留为可选测试替身。
     mock_facade: bool = False
 
     # ---------- pami 接入 ----------
@@ -73,6 +79,13 @@ class Settings:
             env=_env("ZHIYIN_ENV", "local"),
             database_url=_env("ZHIYIN_DATABASE_URL"),
             db_echo=_env_bool("ZHIYIN_DB_ECHO"),
+            redis_url=_env("ZHIYIN_REDIS_URL", "redis://127.0.0.1:6379"),
+            redis_password=_env("ZHIYIN_REDIS_PASSWORD"),
+            redis_ssl=_env_bool("ZHIYIN_REDIS_SSL"),
+            redis_pool_size=int(_env("ZHIYIN_REDIS_POOL_SIZE", "20")),
+            redis_socket_timeout_s=float(
+                _env("ZHIYIN_REDIS_SOCKET_TIMEOUT_S", "2.0")
+            ),
             use_pami_llm=_env_bool("ZHIYIN_USE_PAMI_LLM"),
             use_pami_knowledge=_env_bool("ZHIYIN_USE_PAMI_KNOWLEDGE"),
             use_pami_auth=_env_bool("ZHIYIN_USE_PAMI_AUTH"),

@@ -37,6 +37,21 @@ class AssetRepository(ABC):
         """保存一次新版本记录。"""
 
     @abstractmethod
+    async def save_snapshot(
+        self,
+        version: AssetVersion,
+        *,
+        report: Optional[Report] = None,
+        direction_plans: Optional[list[DirectionPlan]] = None,
+        action_plan: Optional[ActionPlan] = None,
+    ) -> AssetVersion:
+        """原子保存版本及其正文快照。
+
+        三类正文参数最多传一个，且必须与 ``version.asset_type`` 匹配。实现必须保证：
+        任一步失败时版本与正文均不发生变化，成功时二者同时可见。
+        """
+
+    @abstractmethod
     async def list_affected_assets(
         self, user_id: str, profile_keys: Sequence[str]
     ) -> list[AssetVersion]:

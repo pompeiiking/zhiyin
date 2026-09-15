@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 
 from zhiyin_business.ports.blackboard import BlackboardView
 from zhiyin_business.ports.orchestrator import IntentType, LeadDecision
+from zhiyin_data_sdk.repositories import RegistryRepository
 from zhiyin_kernel.enums import AxisAStage, LoopStage
 
 
@@ -35,3 +36,41 @@ class LeadPolicy(ABC):
         - 同一环节不同轴 A 阶段可以选不同主理，这是"同一环节不同服务深度"的落点；
         - `reason` 是给用户看的依据，不是内部日志。
         """
+
+
+class RegistryLeadPolicy(LeadPolicy):
+    """从动态任务入口推导环节主理，不在业务代码固化 agent_id。"""
+
+    IMPLEMENTATION_STATUS = "wired"
+
+    def __init__(self, registry: RegistryRepository) -> None:
+        self._registry = registry
+
+    async def select(
+        self,
+        *,
+        blackboard: BlackboardView,
+        axis_a: AxisAStage,
+        stage: LoopStage,
+        intent: IntentType,
+    ) -> LeadDecision:
+        entries = await self._registry.list_task_entries()
+        lead_agent = next(
+            (
+                entry.lead_agent
+                for entry in entries
+                if entry.target_stage is stage and entry.lead_agent is not None
+            ),
+            None,
+        )
+        if lead_agent is None:
+            raise LookupError(f"动态资源未配置环节主理：{stage.value}")
+        return LeadDecision(
+            lead_agent=lead_agent,
+            assistant_agents=[],
+            info_scout_required=intent is IntentType.VERIFY_DIRECTION,
+            reason=f"当前需求属于{stage.value}环节，由该环节配置的主理继续服务",
+        )
+
+
+__all__ = ["LeadPolicy", "RegistryLeadPolicy"]

@@ -20,7 +20,8 @@ TODO(第二期)：替换为 MySQL 实现（见 persistence/database.py 的 SqlAl
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import asyncio
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Sequence
 from uuid import uuid4
 
@@ -168,15 +169,20 @@ class InMemoryBehaviorRepository(BehaviorRepository):
     ) -> list[BehaviorLog]:
         wanted = set(event_types) if event_types else None
         matched = [
-            item
-            for item in self._logs
+            (index, item)
+            for index, item in enumerate(self._logs)
             if item.user_id == user_id
             and (wanted is None or item.event_type in wanted)
             and (since is None or item.occurred_at >= since)
             and (until is None or item.occurred_at <= until)
         ]
-        matched.sort(key=lambda item: item.occurred_at, reverse=True)
-        return [_snapshot(item) for item in matched[:limit]]
+        # 同刻并列用「追加序」定次序：系统时钟粒度有限（实测 Windows 约 15.6ms），
+        # 同一刻连续写入的多条日志 occurred_at 会完全相同。只按 occurred_at 排序时，
+        # 稳定排序会把并列组保留为插入顺序，结果变成"最早优先"，与"最新优先"契约相反，
+        # 并让 recent(limit=1) / 成就首次解锁 / 工作台时间线取到旧记录。
+        # 换成真实数据库实现时，同一职责应由自增序列或 rowid 承担。
+        matched.sort(key=lambda pair: (pair[1].occurred_at, pair[0]), reverse=True)
+        return [_snapshot(item) for _, item in matched[:limit]]
 
     async def last_occurred_at(
         self, user_id: str, event_type: BehaviorEventType
@@ -194,17 +200,44 @@ class InMemoryConversationMemoryRepository(ConversationMemoryRepository):
 
     def __init__(self) -> None:
         self._memories: dict[tuple[str, Optional[str]], ConversationMemory] = {}
+        self._locks: dict[tuple[str, Optional[str]], asyncio.Lock] = {}
 
     async def get(self, user_id: str, task_id: str) -> Optional[ConversationMemory]:
         memory = self._memories.get((user_id, task_id))
         return _snapshot(memory) if memory is not None else None
 
     async def upsert(self, memory: ConversationMemory) -> ConversationMemory:
+        key = (memory.user_id, memory.task_id)
+        lock = self._locks.setdefault(key, asyncio.Lock())
+        async with lock:
+            return self._upsert_unlocked(memory)
+
+    async def compare_and_swap(
+        self,
+        memory: ConversationMemory,
+        *,
+        expected_last_active_at: Optional[datetime],
+    ) -> Optional[ConversationMemory]:
+        key = (memory.user_id, memory.task_id)
+        lock = self._locks.setdefault(key, asyncio.Lock())
+        async with lock:
+            current = self._memories.get(key)
+            actual = current.last_active_at if current is not None else None
+            if actual != expected_last_active_at:
+                return None
+            return self._upsert_unlocked(memory)
+
+    def _upsert_unlocked(self, memory: ConversationMemory) -> ConversationMemory:
         stored = _snapshot(memory)
         if not stored.id:
             stored.id = _new_id("mem")
-        stored.last_active_at = _now()
-        self._memories[(memory.user_id, memory.task_id)] = stored
+        key = (memory.user_id, memory.task_id)
+        previous = self._memories.get(key)
+        updated_at = _now()
+        if previous is not None and updated_at <= previous.last_active_at:
+            updated_at = previous.last_active_at + timedelta(microseconds=1)
+        stored.last_active_at = updated_at
+        self._memories[key] = stored
         return _snapshot(stored)
 
     async def list_by_user(self, user_id: str) -> list[ConversationMemory]:
@@ -226,6 +259,7 @@ class InMemoryAssetRepository(AssetRepository):
         self._reports: dict[str, list[Report]] = {}
         self._plans: dict[str, list[DirectionPlan]] = {}
         self._action_plans: dict[str, ActionPlan] = {}
+        self._locks: dict[tuple[str, AssetType], asyncio.Lock] = {}
 
     # ---------- 版本 ----------
 
@@ -239,6 +273,64 @@ class InMemoryAssetRepository(AssetRepository):
         return [_snapshot(item) for item in self._by_type(user_id, asset_type)]
 
     async def save_version(self, version: AssetVersion) -> AssetVersion:
+        lock = self._locks.setdefault((version.user_id, version.asset_type), asyncio.Lock())
+        async with lock:
+            return self._save_version_unlocked(version)
+
+    async def save_snapshot(
+        self,
+        version: AssetVersion,
+        *,
+        report: Optional[Report] = None,
+        direction_plans: Optional[list[DirectionPlan]] = None,
+        action_plan: Optional[ActionPlan] = None,
+    ) -> AssetVersion:
+        supplied = sum(
+            item is not None for item in (report, direction_plans, action_plan)
+        )
+        if supplied > 1:
+            raise ValueError("一次只能保存一种资产正文快照")
+        expected = {
+            AssetType.REPORT: report is not None,
+            AssetType.DIRECTION_PLAN: direction_plans is not None,
+            AssetType.ACTION_PLAN: action_plan is not None,
+        }
+        if supplied and not expected[version.asset_type]:
+            raise ValueError("正文快照类型与资产版本类型不一致")
+
+        lock = self._locks.setdefault((version.user_id, version.asset_type), asyncio.Lock())
+        async with lock:
+            # 所有副本先构造完成，之后才一次性修改内存状态，避免半写入。
+            saved = self._prepare_version(version)
+            stored_report = None
+            stored_plans = None
+            stored_action = None
+            if report is not None:
+                if report.user_id != version.user_id:
+                    raise PermissionError("报告正文与版本不属于同一用户")
+                stored_report = _snapshot(
+                    report.model_copy(
+                        update={
+                            "version": saved.version,
+                            "generated_at": saved.created_at,
+                        }
+                    )
+                )
+            elif direction_plans is not None:
+                stored_plans = [_snapshot(item) for item in direction_plans]
+            elif action_plan is not None:
+                stored_action = _snapshot(action_plan)
+
+            self._versions.append(saved)
+            if stored_report is not None:
+                self._reports.setdefault(version.user_id, []).append(stored_report)
+            elif stored_plans is not None:
+                self._plans[version.user_id] = stored_plans
+            elif stored_action is not None:
+                self._action_plans[version.user_id] = stored_action
+            return _snapshot(saved)
+
+    def _prepare_version(self, version: AssetVersion) -> AssetVersion:
         stored = _snapshot(version)
         if not stored.id:
             stored.id = _new_id("av")
@@ -247,6 +339,10 @@ class InMemoryAssetRepository(AssetRepository):
         # 版本必须单调递增；调用方传小值时提升，保证「版本 +1」口径不被破坏。
         stored.version = max(stored.version, floor + 1)
         stored.created_at = _now()
+        return stored
+
+    def _save_version_unlocked(self, version: AssetVersion) -> AssetVersion:
+        stored = self._prepare_version(version)
         self._versions.append(stored)
         return _snapshot(stored)
 
@@ -339,8 +435,9 @@ class InMemoryAssetRepository(AssetRepository):
         for phase in plan.phases:
             for task in phase.tasks:
                 if _task_key(phase.name, task.text) == task_id or task.text == task_id:
-                    task.done = True
-                    task.done_at = _now()
+                    if not task.done:
+                        task.done = True
+                        task.done_at = _now()
                     return _snapshot(plan)
         raise LookupError(f"行动任务不存在：{task_id}")
 

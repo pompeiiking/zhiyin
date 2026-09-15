@@ -8,9 +8,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict
+
+from zhiyin_kernel.enums import BehaviorEventType
 
 # ---------- 事件类型常量 ----------
 
@@ -47,6 +49,19 @@ class ProfileFieldUpdatedPayload(BaseModel):
     source: str
     profile_version: int
     updated_at: datetime
+
+
+class BehaviorLoggedPayload(BaseModel):
+    """behavior_logged 的统一载荷。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    user_id: str
+    behavior_log_id: str
+    behavior_event_type: BehaviorEventType
+    occurred_at: datetime
+    payload: dict[str, Any]
+    related_asset_ids: list[str]
 
 
 class AssetVersionChangedPayload(BaseModel):

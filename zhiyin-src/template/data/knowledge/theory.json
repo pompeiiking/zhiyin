@@ -9,7 +9,11 @@
       "source_url": "https://xz.chsi.com.cn/home.action",
       "fetched_at": "2026-09-14T00:00:00+00:00",
       "source": "学职平台",
-      "namespace": "theory"
+      "source_id": "src-theory-demo",
+      "namespace": "theory",
+      "version": 1,
+      "status": "enabled",
+      "content_hash": "f6a496c53eccbb8b214c4019c24c78c979c44b19af5614895d86373835dff53c"
     },
     {
       "id": "theory-clover",
@@ -19,7 +23,11 @@
       "source_url": "https://xz.chsi.com.cn/home.action",
       "fetched_at": "2026-09-14T00:00:00+00:00",
       "source": "学职平台",
-      "namespace": "theory"
+      "source_id": "src-theory-demo",
+      "namespace": "theory",
+      "version": 1,
+      "status": "enabled",
+      "content_hash": "d32bf6823e3f617db3646ca3d6879b8e0c94ede2ee3a0842650516dcf666ff3a"
     },
     {
       "id": "theory-casve",
@@ -29,7 +37,11 @@
       "source_url": "https://xz.chsi.com.cn/home.action",
       "fetched_at": "2026-09-14T00:00:00+00:00",
       "source": "学职平台",
-      "namespace": "theory"
+      "source_id": "src-theory-demo",
+      "namespace": "theory",
+      "version": 1,
+      "status": "enabled",
+      "content_hash": "79f3de0304a23ab7900ed9e8a49789e2bb5d6b1ad01f7bb4d67f23778f369ef4"
     }
   ]
 }

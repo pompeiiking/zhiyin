@@ -22,4 +22,4 @@ async def get_workspace(request: Request) -> ApiResponse[WorkspacePageView]:
     """
     facade = get_facade()
     user_id = await facade.resolve_user_id(request)
-    return ApiResponse(data=facade.get_workspace(user_id))
+    return ApiResponse(data=await facade.get_workspace(user_id))

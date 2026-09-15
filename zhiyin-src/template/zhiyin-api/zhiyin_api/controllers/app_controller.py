@@ -23,4 +23,4 @@ async def bootstrap(request: Request) -> ApiResponse[BootstrapView]:
     """
     facade = get_facade()
     user_id = await facade.resolve_user_id(request)
-    return ApiResponse(data=facade.bootstrap(user_id))
+    return ApiResponse(data=await facade.bootstrap(user_id))

@@ -170,6 +170,47 @@ class AssetService(ABC):
     ) -> AssetVersion:
         """保存一次新版本并发布 asset_version_changed 事件。"""
 
+    @abstractmethod
+    async def save_report(
+        self,
+        user_id: str,
+        report: Report,
+        *,
+        depends_on_profile_keys: Sequence[str] = (),
+        reason: str = "",
+    ) -> AssetVersion:
+        """保存报告正文及对应版本元数据。"""
+
+    @abstractmethod
+    async def save_direction_plans(
+        self,
+        user_id: str,
+        plans: list[DirectionPlan],
+        *,
+        depends_on_profile_keys: Sequence[str] = (),
+        reason: str = "",
+    ) -> AssetVersion:
+        """整体保存方向方案组及对应版本元数据。"""
+
+    @abstractmethod
+    async def select_direction_plan(self, user_id: str, plan_id: str) -> DirectionPlan:
+        """选择或重选方向方案。"""
+
+    @abstractmethod
+    async def save_action_plan(
+        self,
+        user_id: str,
+        plan: ActionPlan,
+        *,
+        depends_on_profile_keys: Sequence[str] = (),
+        reason: str = "",
+    ) -> AssetVersion:
+        """保存行动计划及对应版本元数据。"""
+
+    @abstractmethod
+    async def mark_task_done(self, user_id: str, task_id: str) -> ActionPlan:
+        """幂等完成行动任务。"""
+
     # ---------- 资产内容读取（供工作台 / 报告页） ----------
 
     @abstractmethod
