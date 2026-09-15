@@ -30,6 +30,8 @@
 | [技术架构文档/第一期工程/第一期分层设计文档/职引技术架构-分层详细设计.md](技术架构文档/第一期工程/第一期分层设计文档/职引技术架构-分层详细设计.md) | 逐层详细设计（含高内聚低耦合验收要求） |
 | [技术架构文档/第一期工程/第一期分层设计文档/第一期分层设计定义/职引技术架构-分层实现与接口设计.md](技术架构文档/第一期工程/第一期分层设计文档/第一期分层设计定义/职引技术架构-分层实现与接口设计.md) | 各层核心接口 + 动态资源表规划（38 张） |
 | [技术架构文档/第一期工程/第一期数据层设计文档/职引技术架构-业务数据采集与存储来源设计.md](技术架构文档/第一期工程/第一期数据层设计文档/职引技术架构-业务数据采集与存储来源设计.md) | 业务数据来源与存储落位 |
+| [superpowers/specs/2026-09-15-pami-wanwu-integration-design.md](superpowers/specs/2026-09-15-pami-wanwu-integration-design.md) | 已批准的 pami/Wanwu 内置接入架构说明 |
+| [superpowers/plans/2026-09-15-pami-wanwu-source-deployment-baseline.md](superpowers/plans/2026-09-15-pami-wanwu-source-deployment-baseline.md) | pami/Wanwu 源码与部署基线实施计划 |
 | [../zhiyin-src/template/contracts/openapi.json](../zhiyin-src/template/contracts/openapi.json) | **接口契约快照**（生成物）：前端类型由它生成，与后端代码由 `tests/test_api_contract.py` 锁定 |
 
 ## 四、评审与现状快照

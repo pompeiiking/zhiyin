@@ -29,6 +29,12 @@ jobs:
         run: python scripts/export_openapi.py --check
       - name: 里程碑门禁 M1（框架可验证，本期退出条件）
         run: python -m zhiyin_boot --check --phase=1
+      - name: Wanwu 源码快照与部署资产边界
+        run: python -m pytest tests/test_wanwu_vendor.py tests/test_container_assets.py tests/test_deploy_assets.py -q
+      - name: 构建职引后端镜像
+        run: docker build --tag zhiyin/backend:ci .
+      - name: 容器内里程碑门禁
+        run: docker run --rm zhiyin/backend:ci python -m zhiyin_boot --check --phase=1
 
   frontend:
     name: 前端（类型检查）
@@ -53,3 +59,16 @@ jobs:
         # 注意：本步断言的是"仓库里已提交的生成物与快照一致"，因此在本地未提交时会必然红，
         # 它的执行场合是 CI（干净工作区）。
         run: npm run check:api
+
+  deployment:
+    name: 统一部署配置
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 生成一次性本地环境
+        run: python deploy/init_env.py
+      - name: 校验 Compose 模型
+        run: docker compose --project-directory . --env-file deploy/.env -f platform/wanwu/docker-compose.yaml -f deploy/compose.yaml config --quiet
