@@ -1,416 +1,240 @@
-# 职引内置 pami/Wanwu 基础平台接入设计
+# 职引内置 pami/Wanwu 源码与接口暴露设计
 
 | 项 | 内容 |
 | --- | --- |
+| 状态 | 已批准设计，作为后续实施计划的依据 |
 | 日期 | 2026-09-15 |
-| 状态 | 待用户评审 |
-| 目标 | 将 pami/Wanwu 完整源码纳入职引交付，在不破坏现有分层的前提下打通后端调用、资源部署与统一发布 |
-| 依据 | 职引目标架构、分层设计、Wanwu 真实 API 契约与实测报告 |
+| 目标 | 将 Wanwu 源码纳入职引仓库与统一部署体系，并通过 Wanwu 自身 Nginx/BFF 暴露原生接口 |
+| 依据 | 《职引技术架构文档》《职引技术架构文档-第一期》《职引技术架构-分层详细设计》及 Wanwu 平台接口与安全文档 |
 
 ## 1. 结论
 
-采用“单仓库、双系统、统一发布”的方式：
+本任务采用“同仓库、统一部署、双入口、边界不变”的方案：
 
-- Wanwu 完整源码作为职引内置平台源码放在 `platform/wanwu/`，保持自身 Go、Python、Vue 和微服务边界；
-- 职引仅通过 `zhiyin-infrastructure/pami/` 调用 Wanwu，不允许业务层直接引用 Wanwu 源码、DTO、数据库或凭据；
-- 职引后端通过控制面 API 在 Wanwu 中创建、配置和发布知识库、RAG、智能体与工作流，通过运行面 API 执行这些资源；
-- 对外只暴露职引的 `/api/v1/*` 产品接口，Wanwu 管理接口只在内部网络可访问；
-- 职引与 Wanwu 由同一套 Compose/后续 Helm 配置构建、启动、健康检查和升级。
+- Wanwu 完整源码作为职引内置基础平台源码放在 `platform/wanwu/`；
+- Wanwu 保持自身 Go、Python、Vue、Nginx、BFF 和微服务边界，独立构建与运行；
+- 职引 API 继续只提供 `/api/v1/*` 产品接口；
+- Wanwu 原生接口由 Wanwu 的 Nginx/BFF 入口提供，不经过职引 FastAPI 透明代理；
+- 本任务不实现真实 pami Client，不配置真实账号、模型或应用，不要求真实业务响应联调；
+- `zhiyin-infrastructure/pami/` 保留生产替换点和显式未实现行为，所有 pami 开关默认关闭。
 
-这能满足“pami 平台接到代码里、接口打通、后端可调用、后续可在其上部署”的目标，同时保留职引现有的分层守卫与替换能力。
+该方案符合正式架构文档对基础设施边界、Adapter 依赖方向和第一期本地模拟策略的要求，同时满足平台侧“源码接入并暴露已有接口”的交付目标。
 
 ## 2. 范围
 
 ### 2.1 本次包含
 
-1. 导入可追溯的 Wanwu 完整源码快照；
-2. 建立 Wanwu 控制面和运行面 HTTP Client；
-3. 打通知识库、RAG、智能体、工作流和平台健康检查；
-4. 支持职引资源代码与 Wanwu 资源 ID/API Key 的映射；
-5. 将 pami Adapter 接入 `zhiyin-boot` 装配与健康报告；
-6. 由 `zhiyin-api` 暴露职引语义接口；
-7. 提供统一 Docker Compose 部署、初始化和就绪检查；
-8. 建立单元、契约、集成和部署冒烟测试。
+1. 导入可追溯、可重复更新的 Wanwu 源码快照；
+2. 提供 Wanwu 与职引后端的容器构建资产；
+3. 提供统一 Docker Compose 网络、环境初始化、启停和配置验证；
+4. 通过 Wanwu 自身 Nginx/BFF 暴露已有 HTTP 接口；
+5. 保持 Wanwu 中间件和内部微服务端口不对宿主机公开；
+6. 保留职引 pami Adapter 骨架、配置开关和架构守卫；
+7. 将现有 Wanwu 接口清单和已知问题文档纳入交付索引；
+8. 建立源码边界、容器资产、Compose 渲染、路由暴露和文档一致性测试；
+9. 提供 CI 与运维说明。
 
 ### 2.2 本次不包含
 
-- 不把 Wanwu 改造成 Python 库并塞入职引 FastAPI 进程；
-- 不允许 `zhiyin-business` 直接调用 Wanwu；
+- 不实现真实 Wanwu HTTP Client 或职引侧运行/控制 Adapter；
+- 不创建、配置或发布真实 Wanwu 资源；
+- 不维护职引资源代码与 Wanwu 资源 ID/API Key 的运行映射；
+- 不配置真实用户、JWT、API Key、模型密钥或外部模型；
+- 不要求真实 Wanwu 业务请求成功；
+- 不在职引 FastAPI 中增加 Wanwu 全接口透明代理；
+- 不把 Wanwu 改造成 Python 包或合入职引进程；
 - 不直接读写 Wanwu MySQL 业务表；
-- 不把 Wanwu 的全部管理接口无差别代理到公网；
-- 不在首期承诺已知不稳定能力：子组织启停、资源成员授权写入、Python 单节点调试、工作流静态 Token；
-- 不在首期建设 Kubernetes 高可用，先交付可重复的单机 Compose 拓扑。
+- 不绕过 Wanwu 既有认证、组织、权限或资源归属检查；
+- 不建设 Kubernetes 或生产高可用部署。
 
-## 3. 总体架构
-
-```text
-Browser / 第三方调用方
-          |
-          | HTTPS /api/v1/*
-          v
-+---------------------------+
-| zhiyin-api                | 公开接口、DTO、trace_id、统一错误
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-| zhiyin-business           | 职业引导规则、资源部署用例、业务服务
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-| zhiyin-orchestration      | Agent/Workflow/Event/Schedule 语义原语
-+-------------+-------------+
-              |
-              | zhiyin-data-sdk Ports
-              v
-+---------------------------+
-| zhiyin-infrastructure     |
-| pami control/runtime      | 协议转换、鉴权、重试、错误映射、审计
-+-------------+-------------+
-              |
-              | 内部 HTTP
-              v
-+-------------------------------------------------------------+
-| platform/wanwu                                              |
-| Nginx/BFF -> IAM/Model/MCP/Knowledge/RAG/Assistant/App       |
-|            -> AgentScope/RAG Engine/Python Agent             |
-+-----------------------------+-------------------------------+
-                              |
-                              v
-              MySQL / Redis / MinIO / Kafka / Elasticsearch
-```
-
-### 3.1 依赖边界
-
-保留现有依赖矩阵：
-
-| 模块 | 可依赖 |
-| --- | --- |
-| `zhiyin_kernel` | 仅自身 |
-| `zhiyin_data_sdk` | `kernel` |
-| `zhiyin_orchestration` | `kernel`、`data_sdk` |
-| `zhiyin_infrastructure` | `kernel`、`data_sdk` |
-| `zhiyin_business` | `kernel`、`data_sdk`、`orchestration` |
-| `zhiyin_api` | `kernel`、`business` |
-| `zhiyin_boot` | 全部职引模块 |
-
-`platform/wanwu` 是独立构建单元，不加入 `pyproject.toml` 的 Python 包清单。职引与 Wanwu 的代码边界以 HTTP 契约为准。
-
-## 4. 目标目录
+## 3. 架构与边界
 
 ```text
-zhiyin/
-|-- platform/
-|   `-- wanwu/                         # Wanwu 完整、可追溯的源码快照
-|       |-- UPSTREAM.md                # 上游仓库、提交号、导入日期、补丁清单
-|       |-- LICENSE
-|       |-- cmd/ internal/ proto/ api/
-|       |-- agent/ web/ configs/
-|       `-- Dockerfile.*
+同一职引仓库与交付单元
 |
 |-- zhiyin-src/template/
-|   |-- zhiyin-data-sdk/zhiyin_data_sdk/
-|   |   |-- gateways/pami_runtime.py   # Agent/RAG 运行面契约
-|   |   `-- gateways/pami_control.py   # 知识/Agent/RAG/Workflow 控制面契约
-|   |
-|   |-- zhiyin-infrastructure/zhiyin_infrastructure/pami/
-|   |   |-- client.py                  # 共享 HTTP、连接池、trace、响应信封
-|   |   |-- credentials.py             # JWT/API Key 提供者
-|   |   |-- errors.py                  # Wanwu 错误映射
-|   |   |-- dto.py                     # 仅本包可见的 Wanwu DTO
-|   |   |-- control.py                 # 控制面 Client
-|   |   |-- runtime.py                 # 运行面 Client
-|   |   |-- knowledge.py
-|   |   |-- rag.py
-|   |   |-- agent.py
-|   |   |-- workflow.py
-|   |   |-- auth.py
-|   |   `-- health.py
-|   |
-|   |-- zhiyin-boot/zhiyin_boot/container/
-|   |   |-- ports.py
-|   |   `-- gateways.py
-|   `-- tests/
-|       |-- contracts/
-|       |-- integration/pami/
-|       `-- e2e/
+|   `-- zhiyin-api
+|       `-- /api/v1/*                  职引产品接口
+|
+|-- platform/wanwu/
+|   |-- web/                           Wanwu 前端
+|   |-- internal/ + cmd/               Wanwu Go 服务
+|   |-- agent/                         Wanwu Python 能力
+|   `-- Nginx -> BFF/AgentScope        Wanwu 原生 HTTP 入口
+|       |-- /user/api/*
+|       |-- /use/model/api/*
+|       |-- /service/api/*
+|       |-- /workflow/api/*
+|       `-- /minio/download/api/*
 |
 `-- deploy/
-    |-- docker-compose.yml
-    |-- docker-compose.pami.yml
-    |-- .env.example
-    |-- nginx/
-    `-- scripts/
-        |-- bootstrap-pami.ps1
-        `-- readiness-check.ps1
+    `-- Compose 覆盖、环境初始化、启停与验证脚本
 ```
 
-源码导入不得包含 `.git`、`.env`、缓存、日志、PID、测试结果和运行输出。Apache 2.0 `LICENSE`、NOTICE/版权信息及本地修改说明必须保留。
-
-## 5. Port 设计
-
-现有 `LLMGateway` 继续表达“原始模型调用”，不把 Wanwu 智能体强行伪装成普通 LLM。新增以下平台能力契约：
-
-### 5.1 运行面
+依赖规则保持为：
 
 ```text
-AgentRuntimeGateway
-  create_conversation(agent_code, user_context) -> ConversationRef
-  chat(agent_code, conversation_id, message, stream) -> AgentResult/EventStream
-
-RagRuntimeGateway
-  query(rag_code, query, stream) -> RagResult/EventStream
-
-WorkflowRuntimeGateway
-  run(workflow_code, inputs, idempotency_key) -> WorkflowRun
-  get_status(run_id) -> WorkflowRun
+zhiyin-business / zhiyin-orchestration
+                  |
+                  v
+             Port / Gateway
+                  ^
+                  |
+zhiyin-infrastructure/pami  --HTTP（后续生产替换）--> Wanwu Nginx/BFF
 ```
 
-### 5.2 控制面
+本次只交付 Wanwu 源码、部署和原生接口入口。真实 HTTP 调用仍是后续生产替换工作。
 
-```text
-KnowledgeControlGateway
-  ensure_knowledge(spec) -> PlatformResourceRef
-  import_document(knowledge_code, document) -> ImportTask
-  get_import_status(task_id) -> ImportTask
+### 3.1 不增加职引透明代理
 
-AgentControlGateway
-  ensure_agent(spec) -> PlatformResourceRef
-  publish(agent_code) -> PublishedApplication
+职引 API 是产品/BFF 接入层，Wanwu 是基础设施平台。在职引 FastAPI 中透传全部 Wanwu 接口会产生第二套网关、鉴权、SSE、上传和错误语义，破坏既有边界。
 
-RagControlGateway
-  ensure_rag(spec) -> PlatformResourceRef
-  publish(rag_code) -> PublishedApplication
+因此：
 
-WorkflowControlGateway
-  ensure_workflow(spec) -> PlatformResourceRef
-  publish(workflow_code) -> PublishedWorkflow
+- 职引产品接口继续使用职引 DTO、Facade 和 OpenAPI；
+- Wanwu 原生接口继续使用 Wanwu 请求模型、错误码、JWT、API Key 和流式协议；
+- 两套入口可以由部署环境使用不同域名或端口发布，但应用代码不互相代理。
 
-PlatformHealthGateway
-  check() -> PlatformHealth
-```
+## 4. 源码纳入
 
-`ensure_*` 采用期望状态语义：不存在则创建，存在且配置变化则更新，配置一致则不操作。这样部署脚本可重复执行，不把 Wanwu 非幂等细节泄漏到业务层。
+Wanwu 快照固定在 `platform/wanwu/`，保存上游地址、完整提交哈希、导入日期和排除项。本地补丁通过职引 Git 历史单独追溯。
 
-## 6. 控制面与运行面
+`scripts/import_wanwu.py` 只从已提交的 Git 对象导出源码，不复制上游脏工作区。重复导入同一提交应产生相同源码内容与元数据。
 
-### 6.1 控制面
+导入过程排除：
 
-使用路径：
+- 上游 `.git`；
+- `.env`、备份环境文件和运行密钥；
+- 日志、PID、缓存和输出目录；
+- Python/pytest 临时文件；
+- 本地数据库、对象存储和运行卷。
 
-- `/user/api/v1/*`
-- `/use/model/api/v1/*`
-- `/workflow/api/*`
+构建必需的非密钥前端环境文件、版本插件和占位目录必须保留。
 
-使用服务账号 JWT，只允许内部部署任务和授权后台调用。职责包括创建、配置、发布和查询平台资源。
+## 5. 构建与统一部署
 
-### 6.2 运行面
+- `platform/wanwu` 是独立构建单元，不加入职引 `pyproject.toml`；
+- Wanwu 沿用自身 Dockerfile/Compose 模型；
+- 职引后端使用 `zhiyin-src/template/Dockerfile`，以非 root 用户运行；
+- Wanwu 与职引共享 `wanwu-net`；
+- MySQL、Redis、Kafka、Elasticsearch、MinIO、BFF、Agent、RAG、AgentScope 等内部端口不映射到宿主机；
+- Wanwu HTTP 流量只从 Wanwu Nginx 进入；
+- 本地开发默认绑定 `127.0.0.1:8081`，不是公网监听；
+- 生产域名、TLS 和公网策略由部署环境外层网关负责。
 
-使用路径：
+`deploy/.env.example` 只保存非秘密默认值和空秘密字段。`deploy/init_env.py` 生成被 Git 忽略的 `deploy/.env`，不得覆盖已有文件或打印秘密。
 
-- `/service/api/openapi/v1/agent/conversation`
-- `/service/api/openapi/v1/agent/chat`
-- `/service/api/openapi/v1/rag/chat`
-- 工作流发布后返回的实际路径
+## 6. Wanwu 原生接口暴露
 
-使用资源对应的 API Key。运行面不得持有管理员 JWT。
+Wanwu Nginx 保持上游路由：
 
-### 6.3 Client 规则
+| 路径 | 用途 | 信任面 |
+| --- | --- | --- |
+| `/user/api/*` | 登录、用户、组织、资源管理 | Wanwu JWT、组织与权限规则 |
+| `/use/model/api/*` | 模型调用与相关能力 | Wanwu 对应中间件规则 |
+| `/service/api/*` | 通用服务与 OpenAPI | 按接口使用 JWT、API Key 或开放规则 |
+| `/workflow/api/*` | AgentScope 工作流能力 | 工作流协议与平台身份透传 |
+| `/minio/download/api/*` | 受控文件下载 | Wanwu/MinIO 既有规则 |
 
-- 使用一个异步连接池，不在每次请求中创建 Client；
-- 默认连接超时 5 秒、普通请求 30 秒、Agent/RAG 运行 60 秒、上传按大小单独配置；
-- GET 和显式幂等请求允许有限重试；创建、发布、工作流运行没有幂等键时不得盲目重试；
-- 同时检查 HTTP 状态、Wanwu 业务码和响应正文；HTTP 200 空正文不视为成功；
-- `X-Trace-Id` 从职引入口透传，日志记录职引资源代码、Wanwu 资源 ID、耗时与结果；
-- Authorization、API Key、模型密钥、上传正文不得写入日志。
+“暴露接口”只表示路由能从 Wanwu Nginx 到达目标服务，不表示接口免认证、业务数据已配置或真实调用成功。
 
-## 7. 资源映射与部署
+### 6.1 静态验收
 
-职引业务使用稳定代码，不直接保存环境相关的 Wanwu ID：
+在不启动真实业务环境时，以以下证据验收：
 
-```text
-career-diagnosis-agent -> assistantId + appId + apiKeyRef
-career-rag             -> ragId + appId + apiKeyRef
-career-knowledge       -> knowledgeId
-career-workflow        -> workflowId + publishedPath + tokenRef
-```
+1. Nginx 配置存在对应路径；
+2. 路径转发到正确 BFF、AgentScope 或 MinIO 服务；
+3. 目标服务与 Nginx 位于同一 Compose 网络；
+4. 个体微服务端口没有宿主机映射；
+5. Compose 合并配置可以成功渲染；
+6. 字段级接口清单记录路径、方法、认证和验证状态。
 
-资源映射应包含：
+本任务不以 HTTP 200 或真实业务结果作为完成条件。
 
-- `resource_code`
-- `resource_type`
-- `wanwu_resource_id`
-- `wanwu_app_id`
-- `credential_ref`
-- `desired_spec_hash`
-- `remote_revision`
-- `status`
-- `last_synced_at`
-- `last_error_code`
+### 6.2 不改变信任面
 
-API Key 与服务账号凭据只保存为密钥引用；本地开发可从环境变量读取，生产环境接入密钥管理服务。普通数据库和 JSON 不保存明文凭据。
+统一部署不得删除 Wanwu 认证中间件、注入固定管理员身份、泄露秘密、把 Callback 改成匿名公网接口，或把“路由存在”描述成“业务已联通”。
 
-部署流程：
+## 7. 职引侧 pami 替换点
 
-```text
-1. 启动 Wanwu 中间件
-2. 执行 Wanwu schema 初始化
-3. 启动 Wanwu 领域服务和 AI 引擎
-4. 等待 Wanwu 业务级 readiness
-5. 启动职引后端
-6. 执行 pami bootstrap/reconcile
-7. 创建或更新知识库、RAG、智能体和工作流
-8. 发布应用并保存资源映射/API Key 引用
-9. 执行运行面冒烟测试
-10. 职引 readiness 变为 ready
-```
+第一期继续使用 `DefaultPassAuth`、`LocalOrMockLLM`、`LocalKnowledgeRepo` 及其他 Local/Mock/Noop Gateway。
 
-只检测端口监听不足以判定 ready；至少验证登录、模型列表、知识服务、Agent/RAG 运行面和职引到 Wanwu 的完整链路。
+`zhiyin-infrastructure/pami/` 中的 Adapter 类保留为生产替换目标。配置开关默认关闭；如果误开启，未实现方法必须显式抛错，不得静默回落。
 
-## 8. 职引对外 API
+架构守卫保证：
 
-对外提供职引语义，不暴露 Wanwu DTO：
+- 业务层不 import `zhiyin_infrastructure`；
+- 基础设施层不 import 业务层或编排层；
+- Wanwu 源码不进入职引 Python 包；
+- API 层不直接引用 Wanwu DTO。
 
-```text
-POST /api/v1/platform/deployments
-GET  /api/v1/platform/deployments/{id}
-GET  /api/v1/platform/health
+## 8. 文档与测试
 
-POST /api/v1/knowledge/documents
-GET  /api/v1/knowledge/documents/{id}/status
-POST /api/v1/knowledge/search
+文档职责：
 
-POST /api/v1/agents/{agentCode}/conversations
-POST /api/v1/agents/{agentCode}/chat
-POST /api/v1/rags/{ragCode}/query
-POST /api/v1/workflows/{workflowCode}/runs
-GET  /api/v1/workflows/runs/{runId}
-```
-
-平台部署接口属于受保护的内部管理接口；普通用户只能调用业务允许的运行接口。Controller 只负责参数与响应，部署和调用逻辑进入业务 Service，外部协议转换进入 pami Adapter。
-
-## 9. 错误与降级
-
-Wanwu 错误统一映射为 SDK 异常：
-
-| 场景 | 职引错误 |
+| 文档 | 职责 |
 | --- | --- |
-| 连接失败、超时、5xx | `UnavailableError` |
-| JWT/API Key 无效 | `AuthenticationError` |
-| Wanwu 权限拒绝 | `AuthorizationError` |
-| 资源不存在 | `ResourceNotFoundError` |
-| 请求或配置不合法 | `ValidationError` |
-| 非幂等冲突、重复发布 | `ConflictError` |
-| 响应字段缺失、空正文 | `UpstreamProtocolError` |
+| `外部平台/pami-Wanwu/接口.md` | 字段级接口、方法、路径、认证和验证状态 |
+| `外部平台/pami-Wanwu/平台报错和未连通接口.md` | 已实际确认的问题 |
+| `外部平台/pami-Wanwu/架构文档/` | Wanwu 路由、服务、安全和部署事实 |
+| 本设计 | 职引纳入源码与暴露原生接口的工程边界 |
 
-运行面失败时由业务用例决定是否降级到本地实现；控制面部署失败不得静默回落，也不得把资源标记为已发布。装配报告必须显示真实状态。
+测试分为：
 
-## 10. 已知 Wanwu 风险处理
+- 源码与边界：导入器、追溯元数据、秘密排除、Python 包边界；
+- 容器与部署：非 root、统一网络、内部端口隔离、环境生成；
+- 路由暴露：静态解析 Nginx 配置，覆盖五组路由并验证目标服务；
+- 职引回归：pytest、Ruff、OpenAPI 快照、阶段一门禁和前端类型检查。
 
-首期处理策略：
+路由测试只证明“配置已接入”，不得伪造真实业务联通结论。
 
-| Wanwu 问题 | 处理 |
-| --- | --- |
-| 智能体专用删除路由漂移 | 使用统一应用删除接口或能力探测 |
-| 文件续传路径漂移 | 以实测 `/file/check/list` 契约为准 |
-| 知识文档列表默认过滤 | 查询全部时显式传 `status=-1` |
-| 重复发布不幂等 | 发布前查询状态并保存 `desired_spec_hash` |
-| 组织启停 panic | 不纳入首期公开能力 |
-| 资源授权写入 EOF | 修复并回归通过前保持禁用 |
-| Python 单节点调试契约不完整 | 不作为工作流部署成功的前置条件 |
-| HTTP 200 空正文 | Client 按协议错误处理 |
+## 9. 五阶段实施
 
-集成测试固定 Wanwu 镜像/源码提交号，避免源码、Swagger、Nginx 和运行二进制漂移。
+### 阶段 1：源码快照
 
-## 11. 测试设计
+- 安全、可重复的导入工具；
+- 固定 Wanwu 提交及追溯元数据；
+- 秘密与运行文件排除。
 
-### 11.1 单元测试
+### 阶段 2：构建与统一部署
 
-- DTO 映射；
-- 错误映射；
-- 凭据选择；
-- 资源映射；
-- 幂等部署决策；
-- 日志脱敏。
+- 职引后端容器化；
+- Wanwu 独立构建资产；
+- 统一 Compose 网络、环境初始化、启停和配置验证。
 
-### 11.2 Port 契约测试
+### 阶段 3：原生接口路由暴露
 
-对 local/mock 与 pami 实现运行同一组语义断言，验证返回类型、顺序、空值、异常和降级口径一致。
+- 核对 Wanwu Nginx/BFF 原生路由；
+- 增加路由静态契约测试；
+- 确认内部端口隔离；
+- 与《接口.md》交叉校验。
 
-### 11.3 模拟服务集成测试
+### 阶段 4：职引边界与替换点
 
-覆盖成功、401、403、404、业务码非零、5xx、超时、空正文、畸形 JSON、SSE 中断和重复发布。
+- 保留 pami Adapter 骨架和关闭状态；
+- 增加误开启时显式失败测试；
+- 增加 Wanwu 源码不得被职引包引用的架构守卫；
+- 确认职引产品 API 与行为不变。
 
-### 11.4 真实 Wanwu 集成测试
+### 阶段 5：CI、文档与验收
 
-按依赖顺序执行并清理：
+- CI 执行源码、容器、部署、路由和架构测试；
+- 更新仓库入口、运维命令和文档索引；
+- 运行完整静态验收并记录未执行的真实联调项。
 
-```text
-登录 -> 知识库 -> 文档上传/导入 -> RAG -> 发布/API Key -> 查询
-     -> 智能体 -> 会话 -> 发布/API Key -> 对话
-     -> 工作流 -> 保存 -> 运行 -> 发布 -> 调用
-```
+## 10. 完成标准
 
-测试资源全部使用唯一前缀，清理失败必须报告残留，不能忽略。
+同时满足以下条件才算完成：
 
-### 11.5 部署冒烟测试
-
-- 单命令可启动完整栈；
-- Wanwu 端口不对公网开放；
-- 职引 `/healthz` 展示 pami 能力为 `wired`；
-- 从职引公开接口完成一次 Agent 和 RAG 调用；
-- 重启后资源映射仍有效；
-- 重复执行 bootstrap 不产生重复资源。
-
-## 12. 分阶段实施
-
-本设计覆盖多个可独立验收的子项目，实施时不得写成一个超大改动。五个阶段分别建立实现计划、测试和评审门禁；只有前一阶段验收通过，后一阶段才能依赖其产物。首次实施计划只覆盖“阶段 1：源码与部署基线”。
-
-### 阶段 1：源码与部署基线
-
-- 导入干净的 Wanwu 源码快照；
-- 记录上游版本和本地补丁；
-- 建立统一 Compose 网络、镜像构建和健康检查；
-- 不修改职引业务行为。
-
-### 阶段 2：Client 与运行面
-
-- 实现共享 Client、错误和凭据；
-- 打通 Agent conversation/chat 与 RAG chat；
-- 完成运行面契约和模拟集成测试；
-- 接入 boot 装配报告。
-
-### 阶段 3：知识与资源部署
-
-- 实现知识库、文件上传、文档导入和状态查询；
-- 实现 RAG/Agent 创建、配置、发布、API Key 获取；
-- 建立资源映射与幂等 reconcile。
-
-### 阶段 4：工作流
-
-- 实现工作流保存、运行、状态和发布；
-- 解析并保存发布路径；
-- 对重复发布和不完整辅助接口做能力探测与保护。
-
-### 阶段 5：职引公开 API 与完整验收
-
-- 通过业务 Service 和 Facade 暴露职引语义接口；
-- 导出 OpenAPI 并生成前端类型；
-- 完成真实 Wanwu 集成和部署冒烟测试；
-- 更新装配门禁和运维文档。
-
-## 13. 完成标准
-
-满足以下条件才算“pami 已接入”，而不是仅有代码骨架：
-
-1. Wanwu 源码和本地补丁可追溯、可构建；
-2. 一个命令可启动职引与 Wanwu 完整依赖；
-3. 职引后端可以创建或复用知识库、RAG、智能体和工作流；
-4. 可以发布资源并通过职引后端调用运行面；
-5. 重复部署不会生成重复资源；
-6. JWT、API Key 和模型密钥不出现在代码、普通配置、响应或日志中；
-7. Wanwu 管理接口不对公网开放；
-8. local 与 pami 实现可由 boot 配置切换；
-9. pami 能力通过契约、集成和部署冒烟测试；
-10. `/healthz` 和分级门禁准确报告是否真实接通。
+1. Wanwu 快照、上游提交和本地补丁可追溯；
+2. 重复导入不会带入秘密或运行状态；
+3. Wanwu 与职引拥有独立构建单元和统一 Compose 网络；
+4. Compose 合并配置可成功渲染；
+5. Wanwu 原生路由通过 Nginx/BFF 暴露并通过静态契约测试；
+6. Wanwu 内部微服务和中间件端口不映射到宿主机；
+7. 职引 `/api/v1/*` 不承担 Wanwu 全接口透明代理；
+8. pami 开关默认关闭，误开启未实现能力时显式失败；
+9. 接口清单准确标记认证方式和实际验证状态；
+10. 后端测试、静态检查、OpenAPI 快照、前端类型和 CI 配置通过；
+11. 文档明确说明未完成真实 Wanwu 业务接入；
+12. 工作树无意外修改，密钥文件未被 Git 跟踪。
