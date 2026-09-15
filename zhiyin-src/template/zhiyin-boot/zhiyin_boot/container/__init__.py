@@ -143,6 +143,11 @@ def build_container(settings: Optional[Settings] = None) -> Container:
         memories=container.memory_service,
     )
 
+    # TODO(第一期未闭合): OPEN-4 —— 以下 Mock Facade 接线已整段注释，settings.mock_facade /
+    # ZHIYIN_MOCK 因此成为死配置；且 MockApplicationFacade 仍是同步签名，与本轮改成 async 的
+    # ApplicationFacade 契约不一致，重新打开会直接报错。二选一：删除死配置，或同步成 async 并补装配用例。
+    # 清单：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-4）。
+    #
     # 前端联调的 Mock Facade 扩展点仍保留；第一期默认始终使用上面的真实 Facade。
     #
     # if settings.mock_facade:

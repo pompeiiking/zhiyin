@@ -78,6 +78,11 @@ def build_gateways(settings: Settings) -> dict[str, Any]:
         gateways["redis_crawl"] = redis_factory.domain_store(settings.env, "crawl")
         gateways["redis_knowledge"] = redis_factory.domain_store(settings.env, "knowledge")
         gateways["redis_vector_sync"] = redis_factory.domain_store(settings.env, "vector-sync")
+        # TODO(第一期未闭合): OPEN-3 —— 上面 6 个域存储只被放进 container.extra，
+        # 全仓没有任何读取方（`rg "redis_schedule"` 只命中本文件）。
+        # 注意：RedisDomainStore 与 RedisCacheGateway 不同，**没有降级兜底**，
+        # Redis 不可用时直接抛异常；接线前请先确认故障策略。
+        # 归属与退出判据：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-3）。
 
     # ---------- pami 替换点（§十） ----------
     # 未实现的分支在首次调用时抛 NotImplementedError，而不是静默回落本地 ——

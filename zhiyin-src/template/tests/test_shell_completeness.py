@@ -145,6 +145,11 @@ def test_infrastructure_drawers_exist() -> None:
 # 已用**真实实现**交付、因此不应再有骨架文件的能力位。
 # 登记在这里等于明确声明"它不是待补的格子"；新增能力位时要么给骨架（文件 + 类名 + 签名），
 # 要么在此登记——两者都不做，下面的守卫会失败。
+# TODO(第一期未闭合): OPEN-5 —— 下面的 `{"loop", *SERVICE_SHELL}` 让
+# `test_remaining_service_skeletons_declare_their_status` 的迭代集合变成**空集**，
+# 该守卫已空转（Worker 侧守卫仍有效）。建议恢复非空集守卫，或改为断言
+# WIRED_SERVICE_PORTS 与装配报告的 wired 集合一致。
+# 清单：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-5）。
 WIRED_SERVICE_PORTS: frozenset[str] = frozenset(
     {"loop", *SERVICE_SHELL}
 )

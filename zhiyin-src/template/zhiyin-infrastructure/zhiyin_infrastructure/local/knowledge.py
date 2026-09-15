@@ -23,6 +23,11 @@ from zhiyin_data_sdk.gateways.ai import (
     SearchHit,
 )
 
+# TODO(第一期未闭合): OPEN-2 —— 本文件（知识库 + 关键词检索）与 data/knowledge/ 数据
+# 都已交付并有测试，但 `zhiyin-business` / `zhiyin-orchestration` 中**零处**引用
+# KnowledgeGateway / SearchGateway：② 诊断与 ③ 决策的 theory_refs 仍是模型占位串，
+# 未达成《工作清单》4.5「保证诊断与决策能通过关键词检索引用来源」。
+# 清单：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-2）。
 _DEFAULT_NAMESPACES = ("profession", "occupation", "jd", "theory")
 
 

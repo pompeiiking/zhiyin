@@ -391,6 +391,12 @@ class DefaultOrchestrator(Orchestrator):
             return []
         profile = await self._profiles.get(user_id)
         dependencies = [field.key for field in profile.fields] if profile else []
+        # TODO(第一期未闭合): OPEN-1 —— 这里只落"版本元数据"，把 output 里的正文
+        # （DiagnoseOutput.verdict/swot/dimensions、DecideOutput.plans、ActOutput.phases）
+        # 丢掉了。因此资产有版本号、但没有正文：报告页 404、工作台 ②③④ 显示"尚未生成…"。
+        # 接线点就是下面这次调用：应改为 assets.save_report / save_direction_plans /
+        # save_action_plan（这三个 API 已实现且已通过契约测试）。
+        # 归属与退出判据：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-1）。
         return [
             await self._assets.save_version(
                 user_id,

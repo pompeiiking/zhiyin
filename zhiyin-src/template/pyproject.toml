@@ -86,6 +86,9 @@ asyncio_mode = "auto"
 markers = [
     "e2e: 五环节端到端主路径（tests/e2e/，M2 退出条件）",
     "integration: 需要显式外部测试实例的集成验证（默认跳过）",
+    # 第一期未闭合项的标记用例：断言目标行为、当前 xfail(strict)，
+    # 修好后会变 XPASS 强制删除标记。清单见 docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md。
+    "phase1_open: 第一期未闭合项标记（实现完成后删除对应用例与 xfail）",
 ]
 # 让 pytest 不装包也能直接跑（pytest>=7 的 pythonpath 选项）。
 pythonpath = [
