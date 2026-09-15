@@ -1,0 +1,43 @@
+name: zhiyin
+
+services:
+  mysql:
+    ports: !reset []
+  redis:
+    ports: !reset []
+  minio:
+    ports: !reset []
+  kafka:
+    ports: !reset []
+  es:
+    ports: !reset []
+  bff-service:
+    ports: !reset []
+  agentscope:
+    ports: !reset []
+  rag:
+    ports: !reset []
+  agent:
+    ports: !reset []
+  nginx:
+    ports: !override
+      - "127.0.0.1:8081:8081"
+
+  zhiyin-api:
+    build:
+      context: ../zhiyin-src/template
+      dockerfile: Dockerfile
+    image: zhiyin/backend:dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ZHIYIN_ENV: local
+      ZHIYIN_PAMI_BASE_URL: http://nginx:8081
+    expose:
+      - "8000"
+    networks:
+      - wanwu-net
+    depends_on:
+      nginx:
+        condition: service_healthy
