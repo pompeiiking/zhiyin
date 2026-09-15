@@ -56,6 +56,22 @@ def validate_routes(manifest_path: Path, nginx_path: Path) -> list[str]:
     return errors
 
 
+def validate_documentation(
+    manifest_path: Path,
+    document_paths: list[Path],
+) -> list[str]:
+    """Return routes whose declared documentation anchor is absent."""
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    documentation = "\n".join(
+        path.read_text(encoding="utf-8") for path in document_paths
+    )
+    return [
+        f"undocumented route: {route['prefix']}"
+        for route in manifest["routes"]
+        if route["documentation_anchor"] not in documentation
+    ]
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)

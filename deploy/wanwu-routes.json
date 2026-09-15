@@ -6,27 +6,32 @@
     {
       "prefix": "/user/api/",
       "upstream": "http://bff-service:6668/",
-      "trust_surface": "wanwu-jwt-and-permissions"
+      "trust_surface": "wanwu-jwt-and-permissions",
+      "documentation_anchor": "/user/api/v1/"
     },
     {
       "prefix": "/use/model/api/",
       "upstream": "http://bff-service:6668/",
-      "trust_surface": "wanwu-model-middleware"
+      "trust_surface": "wanwu-model-middleware",
+      "documentation_anchor": "/use/model/api/"
     },
     {
       "prefix": "/service/api/",
       "upstream": "http://bff-service:6668/",
-      "trust_surface": "per-route-jwt-api-key-or-open-rule"
+      "trust_surface": "per-route-jwt-api-key-or-open-rule",
+      "documentation_anchor": "/service/api/openapi/v1/"
     },
     {
       "prefix": "/workflow/api/",
       "upstream": "http://agentscope-wanwu:6672/",
-      "trust_surface": "wanwu-workflow-protocol"
+      "trust_surface": "wanwu-workflow-protocol",
+      "documentation_anchor": "/workflow/api/"
     },
     {
       "prefix": "/minio/download/api/",
       "upstream": "http://minio-wanwu:9000/",
-      "trust_surface": "wanwu-minio-download-rule"
+      "trust_surface": "wanwu-minio-download-rule",
+      "documentation_anchor": "/minio/download/api/"
     }
   ]
 }

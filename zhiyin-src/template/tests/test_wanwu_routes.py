@@ -20,6 +20,19 @@ NGINX = (
     / "conf.d"
     / "aibase.conf"
 )
+COMPOSE_OVERRIDE = REPO_ROOT / "deploy" / "compose.yaml"
+INTERFACE_DOC = (
+    REPO_ROOT / "docs" / "技术架构文档" / "外部平台" / "pami-Wanwu" / "接口.md"
+)
+ROUTING_DOC = (
+    REPO_ROOT
+    / "docs"
+    / "技术架构文档"
+    / "外部平台"
+    / "pami-Wanwu"
+    / "架构文档"
+    / "08-接口与通信架构.md"
+)
 
 
 def _load_verifier():
@@ -62,3 +75,51 @@ def test_validator_reports_missing_route_and_wrong_upstream(tmp_path: Path) -> N
 
 def test_checked_in_wanwu_routes_match_nginx() -> None:
     assert _load_verifier().validate_routes(MANIFEST, NGINX) == []
+
+
+def test_documentation_validator_reports_an_unanchored_route(tmp_path: Path) -> None:
+    manifest = tmp_path / "routes.json"
+    document = tmp_path / "routes.md"
+    manifest.write_text(
+        json.dumps(
+            {
+                "routes": [
+                    {
+                        "prefix": "/minio/download/api/",
+                        "documentation_anchor": "/minio/download/api/",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    document.write_text("No download route is documented here.", encoding="utf-8")
+
+    errors = _load_verifier().validate_documentation(manifest, [document])
+
+    assert errors == ["undocumented route: /minio/download/api/"]
+
+
+def test_checked_in_routes_are_anchored_in_platform_documentation() -> None:
+    errors = _load_verifier().validate_documentation(
+        MANIFEST,
+        [INTERFACE_DOC, ROUTING_DOC],
+    )
+    assert errors == []
+
+
+def test_compose_override_keeps_internal_services_off_host_ports() -> None:
+    compose = COMPOSE_OVERRIDE.read_text(encoding="utf-8")
+    for service in (
+        "mysql",
+        "redis",
+        "minio",
+        "kafka",
+        "es",
+        "bff-service",
+        "agentscope",
+        "rag",
+        "agent",
+    ):
+        assert f"  {service}:\n    ports: !reset []" in compose
+    assert '"127.0.0.1:8081:8081"' in compose
