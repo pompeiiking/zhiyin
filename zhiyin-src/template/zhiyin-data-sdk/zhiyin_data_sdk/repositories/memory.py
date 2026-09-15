@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Optional
 
 from zhiyin_kernel.blackboard import ConversationMemory
@@ -18,6 +19,15 @@ class ConversationMemoryRepository(ABC):
     @abstractmethod
     async def upsert(self, memory: ConversationMemory) -> ConversationMemory:
         """写入 / 更新会话记忆。"""
+
+    @abstractmethod
+    async def compare_and_swap(
+        self,
+        memory: ConversationMemory,
+        *,
+        expected_last_active_at: Optional[datetime],
+    ) -> Optional[ConversationMemory]:
+        """按最后更新时间进行原子条件写；冲突返回 ``None``。"""
 
     @abstractmethod
     async def list_by_user(self, user_id: str) -> list[ConversationMemory]:

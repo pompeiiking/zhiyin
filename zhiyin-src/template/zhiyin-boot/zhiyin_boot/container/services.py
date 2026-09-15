@@ -60,16 +60,75 @@ def build_services(container: "Container") -> None:
     注意 registry_service 的两个依赖都是**动态资源读取**（内容型 Repository +
     配置型 Gateway），不是数据表——它不需要事务，也不写任何状态。
     """
-    from zhiyin_business.services import AgentDrivenLoopCoordinator
+    from zhiyin_business.policies import (
+        DefaultHandoffPolicy,
+        DefaultStagePolicy,
+        DependencyImpactPolicy,
+        KeywordIntentPolicy,
+        RegistryLeadPolicy,
+    )
+    from zhiyin_business.services import (
+        AgentDrivenLoopCoordinator,
+        DefaultAssetService,
+        DefaultBehaviorService,
+        DefaultConversationMemoryService,
+        DefaultFunctionService,
+        DefaultIdentityService,
+        DefaultOrchestrator,
+        DefaultProfileService,
+        DefaultRegistryService,
+        DefaultWorkspaceService,
+    )
 
     if container.agent_engine is None or container.sessions is None:
         return
+    container.profile_service = DefaultProfileService(
+        container.profiles, container.event_bus_primitive
+    )
+    container.behavior_service = DefaultBehaviorService(
+        container.behaviors, container.event_bus_primitive
+    )
+    container.memory_service = DefaultConversationMemoryService(container.memories)
+    container.asset_service = DefaultAssetService(
+        container.assets,
+        container.event_bus_primitive,
+        DependencyImpactPolicy(),
+    )
+
+    container.identity_service = DefaultIdentityService(container.auth, container.users)
+    container.registry_service = DefaultRegistryService(
+        container.registry, container.feature_flags
+    )
+    container.workspace_service = DefaultWorkspaceService(
+        profiles=container.profile_service,
+        assets=container.asset_service,
+        memories=container.memory_service,
+        behaviors=container.behavior_service,
+    )
+    container.function_service = DefaultFunctionService(
+        assets=container.asset_service,
+        behaviors=container.behavior_service,
+        object_store=container.object_store,
+    )
+    container.orchestrator = DefaultOrchestrator(
+        profiles=container.profile_service,
+        behaviors=container.behavior_service,
+        memories=container.memory_service,
+        assets=container.asset_service,
+        intent_policy=KeywordIntentPolicy(),
+        stage_policy=DefaultStagePolicy(),
+        lead_policy=RegistryLeadPolicy(container.registry),
+        handoff_policy=DefaultHandoffPolicy(),
+        agent_engine=container.agent_engine,
+        sessions=container.sessions,
+        registry=container.registry,
+        event_bus=container.event_bus_primitive,
+    )
     container.loop = AgentDrivenLoopCoordinator(
         container.agent_engine,
         container.sessions,
         container.registry,
-        # blackboard_loader 由黑板服务实现后注入；未注入时 Loop 用空黑板，
-        # 因此"前序资产自动继承"目前不成立（缺失项在 `/healthz` 可见）。
+        blackboard_loader=container.orchestrator.read_blackboard,
     )
 
 
@@ -84,7 +143,28 @@ def build_workers(container: "Container") -> None:
     注册后由 `wire_application` 的 lifespan 统一启停，也可用
     `python -m zhiyin_boot worker <name>` 独立运行，两者复用同一个 container。
     """
+    from zhiyin_business.policies import ConfiguredInterventionPolicy
+    from zhiyin_business.workers import ActiveEventWorker, ImpactPropagationWorker
+
     container.workers = []
+    if container.asset_service is not None and container.event_bus_primitive is not None:
+        container.workers.append(
+            ImpactPropagationWorker(
+                container.asset_service,
+                container.event_bus_primitive,
+                container.cache,
+            )
+        )
+    if container.behavior_service is not None:
+        container.workers.append(
+            ActiveEventWorker(
+                behaviors=container.behavior_service,
+                policy=ConfiguredInterventionPolicy(),
+                registry=container.registry,
+                scheduler=container.scheduler_primitive,
+                notifier=container.notifier_primitive,
+            )
+        )
 
 
 __all__ = ["build_orchestration", "build_services", "build_workers"]

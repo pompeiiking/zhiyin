@@ -1,4 +1,4 @@
-"""DTO Mapper（**骨架**，方法体未实现）：业务形状 → 前端视图。
+"""DTO Mapper：业务形状 → 前端视图。
 
 落位：`api/dto/mappers.py` —— 接口/前端联调负责人。
 
@@ -44,18 +44,32 @@ from zhiyin_api.dto.asset import (
     ExportResultView,
     ReportFullTextView,
 )
-from zhiyin_api.dto.bootstrap import BootstrapView
+from zhiyin_api.dto.bootstrap import (
+    BannerView,
+    BootstrapView,
+    FaqView,
+    MenuView,
+    RouteView,
+    TaskEntryView,
+    TrustBlockView,
+)
 from zhiyin_api.dto.conversation import (
+    ConversationMessageView,
     ConversationTurnView,
     PipelineCardView,
     SessionListView,
     TaskSessionView,
 )
-from zhiyin_api.dto.workspace import WorkspacePageView
+from zhiyin_api.dto.workspace import (
+    DependencyEdgeView,
+    ProfilePanelView,
+    StagePanelView,
+    WorkspacePageView,
+)
 from zhiyin_business.ports.function import ExportResult
 from zhiyin_business.ports.loop import LoopResult
 from zhiyin_business.ports.orchestrator import TurnResult
-from zhiyin_business.ports.workspace import WorkspaceView
+from zhiyin_business.ports.workspace import StagePanel, WorkspaceView
 from zhiyin_kernel.assets import Report
 from zhiyin_kernel.blackboard import AssetVersion, TaskSession
 from zhiyin_kernel.dynamic_content import (
@@ -67,8 +81,15 @@ from zhiyin_kernel.dynamic_content import (
 )
 from zhiyin_kernel.identity import UserAccount
 from zhiyin_kernel.registry import AgentDescriptor, TaskEntrySpec
+from zhiyin_kernel.enums import LoopStage, TaskStatus
 
-_TODO = "TODO(骨架): Mapper 未实现"
+_STAGE_LABELS = {
+    LoopStage.COLLECT: "① 采集建模",
+    LoopStage.DIAGNOSE: "② 诊断匹配",
+    LoopStage.DECIDE: "③ 方向决策",
+    LoopStage.ACT: "④ 行动计划",
+    LoopStage.REVIEW: "⑤ 复盘校准",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +119,77 @@ def bootstrap_view(
       （前端回落显示 agent_id，不静默编名字）；
     - 身份区为 `None`（游客）时 identity 留空 dict。
     """
-    raise NotImplementedError(f"{_TODO}：组装 BootstrapView")
+    return BootstrapView(
+        app_name=copy_bundle.get("app.name", ""),
+        menus=[
+            MenuView(
+                key=item.code,
+                label=item.label,
+                route=item.route,
+                visible=item.visible,
+                sort_order=item.sort_order,
+            )
+            for item in menus
+        ],
+        routes=[
+            RouteView(
+                path=item.path,
+                page_code=item.page_code,
+                require_login=item.require_login,
+                sort_order=item.sort_order,
+            )
+            for item in routes
+        ],
+        task_entries=[
+            TaskEntryView(
+                code=item.code,
+                label=item.label,
+                target_stage=item.target_stage,
+                lead_agent_name=(
+                    agents[item.lead_agent].name
+                    if item.lead_agent and item.lead_agent in agents
+                    else None
+                ),
+                sort_order=item.sort_order,
+            )
+            for item in task_entries
+        ],
+        copy_bundle=dict(copy_bundle),
+        trust_blocks=[
+            TrustBlockView(
+                code=item.code,
+                title=item.title,
+                body=item.body,
+                expandable_ref=item.expandable_ref,
+            )
+            for item in trust_blocks
+        ],
+        banners=[
+            BannerView(
+                code=item.code,
+                title=item.title,
+                body=item.body,
+                action_label=item.action_label,
+                action_route=item.action_route,
+            )
+            for item in banners
+        ],
+        faqs=[
+            FaqView(code=item.code, question=item.question, answer=item.answer)
+            for item in faqs
+        ],
+        feature_flags=dict(feature_flags),
+        identity=(
+            {
+                "user_id": identity.id,
+                "role": identity.role.value,
+                "nickname": identity.nickname,
+                "avatar": identity.avatar_url or "",
+            }
+            if identity is not None
+            else {}
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -114,31 +205,98 @@ def task_session_view(
     progress: float = 0.0,
 ) -> TaskSessionView:
     """左栏会话项。`task_name` 取自动态任务入口文案，不按 agent 名排布。"""
-    raise NotImplementedError(f"{_TODO}：TaskSession → TaskSessionView")
+    return TaskSessionView(
+        task_id=session.id,
+        task_name=task_name,
+        stage=session.loop_stage,
+        stage_label=_STAGE_LABELS[session.loop_stage],
+        lead_agent_name=lead_agent_name,
+        status=session.status,
+        progress=progress,
+        last_active_at=session.updated_at,
+    )
 
 
 def session_list_view(
     sessions: Sequence[TaskSessionView], *, current_task_id: Optional[str] = None
 ) -> SessionListView:
     """左栏会话列表。"""
-    raise NotImplementedError(f"{_TODO}：组装 SessionListView")
+    return SessionListView(sessions=list(sessions), current_task_id=current_task_id)
+
+
+def session_summary_view(
+    panel: StagePanel, *, lead_agent_name: str = ""
+) -> TaskSessionView:
+    """把会话记忆摘要转换为左栏会话项。"""
+    return TaskSessionView(
+        task_id=panel.task_id or "",
+        task_name=panel.title,
+        stage=panel.stage,
+        stage_label=_STAGE_LABELS[panel.stage],
+        lead_agent_name=lead_agent_name,
+        status=TaskStatus.ACTIVE,
+        progress=(list(LoopStage).index(panel.stage) + 1) / len(LoopStage),
+        last_active_at=panel.updated_at,
+    )
 
 
 def conversation_turn_view(turn: TurnResult) -> ConversationTurnView:
     """一轮回复：最短结论 + 显式告知 + 行为引导 + 管线卡。"""
-    raise NotImplementedError(f"{_TODO}：TurnResult → ConversationTurnView")
+    return ConversationTurnView(
+        task_id=turn.task_id,
+        stage=turn.stage,
+        badge=turn.badge.model_dump(mode="json"),
+        messages=[
+            ConversationMessageView(
+                **message.model_dump(mode="python"),
+                agent_name=(turn.badge.name if message.agent_id == turn.badge.agent_id else None),
+            )
+            for message in turn.messages
+        ],
+        disclosure=(turn.disclosure.model_dump(mode="json") if turn.disclosure else None),
+        guide=turn.guide.model_dump(mode="json"),
+        pipeline_cards=pipeline_cards(turn.session, turn.asset_versions),
+        changed_assets=[item.model_dump(mode="json") for item in turn.asset_versions],
+    )
 
 
 def pipeline_cards(
     session: TaskSession, asset_versions: Sequence[AssetVersion]
 ) -> list[PipelineCardView]:
     """右栏 ①-⑤ 管线卡（三态：当前产出 / 理论模型 / 评价状态）。"""
-    raise NotImplementedError(f"{_TODO}：组装 PipelineCardView 列表")
+    order = list(LoopStage)
+    current_index = order.index(session.loop_stage)
+    latest = {item.asset_type.value: item for item in asset_versions}
+    stage_assets = {
+        LoopStage.DIAGNOSE: "report",
+        LoopStage.DECIDE: "direction_plan",
+        LoopStage.ACT: "action_plan",
+    }
+    cards = []
+    for index, stage in enumerate(order):
+        version = latest.get(stage_assets.get(stage, ""))
+        status = "done" if index < current_index else "in_progress" if index == current_index else "empty"
+        cards.append(
+            PipelineCardView(
+                stage=stage,
+                title=_STAGE_LABELS[stage],
+                active=stage is session.loop_stage,
+                status=status,
+                current_output=(version.model_dump(mode="json") if version else None),
+                evaluation={"version": version.version} if version else None,
+            )
+        )
+    return cards
 
 
 def loop_stage_view(result: LoopResult) -> dict:
     """单个环节的产出摘要（供管线卡与工作台共用，避免两处各写一遍摘要口径）。"""
-    raise NotImplementedError(f"{_TODO}：LoopResult → 产出摘要")
+    return {
+        "stage": result.stage.value,
+        "messages": [item.model_dump(mode="json") for item in result.messages],
+        "guide": result.guide.model_dump(mode="json"),
+        "next_stage": result.next_stage.value if result.next_stage else None,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +306,42 @@ def loop_stage_view(result: LoopResult) -> dict:
 
 def workspace_page_view(view: WorkspaceView) -> WorkspacePageView:
     """工作台 ①-⑤ 聚合视图。"""
-    raise NotImplementedError(f"{_TODO}：WorkspaceView → WorkspacePageView")
+    profile = view.profile
+    field_count = len(profile.fields) if profile else 0
+    gap_count = len(profile.gaps) if profile else 0
+    denominator = field_count + gap_count
+    profile_panel = ProfilePanelView(
+        coverage=field_count / denominator if denominator else 0.0,
+        overall_confidence=(
+            sum(item.confidence for item in profile.fields) / field_count
+            if profile and field_count
+            else 0.0
+        ),
+        fields=[item.model_dump(mode="json") for item in profile.fields] if profile else [],
+        gaps=[item.model_dump(mode="json") for item in profile.gaps] if profile else [],
+        updated_at=profile.updated_at if profile else None,
+    )
+    by_stage = {panel.stage: _stage_panel_view(panel) for panel in view.panels}
+    return WorkspacePageView(
+        profile_panel=profile_panel,
+        report_panel=by_stage.get(LoopStage.DIAGNOSE),
+        plan_panel=by_stage.get(LoopStage.DECIDE),
+        action_panel=by_stage.get(LoopStage.ACT),
+        review_panel=by_stage.get(LoopStage.REVIEW),
+        coach_messages=[
+            item.model_dump(mode="json")
+            for item in view.track_events
+            if item.type == "coach_message"
+        ],
+        dependencies=[
+            DependencyEdgeView(**item.model_dump(mode="python"))
+            for item in view.dependencies
+        ],
+        blocks={
+            "available": view.available_blocks,
+            "achievement_badge_keys": view.achievement_badge_keys,
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -160,17 +353,66 @@ def asset_version_view(
     version: AssetVersion, *, previous: Optional[AssetVersion] = None
 ) -> AssetVersionView:
     """资产版本视图。`diff_from_previous` 由两版内容差异生成，不整篇重排。"""
-    raise NotImplementedError(f"{_TODO}：AssetVersion → AssetVersionView")
+    return AssetVersionView(
+        asset_type=version.asset_type,
+        asset_id=version.id,
+        version=version.version,
+        created_at=version.created_at,
+        depends_on_profile_keys=version.depends_on_profile_keys,
+        diff_from_previous=version.diff_from_previous,
+    )
 
 
 def report_full_text_view(report: Report) -> ReportFullTextView:
     """完整报告页正文（只读资产版本，不重新生成）。"""
-    raise NotImplementedError(f"{_TODO}：Report → ReportFullTextView")
+    toc = [
+        {"id": "verdict", "title": "综合结论"},
+        {"id": "swot", "title": "SWOT"},
+        *[
+            {"id": f"dimension-{index}", "title": group.group}
+            for index, group in enumerate(report.dimensions, start=1)
+        ],
+    ]
+    sections = [
+        {"id": "verdict", "title": report.verdict.title, "content": report.verdict.model_dump(mode="json")},
+        {"id": "swot", "title": "SWOT", "content": report.swot.model_dump(mode="json")},
+        *[
+            {
+                "id": f"dimension-{index}",
+                "title": group.group,
+                "content": group.model_dump(mode="json"),
+            }
+            for index, group in enumerate(report.dimensions, start=1)
+        ],
+    ]
+    return ReportFullTextView(
+        report_id=report.id,
+        version=report.version,
+        generated_at=report.generated_at,
+        toc=toc,
+        sections=sections,
+    )
 
 
 def export_result_view(result: ExportResult) -> ExportResultView:
     """导出结果。第一期 `available` 恒 False（占位）。"""
-    raise NotImplementedError(f"{_TODO}：ExportResult → ExportResultView")
+    return ExportResultView(
+        available=result.available,
+        message=result.message,
+        object_key=result.object_key,
+    )
+
+
+def _stage_panel_view(panel: StagePanel) -> StagePanelView:
+    return StagePanelView(
+        stage=panel.stage,
+        title=panel.title,
+        evaluation=panel.evaluation,
+        theory_models=[item.model_dump(mode="json") for item in panel.theory_refs],
+        version=panel.version,
+        diff=panel.diff_from_previous,
+        updated_at=panel.updated_at,
+    )
 
 
 __all__ = [
@@ -182,6 +424,7 @@ __all__ = [
     "pipeline_cards",
     "report_full_text_view",
     "session_list_view",
+    "session_summary_view",
     "task_session_view",
     "workspace_page_view",
 ]

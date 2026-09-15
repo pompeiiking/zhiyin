@@ -18,7 +18,15 @@ from datetime import datetime, timezone
 
 import pytest
 
-from zhiyin_kernel.assets import ActionPhase, ActionPlan, ActionTask, DirectionPlan
+from zhiyin_kernel.assets import (
+    ActionPhase,
+    ActionPlan,
+    ActionTask,
+    DirectionPlan,
+    Report,
+    Swot,
+    Verdict,
+)
 from zhiyin_kernel.blackboard import (
     AssetVersion,
     BehaviorLog,
@@ -122,6 +130,20 @@ async def test_asset_contract(repositories) -> None:
     )
     assert first.version == 1
     assert second.version == 2, "版本必须单调递增，调用方传小值也不能压低"
+
+    snapshot = await repo.save_snapshot(
+        _asset("u2", AssetType.REPORT, ["major"]),
+        report=Report(
+            id="report-u2",
+            user_id="u2",
+            version=99,
+            generated_at=_now(),
+            verdict=Verdict(title="诊断", summary="数据方向"),
+            swot=Swot(),
+        ),
+    )
+    assert snapshot.version == 1
+    assert (await repo.get_report("u2")).version == snapshot.version
 
     await repo.save_version(_asset("u1", AssetType.ACTION_PLAN, ["target_city"]))
     hit = await repo.list_affected_assets("u1", ["major"])
@@ -227,6 +249,19 @@ async def test_memory_contract(repositories) -> None:
     )
     stored = await repo.get("u1", "t1")
     assert stored is not None and stored.summary == "第一轮"
+
+    swapped = await repo.compare_and_swap(
+        stored.model_copy(update={"summary": "条件更新"}),
+        expected_last_active_at=stored.last_active_at,
+    )
+    assert swapped is not None and swapped.summary == "条件更新"
+    assert (
+        await repo.compare_and_swap(
+            stored.model_copy(update={"summary": "过期更新"}),
+            expected_last_active_at=stored.last_active_at,
+        )
+        is None
+    )
 
     await repo.upsert(
         ConversationMemory(

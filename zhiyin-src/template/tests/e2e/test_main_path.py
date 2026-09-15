@@ -1,16 +1,9 @@
-"""五环节主路径 e2e（**外壳已就位，自动门控**）。
+"""第一期五环节主路径 e2e。
 
 为什么现在就建这个目录
 ----------------------
 `--check --phase=2` 的退出条件里写着"五环节主路径 e2e 通过（tests/e2e/）"，
-但此前这个目录并不存在——门禁引用了一个不存在的地方，等于把 M2 的验收
-悬在半空。这里把**断言先写出来**，并用"Facade 是否已装配"自动门控：
-
-    未装配（当前）→ 跳过，不产生红灯噪音
-    装配完成     → 自动开始跑，成为 M2 的真实门禁
-
-这样做的价值是：测试即验收口径。实现者不需要问"e2e 到底测什么"，
-也不会在实现完之后才发现口径不一致而返工。
+本文件把架构文档中的七项验收口径落实成不可跳过的自动化测试。
 
 覆盖的验收项（《第一期技术架构文档》§九）
 ----------------------------------------
@@ -31,12 +24,12 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
-from zhiyin_api.runtime import WIRED
-from zhiyin_boot import Settings, build_container, describe_assembly
+from zhiyin_boot import Settings, build_container
 
 TEMPLATE_ROOT = Path(__file__).resolve().parents[2]
 DATA_DIR = TEMPLATE_ROOT / "data"
@@ -56,21 +49,7 @@ def _container():
     return build_container(_settings())
 
 
-def _facade_wired() -> bool:
-    """是否已具备跑主路径的前提（Facade 装配完成）。"""
-    return describe_assembly(_container()).services["facade"] == WIRED
-
-
-M2_PENDING = pytest.mark.skipif(
-    not _facade_wired(),
-    reason=(
-        "M2 未就绪：business 服务与 Facade 仍是骨架（见 "
-        "`python -m zhiyin_boot --check --phase=2` 的 unmet 清单）。"
-        "装配完成后本用例自动开始执行。"
-    ),
-)
-
-pytestmark = [pytest.mark.e2e, M2_PENDING]
+pytestmark = pytest.mark.e2e
 
 
 @pytest.mark.asyncio
@@ -103,7 +82,25 @@ async def test_acceptance_1_home_task_routes_to_target_stage() -> None:
 @pytest.mark.asyncio
 async def test_acceptance_2_resume_from_any_stage_keeps_prior_assets() -> None:
     """验收项 2：可拆可续。从后续环节进入时，前序资产必须仍在。"""
-    pytest.skip("待 Facade 实现后补：从 ②③④⑤ 任一环节进入 → 前序资产仍在")
+    from zhiyin_api.dto.conversation import TaskEnterRequest
+    from zhiyin_business.contracts.common import AssetUpdateDraft
+    from zhiyin_kernel.enums import AssetType
+
+    container = _container()
+    user_id = "e2e_resume"
+    prior = await container.asset_service.save_version(
+        user_id,
+        AssetUpdateDraft(
+            asset_type=AssetType.REPORT,
+            depends_on_profile_keys=["career_interest"],
+        ),
+    )
+    session = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code="how_to_act")
+    )
+    board = await container.orchestrator.read_blackboard(user_id, session.task_id)
+    assert session.stage.value == "act"
+    assert any(item.id == prior.id for item in board.asset_versions)
 
 
 @pytest.mark.asyncio
@@ -113,28 +110,148 @@ async def test_acceptance_3_handoff_changes_lead_and_discloses() -> None:
     这是产品硬约束的端到端落点：`TurnResult.disclosure` 与
     `TurnResult.badge` 必须同时变化，且 disclosure 非空。
     """
-    pytest.skip("需要在 Orchestrator 实现后补：断言换环节 → 主理变化 + 告知非空")
+    from zhiyin_api.dto.conversation import MessageRequest, TaskEnterRequest
+
+    container = _container()
+    user_id = "e2e_handoff"
+    session = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code="confused")
+    )
+    turn = await container.facade.send_message(
+        user_id,
+        MessageRequest(
+            task_id=session.task_id,
+            message="方向已经定了，但我不知道怎么行动",
+        ),
+    )
+    assert turn.stage.value == "act"
+    assert turn.disclosure is not None
+    assert turn.disclosure["text"]
+    assert turn.disclosure["from_agent"] != turn.disclosure["to_agent"]
+    stored = await container.sessions.get(session.task_id)
+    assert stored is not None and stored.lead_agent == turn.badge["agent_id"]
 
 
 @pytest.mark.asyncio
 async def test_acceptance_4_blackboard_is_shared_across_sessions() -> None:
     """验收项 4：黑板一致。第二个会话必须能读到第一个会话写入的画像与资产。"""
-    pytest.skip("需要在黑板四件套实现后补：断言跨会话读取")
+    from zhiyin_api.dto.conversation import TaskEnterRequest
+    from zhiyin_business.contracts.common import AssetUpdateDraft
+    from zhiyin_kernel.enums import AssetType
+
+    container = _container()
+    user_id = "e2e_blackboard"
+    first = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code="confused")
+    )
+    await container.profile_service.update_field(
+        user_id,
+        "career_interest",
+        "数据工程",
+        confidence=0.9,
+        source="conversation",
+    )
+    asset = await container.asset_service.save_version(
+        user_id,
+        AssetUpdateDraft(
+            asset_type=AssetType.REPORT,
+            depends_on_profile_keys=["career_interest"],
+        ),
+    )
+    second = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code="how_to_act")
+    )
+    assert first.task_id != second.task_id
+    board = await container.orchestrator.read_blackboard(user_id, second.task_id)
+    assert board.profile is not None
+    assert board.profile.fields[0].value == "数据工程"
+    assert any(item.id == asset.id for item in board.asset_versions)
+    assert len(board.memories) == 2
 
 
 @pytest.mark.asyncio
 async def test_acceptance_5_profile_update_propagates_only_affected_assets() -> None:
     """验收项 5：影响面传播。只重算受影响资产，版本 +1，未命中资产版本不变。"""
-    pytest.skip("需要在 AssetService + ImpactPolicy 实现后补：断言版本单调与命中范围")
+    from zhiyin_business.contracts.common import AssetUpdateDraft
+    from zhiyin_kernel.enums import AssetType
+
+    container = _container()
+    user_id = "e2e_impact"
+    await container.asset_service.save_version(
+        user_id,
+        AssetUpdateDraft(
+            asset_type=AssetType.REPORT,
+            depends_on_profile_keys=["skills"],
+        ),
+    )
+    await container.asset_service.save_version(
+        user_id,
+        AssetUpdateDraft(
+            asset_type=AssetType.DIRECTION_PLAN,
+            depends_on_profile_keys=["career_interest"],
+        ),
+    )
+    changed = await container.asset_service.propagate(user_id, ["skills"])
+    assert [(item.asset_type, item.version) for item in changed] == [
+        (AssetType.REPORT, 2)
+    ]
+    untouched = await container.asset_service.list_versions(
+        user_id, AssetType.DIRECTION_PLAN
+    )
+    assert [item.version for item in untouched] == [1]
 
 
 @pytest.mark.asyncio
 async def test_acceptance_6_action_loop_writes_behavior_log() -> None:
     """验收项 6：行为闭环。认领差距 / 选择方案 / 勾任务 / 复盘都产生行为日志。"""
-    pytest.skip("需要在 LoopResult.behavior_events 填充后补：断言四类事件都落库")
+    from zhiyin_business.contracts.common import BehaviorEventDraft
+    from zhiyin_kernel.enums import BehaviorEventType
+
+    container = _container()
+    user_id = "e2e_behavior"
+    expected = {
+        BehaviorEventType.GAP_CLAIM,
+        BehaviorEventType.DECISION_SELECT,
+        BehaviorEventType.TASK_DONE,
+        BehaviorEventType.REVIEW,
+    }
+    for event_type in expected:
+        await container.behavior_service.log(
+            user_id, BehaviorEventDraft(event_type=event_type)
+        )
+    stored = await container.behavior_service.recent(user_id)
+    assert {item.event_type for item in stored} == expected
 
 
 @pytest.mark.asyncio
 async def test_acceptance_7_stall_triggers_coach_message() -> None:
     """验收项 7：主动干预。停滞触发教练消息，且带最小可执行动作。"""
-    pytest.skip("需要在 ActiveEventWorker 实现后补：断言调度触发 + 通知内容")
+    from zhiyin_kernel.blackboard import BehaviorLog
+    from zhiyin_kernel.enums import BehaviorEventType
+    from zhiyin_orchestration import ScheduleSpec
+
+    container = _container()
+    user_id = "e2e_stall"
+    task_id = "tsk_e2e_stall"
+    await container.behaviors.append(
+        BehaviorLog(
+            id="bhv_e2e_stall",
+            user_id=user_id,
+            event_type=BehaviorEventType.TASK_DONE,
+            occurred_at=datetime.now(timezone.utc) - timedelta(days=4),
+            payload={"task_id": task_id},
+        )
+    )
+    container.scheduler_primitive.register(
+        ScheduleSpec(
+            task_id="schedule_e2e_stall",
+            event_type="stall_scan",
+            payload={"user_id": user_id, "task_id": task_id},
+        )
+    )
+    worker = next(item for item in container.workers if item.name == "active_event")
+    assert await worker.run_once() == 1
+    messages = container.notifier.list_messages(user_id)
+    assert len(messages) == 1
+    assert messages[0]["body"]
+    assert messages[0]["action"]["type"] == "resume_review"

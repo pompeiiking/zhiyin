@@ -19,6 +19,12 @@ from typing import Any, Optional
 
 from zhiyin_data_sdk.gateways.ai import LLMGateway, LLMMessage, LLMResult
 
+# TODO(Mock 标注): MOCK-1 —— 占位串单点定义在这里（好），但**后端没有把"内容来源"
+# 透出给前端**：任何 DTO 都没有 source/is_mock 字段，前端 MockBadge.vue 只能靠字符串
+# 匹配判断，而它自己也还是空骨架（文案资源 data/registry/copies.json:mock.source_notice 已就绪）。
+# 该占位串目前已流到用户可见字段：对话正文、主理徽标 theory_refs、行为引导、
+# 画像字段值、工作台依赖图 from_asset/via_profile_keys。
+# 现状清单与退出判据：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（MOCK-1 / MOCK-2）。
 _PLACEHOLDER_TEXT = "（第一期 Mock 产出，未接真实模型）"
 
 
