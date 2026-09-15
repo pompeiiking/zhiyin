@@ -1,5 +1,9 @@
 # pami/Wanwu Source and Deployment Baseline Implementation Plan
 
+> **状态说明（2026-09-15）：** 本计划对应现行设计的阶段 1–2，源码快照与部署
+> 资产已经提交。后续路由、边界、CI 与文档收口由
+> `2026-09-15-pami-wanwu-route-boundary-delivery.md` 承接；不重新导入 Wanwu。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Import a clean, traceable Wanwu source snapshot into the zhiyin repository and provide a repeatable container build and unified Compose baseline that starts Wanwu and the zhiyin backend on one internal network.

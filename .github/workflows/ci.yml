@@ -29,8 +29,18 @@ jobs:
         run: python scripts/export_openapi.py --check
       - name: 里程碑门禁 M1（框架可验证，本期退出条件）
         run: python -m zhiyin_boot --check --phase=1
-      - name: Wanwu 源码快照与部署资产边界
-        run: python -m pytest tests/test_wanwu_vendor.py tests/test_container_assets.py tests/test_deploy_assets.py -q
+      - name: Wanwu 源码、路由与架构边界
+        run: >-
+          python -m pytest
+          tests/test_wanwu_vendor.py
+          tests/test_container_assets.py
+          tests/test_deploy_assets.py
+          tests/test_wanwu_routes.py
+          tests/test_pami_boundary.py
+          -q
+      - name: Wanwu 原生路由契约
+        working-directory: .
+        run: python scripts/verify_wanwu_routes.py
       - name: 构建职引后端镜像
         run: docker build --tag zhiyin/backend:ci .
       - name: 容器内里程碑门禁

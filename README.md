@@ -57,8 +57,12 @@ pwsh deploy/verify.ps1
 pwsh deploy/down.ps1
 ```
 
-当前完成的是源码与统一部署基线。`ZHIYIN_USE_PAMI_*` 保持关闭；运行面和控制面
-Adapter 将在后续阶段实现并通过真实接口测试后启用。
+当前交付包含 Wanwu 源码快照、独立构建、统一 Compose 和原生接口路由。
+Wanwu 原生接口从 `http://127.0.0.1:8081` 的 Nginx/BFF 入口访问，继续使用
+Wanwu 自身的 JWT、API Key 和权限规则。职引 `/api/v1/*` 不透明代理这些接口。
+
+`ZHIYIN_USE_PAMI_*` 保持关闭，`zhiyin-infrastructure/pami/` 仅保留生产替换
+骨架；本交付不宣称真实账号、模型、知识库、Agent、RAG 或工作流已经联通。
 
 **接口字段怎么做到前后端不漂移**（三段链路，任一环断裂 CI 就红）：
 
