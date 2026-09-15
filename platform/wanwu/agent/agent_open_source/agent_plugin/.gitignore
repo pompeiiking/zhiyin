@@ -1,0 +1,10 @@
+action_files/
+action_files_backup/
+function_files/
+function_files_backup/
+*.xlsx
+logs/
+__pycache__/
+.ipynb_checkpoints/
+*.ipynb
+*.pyc

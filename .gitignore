@@ -60,3 +60,13 @@ Thumbs.db
 !.env.example
 *.pem
 *.key
+
+# ---- Embedded Wanwu runtime state ----
+platform/wanwu/.env
+platform/wanwu/.env.*
+platform/wanwu/.cache/
+platform/wanwu/output/
+platform/wanwu/runtime/
+platform/wanwu/**/*.log
+platform/wanwu/**/*.pid
+deploy/.env

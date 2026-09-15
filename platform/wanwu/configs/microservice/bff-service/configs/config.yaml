@@ -1,0 +1,110 @@
+server:
+  host: bff-service
+  port: 6668
+  external_ip: localhost
+  external_port: 6668
+  web_base_url: http://localhost:8081
+  api_base_url: http://localhost:6668
+  callback_url: http://172.17.0.1:6668
+
+log:
+  std: true
+  level: debug
+  logs:
+    - enable: true
+      filename: log/bff-info.log
+      level: info
+      max_size: 10
+      max_backups: 10
+      max_age: 30
+    - enable: true
+      filename: log/bff-err.log
+      level: error
+      max_size: 10
+      max_backups: 10
+      max_age: 30
+
+jwt:
+  signing-key: "zhYZAr7Q7JstuEXQBx5p2MdUtfsC7CY5"
+
+decrypt-passwd:
+  iv: "sdf4ddfsFD86Vdf2"
+  key: "f5Su3GhNMM1rndyp"
+
+i18n:
+  type: jsonl
+  xlsxPath: configs/microservice/bff-service/configs/wanwu-i18n.xlsx
+  xlsxSheets:
+    - bff-service
+    - bff-custom
+    - iam-service
+    - model-service
+    - knowledge-service
+    - mcp-service
+    - rag-service
+    - assistant-service
+    - app-service
+  jsonlPath: configs/microservice/bff-service/configs/wanwu-i18n.jsonl
+  langs:
+    - code: zh
+      name: 中文
+    - code: en
+      name: English
+  defaultLang: zh
+
+custom-info:
+  version: v0.0.1
+  login:
+    background_path: "/v1/static/logo/login_bg.png"
+    login_button_color: "#384BF7"
+    welcome_text: bff_custom_login_welcome_text
+  home:
+    logo_path: "/v1/static/logo/title_logo.svg"
+    title: bff_custom_home_title
+  tab:
+    tab_title: bff_custom_tab_title
+    tab_logo_path: "/v1/static/logo/tab_logo.png"
+
+doc-center:
+  doc_path: configs/microservice/bff-service/static/docs/wanwu-openapi.pdf
+
+# --- middleware ---
+
+minio:
+  endpoint: localhost:9000
+  user: root
+  password: Wanwu123456
+
+# --- microservice ---
+
+iam:
+  host: iam-service:8888
+
+app:
+  host: app-service:9988
+
+model:
+  host: model-service:8989
+
+mcp:
+  host: mcp-service:9898
+
+rag:
+  host: rag-service:9640
+
+assistant:
+  host: assistant-service:8890
+
+knowledge:
+  host: knowledge-service:8889
+
+workflow:
+  host: http://agentscope-wanwu:6672
+  workflow_list_uri: "/workflow/list"
+  delete_workflow_uri: "/workflow/delete"
+
+agent:
+  host: agent-wanwu
+  upload_minio:
+      port: 15001
+      uri: /upload

@@ -1,0 +1,207 @@
+basePath: /openapi/v1
+definitions:
+  request.OpenAPIAgentChatRequest:
+    properties:
+      conversation_id:
+        type: string
+      query:
+        type: string
+      stream:
+        type: boolean
+    required:
+    - conversation_id
+    - query
+    type: object
+  request.OpenAPIAgentCreateConversationRequest:
+    properties:
+      title:
+        type: string
+    type: object
+  request.OpenAPIRagChatRequest:
+    properties:
+      query:
+        type: string
+      stream:
+        type: boolean
+    required:
+    - query
+    type: object
+  response.OpenAIChatHistory:
+    properties:
+      query:
+        type: string
+      response:
+        type: string
+    type: object
+  response.OpenAIChatSearch:
+    properties:
+      kb_name:
+        type: string
+      snippet:
+        type: string
+      title:
+        type: string
+    type: object
+  response.OpenAPIAgentChatFile:
+    properties:
+      output_file_url:
+        type: string
+    type: object
+  response.OpenAPIAgentChatResponse:
+    properties:
+      code:
+        type: integer
+      finish:
+        type: integer
+      gen_file_url_list:
+        items:
+          $ref: '#/definitions/response.OpenAPIAgentChatFile'
+        type: array
+      history:
+        items:
+          $ref: '#/definitions/response.OpenAIChatHistory'
+        type: array
+      message:
+        type: string
+      response:
+        type: string
+      search_list:
+        items:
+          $ref: '#/definitions/response.OpenAIChatSearch'
+        type: array
+      usage:
+        $ref: '#/definitions/response.OpenAPIAgentChatUsage'
+    type: object
+  response.OpenAPIAgentChatUsage:
+    properties:
+      completion_tokens:
+        type: integer
+      prompt_tokens:
+        type: integer
+      total_tokens:
+        type: integer
+    type: object
+  response.OpenAPIAgentCreateConversationResponse:
+    properties:
+      conversation_id:
+        type: string
+    type: object
+  response.OpenAPIRagChatData:
+    properties:
+      output:
+        type: string
+      searchList:
+        items:
+          $ref: '#/definitions/response.OpenAIChatSearch'
+        type: array
+    type: object
+  response.OpenAPIRagChatResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/response.OpenAPIRagChatData'
+      finish:
+        type: integer
+      history:
+        items:
+          $ref: '#/definitions/response.OpenAIChatHistory'
+        type: array
+      message:
+        type: string
+      msg_id:
+        type: string
+    type: object
+  response.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      msg:
+        type: string
+    type: object
+info:
+  contact: {}
+  title: AI Agent Productivity Platform - Open API
+  version: v0.0.1
+paths:
+  /agent/chat:
+    post:
+      consumes:
+      - application/json
+      description: 智能体对话OpenAPI
+      parameters:
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.OpenAPIAgentChatRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OpenAPIAgentChatResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 智能体对话OpenAPI
+      tags:
+      - openapi
+  /agent/conversation:
+    post:
+      consumes:
+      - application/json
+      description: 智能体创建对话OpenAPI
+      parameters:
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.OpenAPIAgentCreateConversationRequest'
+      produces:
+      - application/json
+      responses:
+        "400":
+          description: Bad Request
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.OpenAPIAgentCreateConversationResponse'
+              type: object
+      summary: 智能体创建对话OpenAPI
+      tags:
+      - openapi
+  /rag/chat:
+    post:
+      consumes:
+      - application/json
+      description: 文本问答OpenAPI
+      parameters:
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.OpenAPIRagChatRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.OpenAPIRagChatResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 文本问答OpenAPI
+      tags:
+      - openapi
+swagger: "2.0"

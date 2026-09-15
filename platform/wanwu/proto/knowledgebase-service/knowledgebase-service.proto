@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package knowledgebase_service;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "gitlab.ai-yuanjing.cn/ai-platform-private/backend-used-bff/common-api/api/proto/knowledgebase-service";
+
+service KnowledgeBaseService {
+  // 获取知识库列表
+  rpc SelectKnowledgeList(KnowledgeSelectReq) returns (KnowledgeSelectListResp) {}
+  // 获取知识库详情
+  rpc SelectKnowledgeDetailById(KnowledgeDetailSelectReq) returns (KnowledgeInfo) {}
+  // 获取知识库详情
+  rpc SelectKnowledgeDetailByName(KnowledgeDetailSelectReq) returns (KnowledgeInfo) {}
+  // 新增知识库
+  rpc CreateKnowledge(CreateKnowledgeReq) returns (CreateKnowledgeResp) {}
+  // 修改知识库
+  rpc UpdateKnowledge(UpdateKnowledgeReq) returns (google.protobuf.Empty) {}
+  // 删除文档知识分类
+  rpc DeleteKnowledge(DeleteKnowledgeReq) returns (google.protobuf.Empty) {}
+
+}
+
+message DeleteKnowledgeReq{
+  string knowledgeId = 1;
+  string userId = 2;
+  string orgId = 3;
+}
+
+message UpdateKnowledgeReq{
+  string knowledgeId = 1;
+  string name = 2;
+  string description = 3;
+  string userId = 4;
+  string orgId = 5;
+}
+
+message CreateKnowledgeReq{
+  string userId = 1;
+  string orgId = 2;
+  string name = 3;
+  string description = 4;
+  EmbeddingModelInfo embeddingModelInfo = 5;
+}
+
+message EmbeddingModelInfo{
+  string modelId = 1;
+}
+
+message CreateKnowledgeResp{
+  string knowledgeId = 1;
+}
+
+message KnowledgeSelectReq {
+  string userId = 1;
+  string orgId = 2;
+  string name = 3; //知识库名称，支持模糊搜索
+}
+
+message KnowledgeSelectListResp {
+  repeated KnowledgeInfo knowledgeList = 1; //知识库列表
+}
+
+message KnowledgeDetailSelectReq {
+  string userId = 1;
+  string orgId = 2;
+  string knowledgeId = 3; //知识库id
+  string knowledgeName = 4; // 知识库名称
+}
+
+//知识库信息
+message KnowledgeInfo {
+  string knowledgeId = 1; //知识库id
+  string name = 2; //知识库名称
+  int32 docCount = 3;
+  string description = 4;
+  EmbeddingModelInfo embeddingModelInfo = 5;
+}

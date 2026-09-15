@@ -1,0 +1,370 @@
+basePath: /callback/v1
+definitions:
+  mp.ProviderModelByOpenAICompatible:
+    properties:
+      embedding:
+        $ref: '#/definitions/mp_openai_compatible.Embedding'
+      llm:
+        $ref: '#/definitions/mp_openai_compatible.LLM'
+      rerank:
+        $ref: '#/definitions/mp_openai_compatible.Rerank'
+    type: object
+  mp.ProviderModelByYuanjing:
+    properties:
+      embedding:
+        $ref: '#/definitions/mp_yuanjing.Embedding'
+      llm:
+        $ref: '#/definitions/mp_yuanjing.LLM'
+      rerank:
+        $ref: '#/definitions/mp_yuanjing.Rerank'
+    type: object
+  mp.ProviderModelConfig:
+    properties:
+      providerOpenAICompatible:
+        $ref: '#/definitions/mp.ProviderModelByOpenAICompatible'
+      providerYuanJing:
+        $ref: '#/definitions/mp.ProviderModelByYuanjing'
+    type: object
+  mp_openai_compatible.Embedding:
+    properties:
+      apiKey:
+        description: ApiKey
+        type: string
+      endpointUrl:
+        description: 推理url
+        type: string
+    type: object
+  mp_openai_compatible.LLM:
+    properties:
+      apiKey:
+        description: ApiKey
+        type: string
+      endpointUrl:
+        description: 推理url
+        type: string
+      functionCalling:
+        description: 函数调用是否支持
+        enum:
+        - noSupport
+        - toolCall
+        - functionCall
+        type: string
+    type: object
+  mp_openai_compatible.Rerank:
+    properties:
+      apiKey:
+        description: ApiKey
+        type: string
+      endpointUrl:
+        description: 推理url
+        type: string
+    type: object
+  mp_yuanjing.Embedding:
+    properties:
+      apiKey:
+        description: ApiKey
+        type: string
+      endpointUrl:
+        description: 推理url
+        type: string
+    type: object
+  mp_yuanjing.LLM:
+    properties:
+      apiKey:
+        description: ApiKey
+        type: string
+      endpointUrl:
+        description: 推理url
+        type: string
+      functionCalling:
+        description: 函数调用是否支持
+        enum:
+        - noSupport
+        - toolCall
+        - functionCall
+        type: string
+    type: object
+  mp_yuanjing.Rerank:
+    properties:
+      apiKey:
+        description: ApiKey
+        type: string
+      endpointUrl:
+        description: 推理url
+        type: string
+    type: object
+  request.Avatar:
+    properties:
+      key:
+        description: 前端透传给后端用于保存avatar，例如：custom-upload/avatar/abc/def.png
+        type: string
+      path:
+        description: 前端请求地址，例如：/v1/static/avatar/abc/def.png (请求非必填)
+        type: string
+    type: object
+  request.CallbackUpdateDocStatusReq:
+    properties:
+      id:
+        type: string
+      status:
+        type: integer
+    required:
+    - id
+    - status
+    type: object
+  request.SearchKnowledgeInfoReq:
+    properties:
+      categoryName:
+        type: string
+      orgId:
+        type: string
+      userId:
+        type: string
+    required:
+    - categoryName
+    - userId
+    type: object
+  response.ModelInfo:
+    properties:
+      avatar:
+        allOf:
+        - $ref: '#/definitions/request.Avatar'
+        description: 模型图标路径
+      config: {}
+      createdAt:
+        type: string
+      displayName:
+        description: 模型显示名称
+        type: string
+      examples:
+        allOf:
+        - $ref: '#/definitions/mp.ProviderModelConfig'
+        description: 仅用于swagger展示；模型对应供应商中的对应llm、embedding或rerank结构是config实际的参数
+      isActive:
+        description: '启用状态（true: 启用，false: 禁用）'
+        type: boolean
+      model:
+        description: 模型名称
+        type: string
+      modelId:
+        type: string
+      modelType:
+        enum:
+        - llm
+        - embedding
+        - rerank
+        type: string
+      orgId:
+        type: string
+      provider:
+        description: 模型供应商
+        enum:
+        - OpenAI-API-compatible
+        - YuanJing
+        type: string
+      publishDate:
+        description: 模型发布时间
+        type: string
+      updatedAt:
+        type: string
+      userId:
+        type: string
+    required:
+    - model
+    - modelType
+    - provider
+    type: object
+  response.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      msg:
+        type: string
+    type: object
+info:
+  contact: {}
+  title: AI Agent Productivity Platform - Callback
+  version: v0.0.1
+paths:
+  /api/category/info:
+    get:
+      consumes:
+      - application/json
+      description: 获取Maas平台知识库信息（模型扩展调用）
+      parameters:
+      - description: 根据知识库名称请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.SearchKnowledgeInfoReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取Maas平台知识库信息（模型扩展调用）
+      tags:
+      - callback
+  /api/deploy/info:
+    get:
+      consumes:
+      - application/json
+      description: 获取Maas平台部署信息（模型扩展调用）
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取Maas平台部署信息（模型扩展调用）
+      tags:
+      - callback
+  /api/doc_status_init:
+    get:
+      consumes:
+      - application/json
+      description: 将正在解析的文档设置为解析失败
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 将正在解析的文档设置为解析失败
+      tags:
+      - callback
+  /api/docstatus:
+    post:
+      consumes:
+      - application/json
+      description: 更新文档状态（模型扩展调用）
+      parameters:
+      - description: 更新文档状态请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/request.CallbackUpdateDocStatusReq'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 更新文档状态（模型扩展调用）
+      tags:
+      - callback
+  /model/{modelId}:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: 模型ID
+        in: path
+        name: modelId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.ModelInfo'
+              type: object
+      summary: 根据ModelId获取模型
+      tags:
+      - callback
+  /model/{modelId}/chat/completions:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 模型ID
+        in: path
+        name: modelId
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Model Chat Completions
+      tags:
+      - callback
+  /model/{modelId}/embeddings:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 模型ID
+        in: path
+        name: modelId
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Model Embeddings
+      tags:
+      - callback
+  /model/{modelId}/rerank:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 模型ID
+        in: path
+        name: modelId
+        required: true
+        type: string
+      - description: 请求参数
+        in: body
+        name: data
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Model Rerank
+      tags:
+      - callback
+swagger: "2.0"
