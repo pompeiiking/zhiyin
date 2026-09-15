@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import shutil
 import subprocess
+import uuid
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -21,13 +25,21 @@ def load_importer():
 
 
 def git(repo: Path, *args: str) -> str:
+    command = [
+        "git",
+        "-c",
+        "user.name=VendorTest",
+        "-c",
+        "user.email=vendor@example.invalid",
+        "-C",
+        repo.as_posix(),
+        *args,
+    ]
+    if os.name == "nt":
+        command = ["cmd.exe", "/d", "/s", "/c", subprocess.list2cmdline(command)]
     result = subprocess.run(
-        ["git", "-c", "user.name=Vendor Test", "-c", "user.email=vendor@example.invalid", *args],
-        cwd=repo,
-        # The managed Windows runtime blocks direct child creation for its
-        # bundled git executable; invoking through cmd.exe keeps the fixture
-        # equivalent while remaining portable to CI.
-        shell=True,
+        command,
+        cwd=REPO_ROOT,
         check=True,
         capture_output=True,
         text=True,
@@ -35,9 +47,21 @@ def git(repo: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def test_import_snapshot_filters_sensitive_files_and_records_revision(tmp_path: Path) -> None:
-    source = tmp_path / "source"
+@pytest.fixture
+def workspace_source() -> Iterator[Path]:
+    source = REPO_ROOT / f".pytest-wanwu-source-{uuid.uuid4().hex}"
+    shutil.rmtree(source, ignore_errors=True)
     source.mkdir()
+    try:
+        yield source
+    finally:
+        shutil.rmtree(source, ignore_errors=True)
+
+
+def test_import_snapshot_filters_sensitive_files_and_records_revision(
+    tmp_path: Path, workspace_source: Path
+) -> None:
+    source = workspace_source
     git(source, "init")
     (source / "LICENSE").write_text("Apache License 2.0", encoding="utf-8")
     (source / "README.md").write_text("wanwu", encoding="utf-8")

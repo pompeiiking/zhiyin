@@ -14,13 +14,17 @@ from typing import Sequence
 BLOCKED_ROOT_FILES = frozenset({".env.bak", ".env.image.amd64", ".env.image.arm64"})
 BLOCKED_SUFFIXES = frozenset({".log", ".pid"})
 BLOCKED_PARTS = frozenset({".git", ".cache", ".pytest_cache", "output", "__pycache__"})
+WINDOWS_CMD_FORBIDDEN = frozenset("&|<>%!()\r\n")
 
 
 def run_process(args: Sequence[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
     """Run a Git command across the managed Windows and CI runtimes."""
     if os.name == "nt":
-        command = subprocess.list2cmdline(list(args)).replace("^", "^^")
-        return subprocess.run(command, shell=True, **kwargs)
+        arguments = list(args)
+        if any(any(char in argument for char in WINDOWS_CMD_FORBIDDEN) for argument in arguments):
+            raise ValueError("Git arguments contain unsupported Windows command metacharacters")
+        command = subprocess.list2cmdline(arguments).replace("^", "^^")
+        return subprocess.run(["cmd.exe", "/d", "/s", "/c", command], **kwargs)
     return subprocess.run(list(args), **kwargs)
 
 
@@ -48,9 +52,11 @@ def import_snapshot(source: Path, destination: Path, revision: str) -> dict[str,
     if destination.exists():
         raise FileExistsError(f"destination already exists: {destination}")
 
-    resolved_revision = run_git(source, ["rev-parse", "--verify", f"{revision}^{{commit}}"])
+    resolved_revision = run_git(source, ["rev-parse", "--verify", revision])
     if resolved_revision != revision:
         raise ValueError("revision must be a full 40-character commit hash")
+    if run_git(source, ["cat-file", "-t", revision]) != "commit":
+        raise ValueError("revision must identify a commit")
     remote = run_git(source, ["remote", "get-url", "origin"]) if run_git(source, ["remote"]) else "local"
 
     with tempfile.TemporaryDirectory(prefix="zhiyin-wanwu-import-") as temp_name:
