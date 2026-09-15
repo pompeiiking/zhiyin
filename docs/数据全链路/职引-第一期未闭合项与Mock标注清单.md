@@ -4,8 +4,9 @@
 | --- | --- |
 | 文档用途 | 把第一期"代码已实现、但未接入可运行链路"的缺口与 Mock 内容显式标记出来，避免被"门禁通过 / 测试全绿"掩盖 |
 | 产生方式 | 对 `data-yuan@93f85f3` 的独立复核（2026-09-15），复核命令与实测结果见本文第四节 |
+| 复核范围扩展 | `business-tao@dfd7f34`（业务分支，2026-09-15）：闭合 OPEN-5，新增 OPEN-6 |
 | 与原记录的关系 | 《职引-数据能力全链路完成情况记录》的个人自评保持原样；**两份文档必须合读**，本文只补充其未覆盖的缺口 |
-| 当前状态 | 未闭合项 5 条（OPEN-1 ~ OPEN-5），Mock 标注问题 2 条（MOCK-1 ~ MOCK-2） |
+| 当前状态 | 未闭合项 5 条（OPEN-1 ~ OPEN-4、OPEN-6），Mock 标注问题 2 条（MOCK-1 ~ MOCK-2）；**OPEN-5 已闭合** |
 | 清理约定 | 每项修好后，删除对应代码标记与 `tests/e2e/test_phase1_open_items.py` 中的用例，并把本文状态改为"已闭合" |
 
 > **一句话结论**：数据层的**实现质量**与**测试强度**都达到了第一期要求（门禁全绿、真实 Redis 实例验证通过），
@@ -60,14 +61,24 @@
 | 退出判据 | 删除死配置，或把 Mock 门面同步成 async 并补一条装配用例 |
 | 代码标记 | `zhiyin-boot/zhiyin_boot/container/__init__.py` |
 
-### OPEN-5 · 服务级"骨架必须自报 skeleton"守卫已空转 —— 未闭合
+### OPEN-5 · 服务级"骨架必须自报 skeleton"守卫已空转 —— 已闭合
 
 | 项 | 内容 |
 | --- | --- |
 | 现象 | `test_shell_completeness.py` 的 `WIRED_SERVICE_PORTS` 被改成"全部 `SERVICE_SHELL`"，导致 `test_remaining_service_skeletons_declare_their_status` 的迭代集合为空——该守卫**一次都不执行**，未来任何服务退回骨架都不会被抓到（Worker 侧守卫仍有效） |
 | 归属 | 数据侧 / 测试维护方 |
-| 退出判据 | 恢复一条非空集的守卫（例如断言 `WIRED_SERVICE_PORTS` 必须显式列出、且与装配报告的 `wired` 集合一致） |
-| 代码标记 | 见 `tests/test_shell_completeness.py` 对应常量 |
+| 闭合情况 | 已在 `business-tao@dfd7f34` 闭合：空转的守卫被换成对**全部** `SERVICE_SHELL` 参数化的 `test_service_declares_valid_status`，断言每个服务能力位如实声明 `skeleton` 或 `wired`；同时 `test_first_phase_is_wired_and_later_worker_stays_pending` 改为用 `WIRED_SERVICE_PORTS` / `WIRED_WORKER_PORTS` 常量断言装配结果。守卫恢复为非空集，原来的 `TODO(第一期未闭合)` 标记按其触发条件被删除 |
+| 遗留 | 该守卫断言的仍是"状态合法"，不是"状态与预期一致"；能力位增减时仍需人工同步 `WIRED_SERVICE_PORTS` |
+
+### OPEN-6 · 决策 5 的画像口径没有在工作台生效，且规则被重复实现 —— 未闭合
+
+| 项 | 内容 |
+| --- | --- |
+| 现象 | `business-tao@dfd7f34` 新增 `policies/profile.py` 按决策 5 计算"关键字段的整体置信度（等权平均）"，但该结果只经 `ProfileService.overall_confidence` 暴露，生产路径**没有调用方**；工作台面板的取值仍由 `zhiyin-api/zhiyin_api/dto/mappers.py::workspace_page_view` 内联计算：`overall_confidence = Σ(全部字段 confidence) / 字段数`、`coverage = 字段数 / (字段数 + 缺口数)` |
+| 影响 | 决策 5 的口径（关键字段覆盖 80% + 置信度 ≥ 0.7；缺口 < 0.6）在产品上看不到效果；同一口径在两处实现，会随任一侧修改而漂移；业务规则写在 API 层，与"Mapper 只做形状映射、API 层不写业务判断"的分层要求相悖 |
+| 归属 | 业务侧提供算法（已完成）+ 接口侧收敛取值路径；`mappers.py` 是 `AGENTS.md` §11.2 的共享写点，`WorkspaceView` / `ProfileService` 是冻结契约，需先协调再改 |
+| 退出判据 | 工作台面板的覆盖率与整体置信度由业务层按 `policy_params.profile_collection` 计算并透传，`mappers.py` 只做映射；两处公式收敛为一处；口径措辞（决策记录写"加权平均"、实现为"等权平均"）需拍板并在 `policy_params` 里给出权重或改正文 |
+| 代码标记 | `zhiyin-business/zhiyin_business/policies/profile.py` |
 
 ---
 

@@ -80,14 +80,25 @@ def build_services(container: "Container") -> None:
         DefaultWorkspaceService,
     )
 
+    if (
+        container.profiles is not None
+        and container.registry is not None
+        and container.event_bus_primitive is not None
+    ):
+        container.profile_service = DefaultProfileService(
+            container.profiles,
+            container.registry,
+            container.event_bus_primitive,
+        )
+
+    if container.behaviors is not None and container.event_bus_primitive is not None:
+        container.behavior_service = DefaultBehaviorService(
+            container.behaviors,
+            container.event_bus_primitive,
+        )
+
     if container.agent_engine is None or container.sessions is None:
         return
-    container.profile_service = DefaultProfileService(
-        container.profiles, container.event_bus_primitive
-    )
-    container.behavior_service = DefaultBehaviorService(
-        container.behaviors, container.event_bus_primitive
-    )
     container.memory_service = DefaultConversationMemoryService(container.memories)
     container.asset_service = DefaultAssetService(
         container.assets,
