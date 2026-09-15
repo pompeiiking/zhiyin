@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -15,8 +16,16 @@ BLOCKED_SUFFIXES = frozenset({".log", ".pid"})
 BLOCKED_PARTS = frozenset({".git", ".cache", ".pytest_cache", "output", "__pycache__"})
 
 
+def run_process(args: Sequence[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+    """Run a Git command across the managed Windows and CI runtimes."""
+    if os.name == "nt":
+        command = subprocess.list2cmdline(list(args)).replace("^", "^^")
+        return subprocess.run(command, shell=True, **kwargs)
+    return subprocess.run(list(args), **kwargs)
+
+
 def run_git(source: Path, args: Sequence[str]) -> str:
-    result = subprocess.run(
+    result = run_process(
         ["git", "-c", f"safe.directory={source.as_posix()}", "-C", str(source), *args],
         check=True,
         capture_output=True,
@@ -48,7 +57,7 @@ def import_snapshot(source: Path, destination: Path, revision: str) -> dict[str,
         temp = Path(temp_name)
         archive = temp / "wanwu.zip"
         extracted = temp / "source"
-        subprocess.run(
+        run_process(
             ["git", "-c", f"safe.directory={source.as_posix()}", "-C", str(source), "archive", "--format=zip", f"--output={archive}", revision],
             check=True,
         )

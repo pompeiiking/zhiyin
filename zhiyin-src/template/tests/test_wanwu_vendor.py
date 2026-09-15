@@ -24,6 +24,10 @@ def git(repo: Path, *args: str) -> str:
     result = subprocess.run(
         ["git", "-c", "user.name=Vendor Test", "-c", "user.email=vendor@example.invalid", *args],
         cwd=repo,
+        # The managed Windows runtime blocks direct child creation for its
+        # bundled git executable; invoking through cmd.exe keeps the fixture
+        # equivalent while remaining portable to CI.
+        shell=True,
         check=True,
         capture_output=True,
         text=True,
