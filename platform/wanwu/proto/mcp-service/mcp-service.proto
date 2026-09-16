@@ -1,0 +1,150 @@
+syntax = "proto3";
+
+package mcp_service;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/UnicomAI/wanwu/api/proto/mcp-service";
+
+service MCPService {
+    // --- square mcp ---
+    rpc GetSquareMCP(GetSquareMCPReq) returns (SquareMCPDetail) {}
+    rpc GetSquareMCPList(GetSquareMCPListReq) returns (SquareMCPList) {}
+    
+    // --- custom mcp ---
+    rpc CreateCustomMCP(CreateCustomMCPReq) returns (google.protobuf.Empty) {}
+    rpc GetCustomMCP(GetCustomMCPReq) returns (CustomMCPDetail) {}
+    rpc DeleteCustomMCP(DeleteCustomMCPReq) returns (google.protobuf.Empty) {}
+    rpc GetCustomMCPList(GetCustomMCPListReq) returns (CustomMCPList) {}
+    
+    // --- tool ---
+    rpc GetMCPToolList(GetMCPToolListReq) returns (MCPToolList) {}
+    rpc GetMCPAvatar(GetMCPAvatarReq) returns (MCPAvatar) {}
+}
+
+// --- req ---
+
+message GetSquareMCPReq {
+    string orgId = 1;
+    string userId = 2;
+    string mcpSquareId = 3;
+}
+
+message GetSquareMCPListReq {
+    string orgId = 1;    // (暂无)
+    string userId = 2;   // (暂无)
+    string category = 3; // all | data | create | search | ...
+    string name = 4;
+}
+
+message SquareMCPList {
+    repeated SquareMCPInfo infos = 1;
+}
+
+message CreateCustomMCPReq {
+    string orgId = 1;
+    string userId = 2;
+    string mcpSquareId = 3;
+    string name = 4;
+    string desc = 5;
+    string from = 6;
+    string sseUrl = 7;
+}
+
+message GetCustomMCPReq {
+    string mcpId = 1;
+}
+
+
+message DeleteCustomMCPReq {
+    string mcpId = 1;
+}
+
+message GetCustomMCPListReq {
+    string orgId = 1;
+    string userId = 2;
+    string name = 3;
+}
+
+message CustomMCPList {
+    repeated CustomMCPInfo infos = 1;
+}
+
+message GetMCPToolListReq {
+    string mcpId = 1;  // mcpId优先
+    string sseUrl = 2; // mcpId为空取sseUrl
+}
+
+message MCPToolList {
+    repeated MCPTool tools = 1;
+}
+
+message GetMCPAvatarReq {
+    string avatarPath = 1;
+}
+
+message MCPAvatar {
+    string fileName = 1; // 文件名
+    bytes data = 2;      // 文件二进制数据
+}
+
+// --- mcp ---
+
+message CustomMCPDetail {
+    string mcpId = 1;
+    string sseUrl = 2;
+    SquareMCPInfo info = 3;
+    SquareMCPIntro intro = 4;
+}
+
+message CustomMCPInfo {
+    string mcpId = 1;
+    string sseUrl = 2;
+    SquareMCPInfo info = 3;
+}
+
+message SquareMCPDetail {
+    SquareMCPInfo info = 1;
+    SquareMCPIntro intro = 2;
+    MCPTools tool = 3;
+}
+
+message SquareMCPInfo {
+    string mcpSquareId = 1;
+    string avatarPath = 2;
+    string name = 3;
+    string desc = 4;
+    string from = 5;
+    string category = 6;
+}
+
+message SquareMCPIntro {
+    string summary = 1;  // 使用概述
+    string feature = 2;  // 特性说明
+    string scenario = 3; // 应用场景
+    string manual = 4;   // 使用说明
+    string detail = 5;   // 详情
+}
+
+message MCPTools {
+    string sseUrl = 1;
+    bool hasCustom = 2;
+    repeated MCPTool tools = 3;
+}
+
+message MCPTool {
+    string name = 1;
+    string description = 2;
+    MCPToolInputSchema inputSchema = 3;
+}
+
+message MCPToolInputSchema {
+    string type = 1; // 固定 object
+    map<string, MCPToolInputSchemaValue> properties = 2;
+    repeated string required = 3;
+}
+
+message MCPToolInputSchemaValue {
+    string type = 1;
+    string description = 2;
+}

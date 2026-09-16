@@ -1,0 +1,132 @@
+syntax = "proto3";
+
+package app_service;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "github.com/UnicomAI/wanwu/api/proto/app-service";
+
+service AppService {
+  // --- apiKey ---
+  rpc GenApiKey(GenApiKeyReq) returns (ApiKeyInfo) {}
+  rpc GetApiKeyList(GetApiKeyListReq) returns (ApiKeyInfoList) {}
+  rpc DelApiKey(DelApiKeyReq) returns (google.protobuf.Empty) {}
+  rpc GetApiKeyByKey(GetApiKeyByKeyReq) returns (ApiKeyInfo) {}
+  // --- exploration ---
+  rpc GetExplorationAppList(GetExplorationAppListReq) returns (ExplorationAppList){}
+  rpc ChangeExplorationAppFavorite(ChangeExplorationAppFavoriteReq) returns (google.protobuf.Empty){}
+  rpc RecordAppHistory(RecordAppHistoryReq) returns (google.protobuf.Empty) {}
+  // --- app ---
+  rpc PublishApp(PublishAppReq) returns (google.protobuf.Empty){}
+  rpc GetAppList(GetAppListReq) returns (AppList){}
+  rpc GetAppListByIds(GetAppListByIdsReq) returns (AppList){}
+  rpc DeleteApp(DeleteAppReq) returns (google.protobuf.Empty) {}
+}
+
+message GenApiKeyReq {
+  string appId = 1;
+  string appType = 2;
+  string userId = 3;
+  string orgId = 4;
+}
+
+message GetApiKeyListReq {
+  string appId = 1;
+  string appType = 2;
+  string userId = 3;
+  string orgId = 4;
+}
+
+message ApiKeyInfoList {
+  repeated ApiKeyInfo info = 1;
+  int64 total = 2;
+}
+
+message ApiKeyInfo {
+  string apiId = 1;
+  string apiKey = 2;
+  string userId = 3;
+  string orgId = 4;
+  string appId = 5;
+  string appType = 6;
+  int64 createdAt = 7;
+}
+
+message DelApiKeyReq {
+  string apiId = 1;
+}
+
+message GetApiKeyByKeyReq {
+  string apiKey = 1;
+}
+
+message GetExplorationAppListReq{
+  string name = 1;
+  string appType = 2;
+  string searchType = 3;
+  string userId = 4;
+}
+
+message ExplorationAppList{
+  repeated ExplorationAppInfo infos = 1;
+  int64 total = 2;
+}
+
+message ExplorationAppInfo{
+  string appId = 1;
+  string appType = 2;
+  int64 createdAt = 3;
+  int64 updatedAt = 4;
+  bool isFavorite = 5;
+  string publishType = 6;
+}
+
+message AppInfo{
+  string appId = 1;
+  string appType = 2;
+  int64 createdAt = 3;
+  string publishType = 4;
+}
+
+message ChangeExplorationAppFavoriteReq{
+  string appId = 1;
+  string appType = 2;
+  bool isFavorite = 3;
+  string userId = 4;
+  string orgId = 5;
+}
+
+message RecordAppHistoryReq {
+  string userId = 1;
+  string appId = 2;
+  string appType = 3;
+}
+
+message PublishAppReq{
+  string appId = 1;
+  string appType = 2;
+  string publishType = 3;
+  string userId = 4;
+  string orgId = 5;
+}
+
+message GetAppListReq {
+  string appType = 1;
+  string userId = 2;
+  string orgId = 3;
+}
+
+message GetAppListByIdsReq {
+  repeated string appIdsList = 1;
+}
+
+message AppList {
+  repeated AppInfo infos = 1;
+  int64 total = 2;
+}
+
+message DeleteAppReq {
+  string appId = 1 ;
+  string appType = 2;
+}
+

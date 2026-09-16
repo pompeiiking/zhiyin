@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package common;
+
+option go_package = "github.com/UnicomAI/wanwu/api/proto/common";
+
+message AppBrief {
+    string orgId = 1;
+    string userId = 2;
+    string appId = 3;
+    string appType = 4; // 应用类型 agent,rag,workflow
+    string avatarPath = 5; // 图标minio object path
+    string name = 6;
+    string desc = 7;
+    int64 createdAt = 8; // 创建时间，毫秒时间戳
+    int64 updatedAt = 9; // 更新时间，毫秒时间戳
+}
+
+message AppBriefConfig {
+    string name = 1;
+    string desc = 2;
+    string avatarPath = 3;
+}
+
+message AppModelConfig {
+    string provider = 1;
+    string model = 2;
+    string modelId = 3;
+    string modelType = 4;
+    string config = 5;
+}

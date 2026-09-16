@@ -1,0 +1,387 @@
+syntax = "proto3";
+
+package iam_service;
+
+import "google/protobuf/empty.proto";
+import "proto/err-code/err-status.proto";
+
+option go_package = "github.com/UnicomAI/wanwu/api/proto/iam-service";
+
+service IAMService {
+
+  // --- user ---
+
+  // 获取用户列表（用于下拉选择，不在组织中的用户）
+  rpc GetUserSelectNotInOrg(GetUserSelectNotInOrgReq) returns (Select) {}
+  // 获取用户列表 by userIDs
+  rpc GetUserSelectByUserIDs(GetUserSelectByUserIDsReq) returns (Select) {}
+  // 获取用户列表
+  rpc GetUserList(GetUserListReq) returns (GetUserListResp) {}
+  // 获取用户
+  rpc GetUserInfo(GetUserInfoReq) returns (UserInfo) {}
+  // 创建用户
+  rpc CreateUser(CreateUserReq) returns (IDName) {}
+  // 编辑用户
+  rpc UpdateUser(UpdateUserReq) returns (google.protobuf.Empty) {}
+  // 删除用户
+  rpc DeleteUser(DeleteUserReq) returns (google.protobuf.Empty) {}
+  // 修改用户状态
+  rpc ChangeUserStatus(ChangeUserStatusReq) returns (google.protobuf.Empty) {}
+  // 更新用户密码
+  rpc UpdateUserPassword(UpdateUserPasswordReq) returns (google.protobuf.Empty) {}
+  // 重置用户密码
+  rpc ResetUserPassword(ResetUserPasswordReq) returns (google.protobuf.Empty) {}
+  // 获取用户权限
+  rpc GetUserPermission(GetUserPermissionReq) returns (UserPermission) {}
+  // 修改用户语言
+  rpc ChangeUserLanguage(ChangeUserLanguageReq) returns (google.protobuf.Empty){}
+
+  // --- org ---
+
+  // 获取组织列表（用于下拉选择）
+  rpc GetOrgSelect(GetOrgSelectReq) returns (Select) {}
+  // 获取组织列表
+  rpc GetOrgList(GetOrgListReq) returns (GetOrgListResp) {}
+  // 获取组织
+  rpc GetOrgInfo(GetOrgInfoReq) returns (OrgInfo) {}
+  // 创建组织
+  rpc CreateOrg(CreateOrgReq) returns (IDName) {}
+  // 编辑组织
+  rpc UpdateOrg(UpdateOrgReq) returns (google.protobuf.Empty) {}
+  // 删除组织
+  rpc DeleteOrg(DeleteOrgReq) returns (google.protobuf.Empty) {}
+  // 修改组织状态
+  rpc ChangeOrgStatus(ChangeOrgStatusReq) returns (google.protobuf.Empty) {}
+
+  // 增加组织用户
+  rpc AddOrgUser(AddOrgUserReq) returns (google.protobuf.Empty) {}
+  // 移除组织用户
+  rpc RemoveOrgUser(RemoveOrgUserReq) returns (google.protobuf.Empty) {}
+
+  // --- role ---
+
+  // 获取角色列表（用于下拉选择）
+  rpc GetRoleSelect(GetRoleSelectReq) returns (GetRoleSelectResp) {}
+  // 获取角色列表
+  rpc GetRoleList(GetRoleListReq) returns (GetRoleListResp) {}
+  // 获取角色
+  rpc GetRoleInfo(GetRoleInfoReq) returns (RoleInfo) {}
+  // 创建角色
+  rpc CreateRole(CreateRoleReq) returns (RoleIDName) {}
+  // 编辑角色
+  rpc UpdateRole(UpdateRoleReq) returns (google.protobuf.Empty) {}
+  // 删除角色
+  rpc DeleteRole(DeleteRoleReq) returns (google.protobuf.Empty) {}
+  // 修改角色状态
+  rpc ChangeRoleStatus(ChangeRoleStatusReq) returns (google.protobuf.Empty) {}
+
+  // --- login ---
+  
+  // 获取验证码
+  rpc GetCaptcha(GetCaptchaReq) returns (GetCaptchaResp) {}
+  // 登录
+  rpc Login(LoginReq) returns (LoginResp) {}
+  
+}
+
+message Perm {
+  string perm = 1;
+}
+
+message IDName {
+  string id = 1;
+  string name = 2;
+  err_code.Status nameStatus = 3;
+}
+
+message Select {
+  repeated IDName selects = 1;
+}
+
+// --- user ---
+
+message UserInfo {
+  string userId = 1;
+  bool status = 2;
+  string userName = 3;
+  string nickName = 4;
+  string gender = 5;
+  string phone = 6;
+  string email = 7;
+  string company = 8;
+  string remark = 9;
+  int64 createdAt = 10;
+  IDName creator = 11;
+  repeated UserOrg orgs = 12;
+  string language = 13;
+}
+
+message UserOrg {
+  IDName org = 1;
+  repeated RoleIDName roles = 2;
+}
+
+message GetUserSelectNotInOrgReq {
+  string orgId = 1;
+  string userName = 2;
+}
+
+message GetUserSelectByUserIDsReq {
+  string orgId = 1;
+  repeated string userIds = 2;
+}
+
+message GetUserListReq {
+  string orgId = 1;
+  string userName = 2;
+  int32 pageNo = 3;
+  int32 pageSize = 4;
+}
+
+message GetUserListResp {
+  repeated UserInfo users = 1;
+  int64 total = 2;
+  int32 pageNo = 3;
+  int32 pageSize = 4;
+}
+
+message GetUserInfoReq {
+  string userId = 1;
+  string orgId = 2;
+}
+
+message CreateUserReq {
+  string creatorId = 1;
+  string orgId = 2;
+  string userName = 3;
+  string nickName = 4;
+  string gender = 5;
+  string phone = 6;
+  string email = 7;
+  string company = 8;
+  string remark = 9;
+  string password = 10;
+  repeated string roleIds = 11;
+}
+
+message UpdateUserReq {
+  string userId = 1;
+  string orgId = 2;
+  string userName = 3;
+  string nickName = 4;
+  string gender = 5;
+  string phone = 6;
+  string email = 7;
+  string company = 8;
+  string remark = 9;
+  repeated string roleIds = 10;
+}
+
+message DeleteUserReq {
+  string userId = 1;
+}
+
+message ChangeUserStatusReq {
+  string userId = 1;
+  bool status = 2;
+}
+
+message UpdateUserPasswordReq {
+  string userId = 1;
+  string oldPassword = 2;
+  string newPassword = 3;
+}
+
+message ResetUserPasswordReq {
+  string userId = 1;
+  string password = 2;
+}
+
+message GetUserPermissionReq {
+  string userId = 1;
+  string orgId = 2;
+}
+
+message UserPermission {
+  bool isAdmin = 1;
+  bool isSystem = 2;
+  IDName org = 3;
+  repeated RoleIDName roles = 4;
+  repeated Perm perms = 5;
+}
+
+message ChangeUserLanguageReq{
+  string userId = 1;
+  string language = 2;
+}
+
+// --- org ---
+
+message OrgInfo {
+  string orgId = 1;
+  string name = 2;
+  string remark = 3;
+  bool status = 4;
+  int64 createdAt = 5;
+  IDName creator = 6;
+}
+
+message GetOrgSelectReq {
+  string userId = 1;
+}
+
+message GetOrgListReq {
+  string parentId = 1;
+  string name = 2;
+  int32 pageNo = 3;
+  int32 pageSize = 4;
+}
+
+message GetOrgListResp {
+  repeated OrgInfo orgs = 1;
+  int64 total = 2;
+  int32 pageNo = 3;
+  int32 pageSize = 4;
+}
+
+message GetOrgInfoReq {
+  string parentId = 1;
+  string orgId = 2;
+}
+
+message CreateOrgReq {
+  string parentId = 1;
+  string creatorId = 2;
+  string name = 3;
+  string remark = 4;
+}
+
+message UpdateOrgReq {
+  string parentId = 1;
+  string orgId = 2;
+  string name = 3;
+  string remark = 4;
+}
+
+message DeleteOrgReq {
+  string parentId = 1;
+  string orgId = 2;
+}
+
+message ChangeOrgStatusReq {
+  string parentId = 1;
+  string orgId = 2;
+  bool status = 3;
+}
+
+message AddOrgUserReq {
+  string parentId = 1;
+  string orgId = 2;
+  string userId = 3;
+  string roleId = 4;
+}
+
+message RemoveOrgUserReq {
+  string parentId = 1;
+  string orgId = 2;
+  string userId = 3;
+}
+
+// --- role ---
+
+message RoleIDName {
+  string id = 1;
+  string name = 2;
+  bool isAdmin = 3;
+  bool isSystem = 4;
+}
+
+message RoleInfo {
+  string roleId = 1;
+  string name = 2;
+  string remark = 3;
+  bool isAdmin = 4;
+  bool isSystem = 5;
+  bool status = 6;
+  int64 createdAt = 7;
+  IDName creator = 8;
+  repeated Perm perms = 9;
+}
+
+message GetRoleSelectReq {
+  string orgId = 1;
+}
+
+message GetRoleSelectResp {
+  repeated RoleIDName roles = 1;
+}
+
+message GetRoleListReq {
+  string orgId = 1;
+  string name = 2;
+  int32 pageNo = 3;
+  int32 pageSize = 4;
+}
+
+message GetRoleListResp {
+  repeated RoleInfo roles = 1;
+  int64 total = 2;
+  int32 pageNo = 3;
+  int32 pageSize = 4;
+}
+
+message GetRoleInfoReq {
+  string orgId = 1;
+  string roleId = 2;
+}
+
+message CreateRoleReq {
+  string creatorId = 1;
+  string orgId = 2;
+  string name = 3;
+  string remark = 4;
+  repeated Perm perms = 5;
+}
+
+message UpdateRoleReq {
+  string orgId = 1;
+  string roleId = 2;
+  string name = 3;
+  string remark = 4;
+  repeated Perm perms = 5;
+}
+
+message DeleteRoleReq {
+  string orgId = 1;
+  string roleId = 2;
+}
+
+message ChangeRoleStatusReq {
+  string orgId = 1;
+  string roleId = 2;
+  bool status = 3;
+}
+
+// --- login ---
+
+message GetCaptchaReq {
+  string key = 1; // 客户端key
+}
+
+message GetCaptchaResp {
+  string key = 1; // 客户端key
+  string b64 = 2; // 验证码png图片base64字符串
+}
+
+message LoginReq {
+  string userName = 1; // 用户名
+  string password = 2; // 密码
+  string key = 3; // 客户端key
+  string code = 4; // 验证码
+  string language = 5; //用户语言
+}
+
+message LoginResp {
+  UserInfo user = 1;
+  UserPermission permission = 2;
+}

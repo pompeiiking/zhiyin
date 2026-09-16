@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package rag_service;
+
+import "google/protobuf/empty.proto";
+import "proto/common/common.proto";
+
+option go_package = "github.com/UnicomAI/wanwu/api/proto/rag-service";
+
+service RagService {
+  // 流式对话
+  rpc ChatRag(ChatRagReq) returns (stream ChatRagResp) {}
+  // 创建 rag
+  rpc CreateRag(CreateRagReq) returns (CreateRagResp) {}
+  // 更新 rag 基本信息
+  rpc UpdateRag(UpdateRagReq) returns (google.protobuf.Empty) {}
+  // 更新 rag 配置信息
+  rpc UpdateRagConfig(UpdateRagConfigReq) returns (google.protobuf.Empty) {}
+  //  删除 rag
+  rpc DeleteRag(RagDeleteReq) returns (google.protobuf.Empty) {}
+  // 获取 rag
+  rpc GetRagDetail(RagDetailReq) returns (RagInfo) {}
+  // 获取 rag 列表
+  rpc ListRag(RagListReq) returns (RagListResp) {}
+  // 根据 ragIds 获取 rag 列表
+  rpc GetRagByIds(GetRagByIdsReq) returns (AppBriefList) {}
+}
+message Identity {
+  string userId = 1;
+  string orgId = 2;
+}
+
+message ChatRagReq {
+  string ragId = 1;
+  string question = 2;
+  Identity identity = 3;
+}
+
+message ChatRagResp {
+  string content = 1;
+}
+
+message UpdateRagReq{
+  string ragId = 1;
+  common.AppBriefConfig appBrief = 2;
+}
+
+message UpdateRagConfigReq{
+  string ragId = 1;
+  common.AppModelConfig modelConfig = 2;                  // 模型
+  common.AppModelConfig rerankConfig = 3;                 // Rerank模型
+  RagKnowledgeBaseConfig knowledgeBaseConfig = 4;         // 知识库
+}
+
+message CreateRagReq {
+  common.AppBriefConfig appBrief = 1;
+  Identity identity = 2;
+}
+
+message CreateRagResp {
+  string ragId = 1;
+}
+
+message RagInfo {
+  string ragId = 1;
+  common.AppBriefConfig briefConfig = 2;
+  common.AppModelConfig modelConfig = 3;                  // 模型
+  common.AppModelConfig rerankConfig = 4;                 // Rerank模型
+  RagKnowledgeBaseConfig knowledgeBaseConfig = 5;         // 知识库
+  Identity identity = 6;
+}
+
+message RagDeleteReq {
+  string ragId = 1;
+}
+
+message RagDetailReq {
+  string ragId = 1;
+}
+
+message RagKnowledgeBaseConfig {
+  string knowledgeBaseId = 1;                     // 知识库id
+  int32 maxHistory = 2;                           // 最长上下文
+  bool maxHistoryEnable = 3;                      // 是否启用最长上下文
+  float threshold = 4;                            // 过滤阈值
+  bool thresholdEnable = 5;                       // 是否启用过滤阈值
+  int32 topK = 6;                                 // topK
+  bool topKEnable = 7;                            // 是否启用topK
+}
+
+message RagListReq {
+  string name = 1;
+  Identity identity = 2;
+}
+
+message RagListResp {
+  repeated common.AppBrief ragInfos = 1;
+  int64 total = 2;
+}
+
+message GetRagByIdsReq{
+  repeated string ragIdList = 1;
+}
+
+message AppBriefList{
+  repeated common.AppBrief ragInfos = 1;
+}

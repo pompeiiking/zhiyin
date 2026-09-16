@@ -1,0 +1,252 @@
+services:
+  nginx:
+    restart: always
+    image: ${WANWU_NGINX_IMAGE}
+    container_name: ${WANWU_NGINX_HOST}
+    networks:
+      - ${WANWU_DOCKER_NETWORK}
+    ports:
+      - 8081:8081
+    volumes:
+      - ./configs/middleware/nginx/conf.d:/etc/nginx/conf.d
+      - ${WANWU_PROJECT_DIR}/nginx/html:/usr/share/nginx/html
+      - ${WANWU_PROJECT_DIR}/nginx/log:/var/log/nginx
+
+  # ------ microservice ------
+  bff-service:
+    restart: always
+    image: ${WANWU_GO_IMAGE}
+    container_name: bff-service
+    networks:
+      - ${WANWU_DOCKER_NETWORK}
+    ports:
+      - 6668:6668
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ./bin/${WANWU_ARCH}/bff-service:/app/bin/bff-service
+      - ./configs/microservice/bff-service/configs:/app/configs/microservice/bff-service/configs
+      - ./configs/microservice/bff-service/static:/app/configs/microservice/bff-service/static
+      - ${WANWU_PROJECT_DIR}/bff-service/cache:/app/cache
+      - ${WANWU_PROJECT_DIR}/bff-service/log:/app/log
+      - ${WANWU_PROJECT_DIR}/bff-service/tmp:/app/tmp
+    environment:
+      CUSTOM_INFO_VERSION: ${WANWU_VERSION}
+      SERVER_EXTERNAL_IP: ${WANWU_EXTERNAL_IP}
+      SERVER_EXTERNAL_PORT: ${WANWU_EXTERNAL_PORT}
+      SERVER_WEB_BASE_URL: ${WANWU_WEB_BASE_URL}
+      SERVER_API_BASE_URL: ${WANWU_API_BASE_URL}
+      MINIO_ENDPOINT: ${WANWU_MINIO_ENDPOINT}
+      MINIO_USER: ${WANWU_MINIO_USER}
+      MINIO_PASSWORD: ${WANWU_MINIO_PASSWORD}
+    working_dir: /app
+    command: ./bin/bff-service
+
+  iam-service:
+    restart: always
+    image: ${WANWU_GO_IMAGE}
+    container_name: iam-service
+    networks:
+      - ${WANWU_DOCKER_NETWORK}
+    ports:
+      - 8888:8888
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ./bin/${WANWU_ARCH}/iam-service:/app/bin/iam-service
+      - ./configs/microservice/iam-service/configs:/app/configs/microservice/iam-service/configs
+      - ${WANWU_PROJECT_DIR}/iam-service/log:/app/log
+    environment:
+      DB_NAME: ${WANWU_DB_NAME}
+      DB_MYSQL_ADDRESS: ${WANWU_MYSQL_ADDRESS}
+      DB_MYSQL_PASSWORD: ${WANWU_MYSQL_PASSWORD}
+      REDIS_HOST: ${WANWU_REDIS_HOST}
+      REDIS_PORT: ${WANWU_REDIS_PORT}
+      REDIS_PASSWORD: ${WANWU_REDIS_PASSWORD}
+    working_dir: /app
+    command: ./bin/iam-service
+
+  app-service:
+    restart: always
+    image: ${WANWU_GO_IMAGE}
+    container_name: app-service
+    networks:
+      - ${WANWU_DOCKER_NETWORK}
+    ports:
+      - 9988:9988
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ./bin/${WANWU_ARCH}/app-service:/app/bin/app-service
+      - ./configs/microservice/app-service/configs:/app/configs/microservice/app-service/configs
+      - ${WANWU_PROJECT_DIR}/app-service/log:/app/log
+    environment:
+      DB_NAME: ${WANWU_DB_NAME}
+      DB_MYSQL_ADDRESS: ${WANWU_MYSQL_ADDRESS}
+      DB_MYSQL_PASSWORD: ${WANWU_MYSQL_PASSWORD}
+      REDIS_HOST: ${WANWU_REDIS_HOST}
+      REDIS_PORT: ${WANWU_REDIS_PORT}
+      REDIS_PASSWORD: ${WANWU_REDIS_PASSWORD}
+    working_dir: /app
+    command: ./bin/app-service
+
+  model-service:
+    restart: always
+    image: ${WANWU_GO_IMAGE}
+    container_name: model-service
+    networks:
+      - ${WANWU_DOCKER_NETWORK}
+    ports:
+      - 8989:8989
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ./bin/${WANWU_ARCH}/model-service:/app/bin/model-service
+      - ./configs/microservice/model-service/configs:/app/configs/microservice/model-service/configs
+      - ${WANWU_PROJECT_DIR}/model-service/log:/app/log
+    environment:
+      DB_NAME: ${WANWU_DB_NAME}
+      DB_MYSQL_ADDRESS: ${WANWU_MYSQL_ADDRESS}
+      DB_MYSQL_PASSWORD: ${WANWU_MYSQL_PASSWORD}
+      REDIS_HOST: ${WANWU_REDIS_HOST}
+      REDIS_PORT: ${WANWU_REDIS_PORT}
+      REDIS_PASSWORD: ${WANWU_REDIS_PASSWORD}
+    working_dir: /app
+    command: ./bin/model-service
+  
+  mcp-service:
+    restart: always
+    image: ${WANWU_GO_IMAGE}
+    container_name: mcp-service
+    networks:
+      - ${WANWU_DOCKER_NETWORK}
+    ports:
+      - 9898:9898
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ./bin/${WANWU_ARCH}/mcp-service:/app/bin/mcp-service
+      - ./configs/microservice/mcp-service/configs:/app/configs/microservice/mcp-service/configs
+      - ${WANWU_PROJECT_DIR}/mcp-service/log:/app/log
+    environment:
+      DB_NAME: ${WANWU_DB_NAME}
+      DB_MYSQL_ADDRESS: ${WANWU_MYSQL_ADDRESS}
+      DB_MYSQL_PASSWORD: ${WANWU_MYSQL_PASSWORD}
+      REDIS_HOST: ${WANWU_REDIS_HOST}
+      REDIS_PORT: ${WANWU_REDIS_PORT}
+      REDIS_PASSWORD: ${WANWU_REDIS_PASSWORD}
+    working_dir: /app
+    command: ./bin/mcp-service
+
+  rag-service:
+    restart: always
+    image: ${WANWU_GO_IMAGE}
+    container_name: rag-service
+    networks:
+      - ${WANWU_DOCKER_NETWORK}
+    ports:
+      - 9640:9640
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ./bin/${WANWU_ARCH}/rag-service:/app/bin/rag-service
+      - ./configs/microservice/rag-service/configs:/app/configs/microservice/rag-service/configs
+      - ${WANWU_PROJECT_DIR}/rag-service/log:/app/log
+    environment:
+      DB_NAME: ${WANWU_DB_NAME}
+      DB_MYSQL_ADDRESS: ${WANWU_MYSQL_ADDRESS}
+      DB_MYSQL_PASSWORD: ${WANWU_MYSQL_PASSWORD}
+      REDIS_HOST: ${WANWU_REDIS_HOST}
+      REDIS_PORT: ${WANWU_REDIS_PORT}
+      REDIS_PASSWORD: ${WANWU_REDIS_PASSWORD}
+    working_dir: /app
+    command: ./bin/rag-service
+
+  knowledge-service:
+    restart: always
+    image: ${WANWU_GO_IMAGE}
+    container_name: knowledge-service
+    networks:
+      - ${WANWU_DOCKER_NETWORK}
+    ports:
+      - 8889:8889
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ./bin/${WANWU_ARCH}/knowledge-service:/app/bin/knowledge-service
+      - ./configs/microservice/knowledge-service/configs:/app/configs/microservice/knowledge-service/configs
+      - ${WANWU_PROJECT_DIR}/knowledge-service/log:/app/log
+      - ${WANWU_PROJECT_DIR}/knowledge-service/static:/app/static
+    environment:
+      DB_NAME: ${WANWU_DB_NAME}
+      DB_MYSQL_ADDRESS: ${WANWU_MYSQL_ADDRESS}
+      DB_MYSQL_PASSWORD: ${WANWU_MYSQL_PASSWORD}
+      KAFKA_ADDR: ${WANWU_KAFKA_ADDRESS}
+      KAFKA_USER: ${WANWU_KAFKA_USER}
+      KAFKA_PASSWORD: ${WANWU_KAFKA_PASSWORD}
+      MINIO_ENDPOINT: ${WANWU_MINIO_ENDPOINT}
+      MINIO_USER: ${WANWU_MINIO_USER}
+      MINIO_PASSWORD: ${WANWU_MINIO_PASSWORD}
+    working_dir: /app
+    command: ./bin/knowledge-service
+
+  assistant-service:
+    restart: always
+    image: ${WANWU_GO_IMAGE}
+    container_name: assistant-service
+    networks:
+      - ${WANWU_DOCKER_NETWORK}
+    ports:
+      - 8890:8890
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - ./bin/${WANWU_ARCH}/assistant-service:/app/bin/assistant-service
+      - ./configs/microservice/assistant-service/configs:/app/configs/microservice/assistant-service/configs
+      - ${WANWU_PROJECT_DIR}/assistant-service/log:/app/log
+    environment:
+      DB_NAME: ${WANWU_DB_NAME}
+      DB_MYSQL_ADDRESS: ${WANWU_MYSQL_ADDRESS}
+      DB_MYSQL_PASSWORD: ${WANWU_MYSQL_PASSWORD}
+      REDIS_HOST: ${WANWU_REDIS_HOST}
+      REDIS_PORT: ${WANWU_REDIS_PORT}
+      REDIS_PASSWORD: ${WANWU_REDIS_PASSWORD}
+      MINIO_ENDPOINT: ${WANWU_MINIO_ENDPOINT}
+      MINIO_USER: ${WANWU_MINIO_USER}
+      MINIO_PASSWORD: ${WANWU_MINIO_PASSWORD}
+      ES_ADDRESS: ${WANWU_ELASTIC_ADDRESS}
+      ES_USERNAME: ${WANWU_ELASTIC_USER}
+      ES_PASSWORD: ${WANWU_ELASTIC_PASSWORD}
+    working_dir: /app
+    command: ./bin/assistant-service
+
+  # ------ middleware ------
+  kibana:
+    restart: always
+    image: ${WANWU_KIBANA_IMAGE}
+    container_name: ${WANWU_KIBANA_HOST}
+    networks:
+      - ${WANWU_DOCKER_NETWORK}
+    ports:
+      - 5601:5601
+    volumes:
+      - wanwu_es_certs:/usr/share/kibana/config/certs
+      # - wanwu_kibana_data:/usr/share/kibana/data
+    environment:
+      - SERVERNAME=kibana
+      - ELASTICSEARCH_HOSTS=https://es:9200
+      - ELASTICSEARCH_USERNAME=${WANWU_KIBANA_USERNAME}
+      - ELASTICSEARCH_PASSWORD=${WANWU_KIBANA_PASSWORD}
+      - ELASTICSEARCH_SSL_CERTIFICATEAUTHORITIES=config/certs/ca/ca.crt
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+    mem_limit: 4294967296 # 4GB
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s -I http://localhost:5601 | grep -q 'HTTP/1.1 302 Found'",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 99
+      start_period: 10s
+
+networks:
+  wanwu-net:
+    external: true
+
+volumes:
+  wanwu_es_certs:
+  # wanwu_kibana_data:

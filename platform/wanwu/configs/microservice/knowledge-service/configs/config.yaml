@@ -1,0 +1,128 @@
+server:
+  grpc-endpoint: 0.0.0.0:8889
+  max-recv-msg-size: 4194304 # 1024 * 1024 * 4 = 4M
+
+# logger configuration
+log:
+  std: true
+  level: info
+  logs:
+    - enable: true
+      filename: log/knowledge-info.log
+      level: info
+      max_size: 10
+      max_backups: 10
+      max_age: 30
+    - enable: true
+      filename: log/knowledge-err.log
+      level: error
+      max_size: 10
+      max_backups: 10
+      max_age: 30
+access-log:
+  std: true
+  level: info
+  logs:
+    - enable: true
+      filename: log/knowledge-access.log
+      level: info
+      max_size: 10
+      max_backups: 10
+      max_age: 30
+rpc-log:
+  std: true
+  level: info
+  logs:
+    - enable: true
+      filename: log/knowledge-rpc.log
+      level: info
+      max_size: 10
+      max_backups: 10
+      max_age: 30
+
+db:
+  name: mysql # mysql | postgres | tidb | oceanbase
+  mysql:
+    address: localhost:3306
+    user: root
+    password: Wanwu123456
+    database: knowledge_service
+    max_open_conns: 16
+    max_idle_conns: 16
+    log_mode: false
+  postgres:
+    address: localhost:5432
+    user: postgres
+    password: Wanwu123456
+    database: knowledge_service
+    max_open_conns: 16
+    max_idle_conns: 16
+    log_mode: false
+  tidb:
+    address: localhost:4000
+    user: root
+    password: Wanwu123456
+    database: knowledge_service
+    max_open_conns: 16
+    max_idle_conns: 16
+    log_mode: false
+  oceanbase:
+    address: localhost:2881
+    user: root@wanwu
+    password: Wanwu123456
+    database: knowledge_service
+
+minio:
+  endpoint: localhost:9000
+  user: root
+  password: Wanwu123456
+  bucket: rag-doc
+  public-rag-bucket: rag-public
+  knowledge-dir: /knowledge
+
+kafka:
+  addr: kafka-wanwu:9092
+  user: "admin"
+  password:
+  topic: "doc-rag"
+  url-analysis-topic: "url-batch-a-prod"
+  url-import-topic: "url-batch-i-prod"
+  default-partition-num: 3
+
+rag-server:
+  endpoint: 'http://rag-wanwu:8681'
+  url-analysis-endpoint: 'http://rag-wanwu:8613'
+  url-import-endpoint: 'http://rag-wanwu:8613'
+  init-knowledge-uri: '/rag/init-knowledge-base'
+  update-knowledge-uri: '/rag/update-kb-name'
+  delete-knowledge-uri: '/rag/del-knowledge-base'
+  get-doc-segment-uri: '/rag/get-content-list'
+  doc-segment-update-status-uri: '/rag/update-content-status'
+  doc-delete-uri: '/rag/del-knowledge-file'
+  doc-url-analysis-uri: '/url_pra'
+  doc-url-import-uri: '/url_insert'
+  timeout: 60
+
+usage-limit:
+  category-depth: 3
+  doc-total: -1
+  punc-types: "？@#@！@#@。@#@?@#@......@#@!@#@."
+  file-types: ".docx;.txt;.pdf;.xlsx;.csv;.pptx;.html;.doc;.xls"
+  compressed-file-type: ".zip;.tar.gz"
+  max-number-of-files-in-compressed: -1
+  max-file-size: 209715200
+  txt-size-limit: 209715200
+  docx-size-limit: 209715200
+  pdf-size-limit: 209715200
+  excel-size-limit: 209715200
+  csv-size-limit: 209715200
+  pptx-size-limit: 209715200
+  html-size-limit: 209715200
+  compressed-size-limit: 209715200
+  # 文件大小限制30MB
+  file-size-limit: 30
+  #上传接口并发限制
+  upload-concurrent-limit: 100
+
+knowledge-doc-config:
+  doc-local-file-path: static/temp
