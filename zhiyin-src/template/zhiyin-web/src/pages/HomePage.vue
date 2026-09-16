@@ -8,7 +8,6 @@ import { ApiError, ErrorCode } from '@/api/client'
 import { useGuestGuard } from '@/composables'
 import TaskCardGroup from '@/components/home/TaskCardGroup.vue'
 import TrustSection from '@/components/home/TrustSection.vue'
-import ShowcaseStage from '@/components/home/ShowcaseStage.vue'
 
 const session = useSessionStore()
 const conversation = useConversationStore()
@@ -123,7 +122,6 @@ async function selectTask(code: string) {
 
     <div class="container">
       <TrustSection class="reveal" />
-      <ShowcaseStage />
       <TaskCardGroup class="reveal" :busy="busy" :selected="selected" @select="selectTask" />
       <p v-if="message" class="task-message" role="status">{{ message }}</p>
 
