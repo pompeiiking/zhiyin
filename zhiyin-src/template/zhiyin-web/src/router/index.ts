@@ -36,7 +36,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/conv',
     name: 'conversation',
     component: () => import('@/pages/ConversationPage.vue'),
-    meta: { anchor: PAGE_ANCHORS.conversation, requireLogin: true },
+    meta: { anchor: PAGE_ANCHORS.conversation, requireLogin: false },
   },
   {
     path: '/wb',

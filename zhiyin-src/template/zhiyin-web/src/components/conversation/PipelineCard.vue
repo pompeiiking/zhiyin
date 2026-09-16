@@ -2,9 +2,9 @@
 import { computed, ref } from 'vue'
 import type { PipelineCardView } from '@/api/schema'
 
-const props = defineProps<{ card: PipelineCardView; index: number }>()
+const props = defineProps<{ card: PipelineCardView; index: number; leadName?: string }>()
 
-type Mode = 'output' | 'theory' | 'eval'
+type Mode = 'output' | 'theory' | 'eval' | 'handoff'
 const open = ref<Mode | null>(null)
 
 function toggle(mode: Mode) {
@@ -44,6 +44,17 @@ function hint(index: number) {
         <small>{{ statusText }}</small>
       </div>
     </header>
+
+    <div class="lead-row">
+      <span>当前主理</span>
+      <strong>{{ leadName || '待分配' }}</strong>
+    </div>
+    <div class="mode handoff">
+      <button type="button" class="mode-head" :aria-expanded="open === 'handoff'" @click="toggle('handoff')">
+        交接记录 <span aria-hidden="true">{{ open === 'handoff' ? '−' : '＋' }}</span>
+      </button>
+      <p v-if="open === 'handoff'" class="handoff-empty">当前暂无交接记录</p>
+    </div>
 
     <p v-if="isEmpty" class="empty-note">待进入 · 这一步会{{ hint(index) }}</p>
 
@@ -98,6 +109,11 @@ function hint(index: number) {
 .pipeline-card.active {
   border-color: var(--color-brand);
   box-shadow: inset 3px 0 var(--color-brand), var(--shadow-card);
+  animation: active-breathe 3s ease-in-out infinite;
+}
+
+@keyframes active-breathe {
+  50% { box-shadow: inset 3px 0 var(--color-brand), 0 0 0 3px var(--color-brand-soft); }
 }
 
 .pipeline-card.done .number {
@@ -130,6 +146,28 @@ function hint(index: number) {
 .card-title small {
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
+}
+
+.lead-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.lead-row strong { color: var(--color-role); }
+
+.handoff-empty {
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pipeline-card.active { animation: none; }
 }
 
 .empty-note {

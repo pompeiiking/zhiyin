@@ -24,8 +24,6 @@
     { "code": "achievement_unlock", "channel": "backend", "note": "成就解锁由行为事件派生" },
     { "code": "auth_login_success", "channel": "backend", "note": "登录成功由鉴权派生" },
     { "code": "auth_guest_merge", "channel": "backend", "note": "游客合并由身份服务派生" },
-    { "code": "home_showcase_switch", "channel": "frontend", "note": "首页展示台标签切换，纯前端事件" },
-    { "code": "home_showcase_open", "channel": "frontend", "note": "打开示例报告（先看示例报告 CTA），纯前端事件" },
     { "code": "home_reserve_click", "channel": "frontend", "note": "未开放任务预约提醒点击，纯前端事件" }
   ]
 }

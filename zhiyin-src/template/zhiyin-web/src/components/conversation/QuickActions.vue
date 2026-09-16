@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useSessionStore } from '@/stores/session'
-defineProps<{ disabled?: boolean }>()
-const emit = defineEmits<{ select: [value: string] }>()
-const session = useSessionStore()
-const actions = computed(() => [
-  ['conv.quick.gap_claim', session.copyBundle['conv.quick.gap_claim']],
-  ['conv.quick.compare', session.copyBundle['conv.quick.compare']],
-  ['conv.quick.review', session.copyBundle['conv.quick.review']],
-].filter((item): item is [string, string] => Boolean(item[1])))
+// 对话页 · 快捷行为组（§4.2，中栏底部）。
+//
+// 与 BehaviorGuide 的分工：BehaviorGuide 承载后端下发的"本轮必做的下一步"
+// （四选一，必须渲染出可点元素）；QuickActions 是**用户主动可选**的常用动作
+// （认领差距 / 比较方案 / 勾任务 / 我要复盘），不替代行为引导。
+//
+// 口径：动作项不硬编码中文，取自 bootstrap.copyBundle 的 key；
+// 触发后走 conversation store 的相应 action，并落对应埋点。
+// TODO(骨架): 渲染动作按钮并绑定 store action
 </script>
-<template><div v-if="actions.length" class="quick-actions" aria-label="常用操作"><button v-for="item in actions" :key="item[0]" :disabled="disabled" @click="emit('select', item[1])">{{ item[1] }}</button></div></template>
-<style scoped>.quick-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }button { min-height: 40px; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-pill); background: var(--color-surface); color: var(--color-text-secondary); }</style>
+
+<template>
+  <div class="quick-actions">
+    <!-- TODO(骨架): 常用动作按钮组 -->
+  </div>
+</template>

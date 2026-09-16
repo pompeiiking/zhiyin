@@ -3,12 +3,11 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useConversationStore } from '@/stores/conversation'
-import { enterTask, trackEvent } from '@/api/endpoints'
+import { enterTask } from '@/api/endpoints'
 import { ApiError, ErrorCode } from '@/api/client'
 import { useGuestGuard } from '@/composables'
 import TaskCardGroup from '@/components/home/TaskCardGroup.vue'
 import TrustSection from '@/components/home/TrustSection.vue'
-import ShowcaseStage from '@/components/home/ShowcaseStage.vue'
 
 const session = useSessionStore()
 const conversation = useConversationStore()
@@ -49,9 +48,6 @@ onMounted(() => {
   els.forEach(el => revealObserver?.observe(el))
 })
 onUnmounted(() => revealObserver?.disconnect())
-function openShowcase() {
-  void trackEvent('home_showcase_open', {}).catch(() => {})
-}
 
 async function selectTask(code: string) {
   if (busy.value) return
@@ -63,7 +59,7 @@ async function selectTask(code: string) {
     message.value = `已选择「${entry.label}」。当前为只读界面演示，连接服务后才能开始对话。`
     return
   }
-  if (!session.isLoggedIn) {
+  if (!session.isLoggedIn && entry.target_stage != null) {
     session.pendingTaskCode = code
     session.openLogin('已保留你选择的任务，登录后继续。')
     return
@@ -104,7 +100,6 @@ async function selectTask(code: string) {
         <div class="hero-actions">
           <button v-if="freeChat" class="primary-action" :disabled="busy" @click="selectTask(freeChat.code)">开始对话 <span aria-hidden="true">→</span></button>
           <a v-else class="primary-action" href="#task-entries">开始对话 <span aria-hidden="true">→</span></a>
-          <a class="secondary-action" href="#showcase" @click="openShowcase">先看示例报告</a>
         </div>
         <p class="hero-note"><span aria-hidden="true">○</span> 不替你做决定，陪你找到依据。</p>
       </div>
@@ -126,7 +121,6 @@ async function selectTask(code: string) {
 
     <div class="container">
       <TrustSection class="reveal" />
-      <ShowcaseStage class="reveal" />
       <TaskCardGroup class="reveal" :busy="busy" :selected="selected" @select="selectTask" />
       <p v-if="message" class="task-message" role="status">{{ message }}</p>
 
@@ -138,7 +132,7 @@ async function selectTask(code: string) {
           <div class="identity-card" :class="{ current: isGuest }">
             <strong>游客</strong>
             <p>先不登录，直接体验一次对话</p>
-            <button type="button" class="identity-action" @click="session.openLogin()">立即体验</button>
+            <button type="button" class="identity-action" @click="freeChat ? selectTask(freeChat.code) : session.openLogin()">立即体验</button>
           </div>
           <div class="identity-card" :class="{ current: !isGuest }">
             <strong>学生</strong>
@@ -284,22 +278,6 @@ h1 {
 
 .primary-action:hover:not(:disabled) {
   background: var(--color-brand);
-}
-
-.secondary-action {
-  display: inline-flex;
-  align-items: center;
-  min-height: 48px;
-  padding: var(--space-3) var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--color-link);
-  text-decoration: none;
-}
-
-.secondary-action:hover {
-  border-color: var(--color-brand-border);
 }
 
 .hero-note {
@@ -518,12 +496,8 @@ h1 {
   color: var(--color-text-primary);
 }
 
-/* 微交互三态（§2.5）：主/次 CTA 按下反馈 */
+/* 微交互（§2.5）：主 CTA 按下反馈 */
 .primary-action:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.secondary-action:active {
   transform: scale(0.98);
 }
 

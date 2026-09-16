@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-const props = defineProps<{ guide: Record<string, unknown> | null; disabled?: boolean }>()
-const emit = defineEmits<{ act: [value: string] }>()
-const done = ref(false)
-const kind = computed(() => String(props.guide?.kind ?? ''))
-const options = computed(() => (props.guide?.options as Record<string, unknown>[] | undefined) ?? [])
-const task = computed(() => (props.guide?.task as Record<string, unknown> | undefined))
-const reminder = computed(() => (props.guide?.reminder as Record<string, unknown> | undefined))
+// 行为引导（全局约束③，最重要的一件）。
+//
+// 任何一轮回复的结尾必须是四选一，且页面上必须存在对应的可点元素：
+//   question  一个追问         → 输入框聚焦 + 提示语
+//   options   一组选项         → 渲染为可点选项
+//   task      一个小任务       → 渲染为可勾选任务
+//   reminder  一条提醒         → 渲染为提醒条
+//
+// 禁止空转寒暄与无下一步的总结。对应后端 BehaviorGuide。
+//
+// 埋点：认领差距 gap_claim / 比较方案 decision_compare / 做出选择 decision_select /
+//       修改选择 decision_reselect / 勾掉任务 action_task_done
+// TODO(骨架): 按 guide.kind 渲染四种形态并绑定动作
 </script>
+
 <template>
-  <section v-if="guide?.text" class="behavior-guide" aria-label="下一步"><p class="label">下一步</p><p class="prompt">{{ String(guide.text) }}</p>
-    <button v-if="kind === 'question'" type="button" :disabled="disabled" @click="emit('act', String(guide.question ?? guide.text))">回答这个问题 <span aria-hidden="true">→</span></button>
-    <div v-else-if="kind === 'options'" class="options"><button v-for="(option, index) in options" :key="String(option.option_id ?? index)" :disabled="disabled" @click="emit('act', String(option.value ?? option.label ?? ''))">{{ String(option.label ?? option.value ?? '') }}</button></div>
-    <label v-else-if="kind === 'task' && task" class="task"><input v-model="done" type="checkbox" :disabled="disabled" @change="done && emit('act', String(task.text ?? guide.text))" /><span>{{ String(task.text ?? guide.text) }}</span></label>
-    <button v-else-if="kind === 'reminder'" type="button" :disabled="disabled" @click="emit('act', String(reminder?.title ?? guide.text))">{{ String(reminder?.title ?? '知道了') }}</button>
-  </section>
+  <div class="behavior-guide">
+    <!-- TODO(骨架): 按 kind 切换四种形态 -->
+  </div>
 </template>
-<style scoped>
-.behavior-guide { padding: var(--space-4); border: 1px solid var(--color-brand-border); border-radius: var(--radius-lg); background: var(--color-brand-soft); }.label { margin: 0; font-size: var(--font-size-xs); color: var(--color-link); font-weight: var(--font-weight-semibold); }.prompt { margin: var(--space-2) 0 var(--space-4); font-weight: var(--font-weight-semibold); }.options { display: flex; flex-wrap: wrap; gap: var(--space-2); }button, .task { min-height: 44px; display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); border: 1px solid var(--color-brand-border); border-radius: var(--radius-pill); background: var(--color-surface); color: var(--color-link); cursor: pointer; }.task input { width: 18px; height: 18px; }
-</style>

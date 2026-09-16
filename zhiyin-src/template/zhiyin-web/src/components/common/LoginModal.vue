@@ -42,7 +42,7 @@ async function refreshIdentity() {
     <div class="modal-body">
       <button class="close" type="button" aria-label="关闭登录弹窗" @click="close">×</button>
       <div class="modal-mark" aria-hidden="true">引</div>
-      <p class="eyebrow">WELCOME TO ZHIYIN</p>
+      <p class="eyebrow">继续职业探索</p>
       <h2 id="login-title">让每一次探索，都有迹可循</h2>
       <p id="login-reason" class="description">{{ session.loginReason }}</p>
       <div class="service-note">当前为第一期界面预览，短信与登录服务尚未接入。请勿输入真实手机号。</div>

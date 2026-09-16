@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import TopBar from '@/components/common/TopBar.vue'
+import LoginModal from '@/components/common/LoginModal.vue'
 </script>
 
 <template>
@@ -8,6 +9,7 @@ import TopBar from '@/components/common/TopBar.vue'
     <main class="app-main">
       <slot />
     </main>
+    <LoginModal />
   </div>
 </template>
 
