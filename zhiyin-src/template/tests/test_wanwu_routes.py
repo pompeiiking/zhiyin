@@ -22,13 +22,13 @@ NGINX = (
 )
 COMPOSE_OVERRIDE = REPO_ROOT / "deploy" / "compose.yaml"
 INTERFACE_DOC = (
-    REPO_ROOT / "docs" / "技术架构文档" / "外部平台" / "pami-Wanwu" / "接口.md"
+    REPO_ROOT / "docs" / "技术架构文档" / "pami" / "pami-Wanwu" / "接口.md"
 )
 ROUTING_DOC = (
     REPO_ROOT
     / "docs"
     / "技术架构文档"
-    / "外部平台"
+    / "pami"
     / "pami-Wanwu"
     / "架构文档"
     / "08-接口与通信架构.md"
