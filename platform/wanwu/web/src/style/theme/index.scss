@@ -1,0 +1,14 @@
+// 红色主题
+// @import './vars_red.scss';
+
+// 蓝色主题
+@import './vars_blue.scss';
+
+// 公共变量
+@import './common.scss';
+
+// element-ui样式覆盖
+@import './element_cover.scss';
+
+// 组件样式
+@import './module.scss';

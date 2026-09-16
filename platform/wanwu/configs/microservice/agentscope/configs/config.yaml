@@ -1,0 +1,51 @@
+db:
+  name:
+
+database:
+  dialect: mysql
+  driver: pymysql
+  username: root
+  password:
+  host: 172.17.0.1
+  port: 5000
+  database: agentscope
+
+tidb:
+  dialect: mysql
+  driver: pymysql
+  username: root
+  password:
+  host: 172.17.0.1
+  port: 5000
+  database: agentscope
+
+oceanbase:
+  dialect: mysql
+  driver: pymysql
+  username: root
+  password:
+  host: 172.17.0.1
+  port: 5000
+  database: agentscope
+
+redis:
+  host: 172.17.0.1
+  port: 6699
+  db: 3
+  password:
+
+service:
+  service_url: http://agentscope-wanwu:6672/plugin/api
+  service_inner_url: 
+  rag_url: http://rag-wanwu:8681/rag/search-knowledge-base
+  llm_url: http://bff-service:6668/openapi/v1/chat/completions
+  llm_token:
+  gui_agent_url: 
+  file_generate_url: http://agent-wanwu:15002/upload
+  file_parse_url: http://agent-wanwu:15003/doc_pra
+  bff_service_endpoint: http://bff-service:6668
+  kong_service: 
+  agentscope_host: agentscope-wanwu
+
+server:
+  server_port: 6672

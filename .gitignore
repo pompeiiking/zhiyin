@@ -19,6 +19,7 @@ ENV/
 
 # ---- 测试与类型检查缓存 ----
 .pytest_cache/
+.pytest-*/
 .mypy_cache/
 .ruff_cache/
 .coverage
@@ -50,6 +51,9 @@ dist-ssr/
 .DS_Store
 Thumbs.db
 
+# ---- Git worktrees ----
+.worktrees/
+
 # ---- 敏感配置 ----
 # 只提交 .env.example；真实密钥、Token、数据库口令一律不入库。
 .env
@@ -57,3 +61,25 @@ Thumbs.db
 !.env.example
 *.pem
 *.key
+
+# ---- Embedded Wanwu runtime state ----
+platform/wanwu/.env
+platform/wanwu/.env.*
+platform/wanwu/.cache/
+platform/wanwu/output/
+platform/wanwu/runtime/
+platform/wanwu/**/*.log
+platform/wanwu/**/*.pid
+deploy/.env
+
+# These upstream files are required by the Wanwu frontend build despite
+# repository-wide generated-file and environment-file ignore rules.
+!platform/wanwu/web/
+!platform/wanwu/web/.env.development
+!platform/wanwu/web/.env.production
+!platform/wanwu/web/build/
+platform/wanwu/web/build/*
+!platform/wanwu/web/build/version-plugin.js
+!platform/wanwu/project/
+platform/wanwu/project/*
+!platform/wanwu/project/blank

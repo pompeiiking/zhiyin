@@ -1,0 +1,166 @@
+syntax = "proto3";
+
+package knowledgebase_doc_service;
+
+import "google/protobuf/empty.proto";
+
+option go_package = "gitlab.ai-yuanjing.cn/ai-platform-private/backend-used-bff/common-api/api/proto/knowledgebase-doc-service";
+
+service KnowledgeBaseDocService {
+  // 获取文档列表
+  rpc GetDocList(GetDocListReq) returns (GetDocListResp) {}
+  // 上传文档
+  rpc ImportDoc(ImportDocReq) returns (google.protobuf.Empty) {}
+  // 更新文档状态
+  rpc UpdateDocStatus(UpdateDocStatusReq) returns (google.protobuf.Empty) {}
+  // 初始化文档状态
+  rpc InitDocStatus(InitDocStatusReq) returns (google.protobuf.Empty) {}
+  // 删除文档
+  rpc DeleteDoc(DeleteDocReq) returns (google.protobuf.Empty) {}
+  // 获取知识库异步上传任务提示
+  rpc GetDocCategoryUploadTip(DocImportTipReq) returns (DocImportTipResp) {}
+  // 获取知识库文档切分结果
+  rpc GetDocSegmentList(DocSegmentListReq) returns (DocSegmentListResp) {}
+  // 更新文档切片状态
+  rpc UpdateDocSegmentStatus(UpdateDocSegmentReq) returns (google.protobuf.Empty) {}
+  // url上传功能-解析url
+  rpc AnalysisDocUrl(AnalysisUrlDocReq) returns (AnalysisUrlDocResp) {}
+}
+
+
+message GetDocListReq{
+  string knowledgeId = 1;
+  string docName = 2;
+  int32 status = 3;
+  int32 pageSize = 4;
+  int32 pageNum = 5;
+  string userId = 6;
+  string orgId = 7;
+}
+
+message GetDocListResp {
+  repeated DocInfo docs = 1;
+  int64 total = 2;
+  int32 pageNum = 3;
+  int32 pageSize = 4;
+}
+
+message ImportDocReq {
+  string userId = 1;
+  string orgId = 2;
+  string knowledgeId = 3; //知识库id
+  int32 docImportType = 4;//文档导入类型，0：文件上传，1：url上传，2.批量url上传
+  repeated DocFileInfo docInfoList = 5; //上传文档列表
+  DocSegment docSegment = 6; //分段信息配置
+  repeated string docAnalyzer = 7;//文档解析类型
+}
+
+message UpdateDocStatusReq {
+  string docId = 1; //文档id
+  int32 status = 2;//文档状态
+}
+
+message InitDocStatusReq {
+  string userId = 1;
+  string orgId = 2;
+}
+
+message DeleteDocReq{
+  repeated string ids = 1;
+  string userId = 2;
+  string orgId = 3;
+}
+
+
+message DocFileInfo {
+  string docName = 1;  //文档名称
+  string docUrl = 2;  //文档url
+  string docType = 3; // 文档类型
+  string docId = 4;//文档id
+  int64 docSize = 5;//文档大小
+}
+
+message DocSegment {
+  string SegmentType = 1;  //分段方式 0：自定分段；1：自定义分段
+  repeated string Splitter = 2;     // 分隔符（只有自定义分段必填）
+  int32 MaxSplitter = 3;   // 可分隔最大值（只有自定义分段必填）
+  float Overlap = 4;       // 可重叠值（只有自定义分段必填）
+}
+
+message DocImportTipReq {
+  string userId = 1;
+  string orgId = 2;
+  string knowledgeId = 3;
+}
+
+message DocImportTipResp{
+  string knowledgeName = 1;
+  string knowledgeId = 2;
+  string message = 3;
+  int32 uploadStatus = 4;
+}
+
+message DocSegmentListResp{
+  string fileName = 1;
+  repeated SegmentContent contentList = 2;
+  int32 pageTotal = 3;
+  int32 segmentTotalNum = 4;
+  int32 maxSegmentSize = 5;
+  string createdAt = 6;
+  string segType = 7;
+  string splitter = 8;
+}
+
+message SegmentContent{
+  string content = 1;
+  int32 len = 2;
+  bool available = 3;
+  string contentId = 4;
+  int32 contentNum = 5;
+}
+
+message DocInfo{
+  string docId = 1;
+  string docName = 2;
+  int64 docSize = 3;
+  string docType = 4; //文档名称
+  string knowledgeId = 5;
+  string uploadTime = 6;
+  int32 status = 7;
+  string errorMsg = 8;
+}
+
+message DocSegmentListReq{
+  string userId = 1;
+  string orgId = 2;
+  string docId = 3;
+  int32 pageSize = 4;
+  int32 pageNo = 5;
+}
+
+message UpdateDocSegmentReq{
+  string userId = 1;
+  string orgId = 2;
+  string docId = 3;
+  string contentId = 4;
+  string contentStatus = 5;
+  bool all = 6;
+}
+
+message AnalysisUrlDocReq{
+  string userId = 1;
+  string orgId = 2;
+  string knowledgeId = 3;
+  repeated string urlList = 4;
+}
+
+message AnalysisUrlDocResp{
+  repeated UrlInfo urlList = 1;
+}
+
+message UrlInfo{
+  string url = 1;
+  string fileName = 2;
+  double fileSize = 3;
+}
+

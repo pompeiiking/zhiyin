@@ -1,0 +1,391 @@
+$fontSize: 12px;
+
+/deep/.el-button--primary {
+    background-color: $btn_bg;
+    border-color: $btn_bg;
+}
+
+/deep/.el-tabs {
+    height: 100%;
+    margin-top: 0;
+    .is-active {
+      color: $btn_bg;
+    }
+    .el-tabs__active-bar {
+      border-color: $btn_bg;
+      background-color: $btn_bg;
+    }
+}
+/deep/.el-radio__input.is-checked .el-radio__inner {
+    border-color: $btn_bg;
+    background: $btn_bg;
+}
+/deep/.el-radio__input.is-checked+.el-radio__label {
+          color: $btn_bg;
+}
+/deep/.edit-api {
+    &:hover {
+        color: $btn_bg !important;
+        border-color: $btn_bg !important;
+    }
+}
+/deep/.start-params-addbt {
+    background: #fff;
+    &:hover {
+        color: $btn_bg !important;
+        border-color: $btn_bg !important;
+    }
+}
+/deep/.edit {
+    &:hover {
+        color: $btn_bg !important;
+        border-color: $btn_bg !important;
+    }
+}
+/deep/.el-icon-plus {
+    &:hover {
+        cursor: pointer;
+    }
+}
+/deep/.el-table .cell {
+    font-size: $fontSize;
+}
+/deep/.el-tabs__item{
+    font-size: $fontSize;
+
+    &:hover {
+        color: #303133;
+    }
+}
+.workflow_popover {
+    border-radius: 10px !important;
+    width: 300px !important;
+    max-height: 90vh;
+    overflow-y: auto;
+    .node-items {
+        border: 0;
+        // & + div {
+        //     border-top: 1px solid #ddd;
+        //     padding: 10px;
+        //     cursor: pointer;
+        //     margin-bottom: 10px;
+        // }
+        .node-items-box {
+            border: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+
+            span {
+                display: flex;
+                align-items: center;
+                font-weight: bold;
+                font-size: 13px;
+
+                img {
+                    width: 20px;
+                    height: 20px;
+                }
+            }
+            div {
+                padding: 5px 0;
+                color:#84868c;
+                font-size: 12px;
+            }
+            &:hover {
+                background:#f9f9fb;
+                cursor: pointer;
+            }
+        }
+    }
+}
+.node-content {
+  .name {
+    margin-right: 10px;
+  }
+}
+.node-content:hover {
+  background: #eee;
+  border-radius: 6px;
+}
+.item.last-item.popover-select.el-popover__reference {
+  -webkit-appearance: none;
+  background-color: #fff;
+  border-radius: 4px;
+  border: 1px solid #dcdfe6;
+  box-sizing: border-box;
+  color: #606266;
+  display: inline-block;
+  height: 28px;
+  line-height: 28px;
+  outline: 0;
+  padding: 0 15px;
+  transition: border-color .2s cubic-bezier(.645,.045,.355,1);
+  cursor: pointer;
+  vertical-align: middle;
+}
+.workflow_popover_scale {
+    border-radius: 10px !important;
+    width: 100px !important;
+    min-width: 100px !important;
+    .node-items {
+        border: 0;
+        // & + div {
+        //     border-top: 1px solid #ddd;
+        //     padding: 10px;
+        //     cursor: pointer;
+        //     margin-bottom: 10px;
+        // }
+        .node-items-box {
+            border: 0;
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+
+            span {
+                display: flex;
+                align-items: center;
+                font-weight: bold;
+                font-size: 13px;
+
+                img {
+                    width: 20px;
+                    height: 20px;
+                }
+            }
+            div {
+                padding: 5px 0;
+                color:#84868c;
+                font-size: 12px;
+            }
+            &:hover {
+                background:#f9f9fb;
+                cursor: pointer;
+            }
+        }
+    }
+    
+}
+/*.el-popper {
+    border: 1px solid #ccc;
+    .popper__arrow {
+        display: none;
+    }
+}*/
+.footer-setting {
+    align-items: center;
+    font-size: 12px;
+}
+.debug-bt {
+    background: transparent !important;
+    color: #333 !important;
+    border: 0 !important;
+    margin-left: 0 !important;
+
+    &:hover {
+        cursor: pointer;
+        color: #333;
+        background: #f7f7f9 !important;
+    }
+    span {
+        font-size: 12px;
+    }
+}
+.add-bt {
+    padding: 7px 10px;
+    background: $btn_bg !important;
+    border-color: $btn_bg !important;
+    span {
+        font-size: 12px;
+    }
+}
+/deep/.el-tabs__item.is-active {
+    color: $btn_bg !important;
+}
+.edit-modal {
+    top: 47px !important;
+    .req-url {
+        .el-input__inner {
+            height: 30px;
+            line-height: 30px;
+        }
+        .el-input__icon {
+            line-height: 30px;
+        }
+    }
+}
+.edit-api-box {
+    top: 47px !important;
+}
+.edit-api,
+.edit,
+.start-params-addbt,
+.run-bt {
+    background-color: transparent !important;
+    color: #606266 !important;
+    border-color: #e8e9eb !important;
+    &:hover {
+        color: $btn_bg !important;
+        border-color: $btn_bg !important;
+    }
+}
+.workflow-list {
+    /deep/.el-input__inner {
+        &:focus {
+            border-color: $btn_bg; 
+        }
+    }
+    .el-checkbox__input.is-checked+.el-checkbox__label{
+        color: $btn_bg;
+    }
+    .el-checkbox__input.is-checked .el-checkbox__inner {
+        background-color: $btn_bg;
+        border-color: $btn_bg;
+    }
+    .el-textarea__inner {
+        &:focus {
+            border-color: $btn_bg; 
+        }
+    }
+    .el-table-filter__list {
+        font-size: 12px;
+    }
+}
+.workflow .el-collapse {
+    border: 0 !important;
+
+    .el-collapse-item__header {
+        display: block !important;
+        background: transparent !important;
+        border: 0 !important;
+        height: auto !important;
+        line-height: normal !important;
+
+        .el-row {
+            margin-left: 4%;
+            width: 95%;
+        }
+    }
+    .el-collapse-item__wrap {
+        background: transparent !important;
+        border: 0 !important;
+    }
+    .el-collapse-item__content {
+        padding-bottom: 0 !important;
+    }
+    .params-type-span {
+    }
+    .el-icon-arrow-right {
+        position: absolute;
+        top: 14px;
+    }
+    .el-icon-arrow-right:before {
+        content: '\e791';
+    }
+    
+}
+.haveReleased {
+    &:hover {
+        background: #f0f9eb !important;
+        color: #67c23a  !important;
+    }
+
+}
+.noReleased {
+    background-color: #fdf6ec;
+    border-color: #faecd8;
+    color: #e6a23c;
+    &:hover {
+        background: #fdf6ec !important;
+        color: #e6a23c  !important;
+    }
+}
+/deep/.el-checkbox__input.is-checked+.el-checkbox__label {
+    color: $btn_bg;
+}
+/deep/.el-checkbox__input.is-checked+.el-checkbox__label {
+    border-color: $btn_bg;
+}
+
+/deep/.x6-graph-toolbar .x6-toolbar-item-remove {
+  background-color: #2468f2; /* 将颜色改为红色 */
+}
+ 
+/deep/.x6-graph-toolbar .x6-toolbar-item-remove:hover {
+  background-color: #ff3333; /* 将悬停时的颜色改为深红色 */
+}
+
+.workflow-errormsg{
+    color: #ff3333;
+    font-size: 13px;
+}
+
+.node-params {
+    padding: 10px;
+    background-color: #f9f9fb;
+    color: #151b26;
+    border-radius: 10px;
+    margin-top: 20px;
+    .el-row {
+      width: 100% !important;
+    }
+    .params-type {
+      position: relative;
+      .add-icon {
+        position: absolute;
+        right: 20px;
+        top: 10px;
+        font-size: 16px;
+      }
+      .params-type-span {
+        margin-left: 10px;
+      }
+    }
+    .params-content {
+      margin-top: 8px;
+      min-height: 40px;
+      .params-content-item {
+        span {
+          font-size: 12px;
+        }
+        span:nth-child(1) {
+          color: #876300;
+        }
+        span:nth-child(2) {
+          margin-left: 6px;
+          height: 20px;
+          padding: 0 5px;
+          white-space: nowrap;
+          border-radius: 4px;
+          background-color: #e8e9eb;
+          color: #5c5f66;
+        }
+        span:nth-child(3) {
+          margin-left: 6px;
+          height: 20px;
+          padding: 0 5px;
+          white-space: nowrap;
+        }
+      }
+    }
+    .params-form {
+      margin-top: 10px;
+      .form-item {
+        display: flex;
+        gap: 5px;
+        margin: 5px 0;
+        .item {
+            flex: 1;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+          }
+        .last-item {
+          flex: 2;
+        }
+        .del-icon {
+          line-height: 30px;
+        }
+      }
+    }
+  }
