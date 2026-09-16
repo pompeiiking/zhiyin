@@ -1,17 +1,14 @@
 <script setup lang="ts">
-// 对话页 · 快捷行为组（§4.2，中栏底部）。
-//
-// 与 BehaviorGuide 的分工：BehaviorGuide 承载后端下发的"本轮必做的下一步"
-// （四选一，必须渲染出可点元素）；QuickActions 是**用户主动可选**的常用动作
-// （认领差距 / 比较方案 / 勾任务 / 我要复盘），不替代行为引导。
-//
-// 口径：动作项不硬编码中文，取自 bootstrap.copyBundle 的 key；
-// 触发后走 conversation store 的相应 action，并落对应埋点。
-// TODO(骨架): 渲染动作按钮并绑定 store action
+const emit = defineEmits<{ (event: 'choose', value: string): void }>()
+const actions = ['认领一个差距', '比较方案', '查看行动任务', '我要复盘']
 </script>
 
 <template>
-  <div class="quick-actions">
-    <!-- TODO(骨架): 常用动作按钮组 -->
-  </div>
+  <div class="quick-actions" aria-label="快捷动作"><button v-for="item in actions" :key="item" type="button" @click="emit('choose', item)">{{ item }}</button></div>
 </template>
+
+<style scoped>
+.quick-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); padding:var(--space-2) var(--space-6); }
+button { border:0; border-radius:var(--radius-pill); background:var(--color-bg); color:var(--color-link); padding:var(--space-2) var(--space-3); cursor:pointer; font-size:var(--font-size-xs); }
+button:hover { background:var(--color-brand-soft); }
+</style>

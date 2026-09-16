@@ -8,6 +8,7 @@ import { ApiError, ErrorCode } from '@/api/client'
 import { useGuestGuard } from '@/composables'
 import TaskCardGroup from '@/components/home/TaskCardGroup.vue'
 import TrustSection from '@/components/home/TrustSection.vue'
+import ShowcaseStage from '@/components/home/ShowcaseStage.vue'
 
 const session = useSessionStore()
 const conversation = useConversationStore()
@@ -100,6 +101,7 @@ async function selectTask(code: string) {
         <div class="hero-actions">
           <button v-if="freeChat" class="primary-action" :disabled="busy" @click="selectTask(freeChat.code)">开始对话 <span aria-hidden="true">→</span></button>
           <a v-else class="primary-action" href="#task-entries">开始对话 <span aria-hidden="true">→</span></a>
+          <RouterLink class="secondary-action" :to="{ name: 'report' }">先看示例报告</RouterLink>
         </div>
         <p class="hero-note"><span aria-hidden="true">○</span> 不替你做决定，陪你找到依据。</p>
       </div>
@@ -121,6 +123,7 @@ async function selectTask(code: string) {
 
     <div class="container">
       <TrustSection class="reveal" />
+      <ShowcaseStage />
       <TaskCardGroup class="reveal" :busy="busy" :selected="selected" @select="selectTask" />
       <p v-if="message" class="task-message" role="status">{{ message }}</p>
 
@@ -500,6 +503,20 @@ h1 {
 .primary-action:active:not(:disabled) {
   transform: scale(0.98);
 }
+
+.secondary-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 var(--space-5);
+  border: 1px solid var(--color-brand-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-link);
+  text-decoration: none;
+}
+
+.secondary-action:hover { background: var(--color-brand-soft); }
 
 @media (prefers-reduced-motion: reduce) {
   .glow { animation: none; }

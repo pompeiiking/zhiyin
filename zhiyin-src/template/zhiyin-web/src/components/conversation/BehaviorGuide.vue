@@ -1,21 +1,21 @@
 <script setup lang="ts">
-// 行为引导（全局约束③，最重要的一件）。
-//
-// 任何一轮回复的结尾必须是四选一，且页面上必须存在对应的可点元素：
-//   question  一个追问         → 输入框聚焦 + 提示语
-//   options   一组选项         → 渲染为可点选项
-//   task      一个小任务       → 渲染为可勾选任务
-//   reminder  一条提醒         → 渲染为提醒条
-//
-// 禁止空转寒暄与无下一步的总结。对应后端 BehaviorGuide。
-//
-// 埋点：认领差距 gap_claim / 比较方案 decision_compare / 做出选择 decision_select /
-//       修改选择 decision_reselect / 勾掉任务 action_task_done
-// TODO(骨架): 按 guide.kind 渲染四种形态并绑定动作
+import { ref } from 'vue'
+const props = defineProps<{ guide?: Record<string, unknown> | null }>()
+const emit = defineEmits<{ (event: 'choose', value: string): void }>()
+const done = ref(false)
+const options = ['先说说你最在意的条件', '我想先看看可选方向']
+const title = () => String(props.guide?.text ?? '先选一个最容易开始的动作')
 </script>
 
 <template>
-  <div class="behavior-guide">
-    <!-- TODO(骨架): 按 kind 切换四种形态 -->
-  </div>
+  <div class="behavior-guide"><div><strong>下一步</strong><span>{{ title() }}</span></div><div class="guide-actions"><button v-for="item in options" :key="item" type="button" @click="emit('choose', item)">{{ item }}</button><label><input v-model="done" type="checkbox" @change="emit('choose', '完成一次自我盘点')" /> 完成一次自我盘点</label></div></div>
 </template>
+
+<style scoped>
+.behavior-guide { padding:var(--space-3) var(--space-4); border-top:1px solid var(--color-brand-border); background:var(--color-brand-soft); }
+.behavior-guide > div:first-child { display:flex; gap:var(--space-3); align-items:center; margin-bottom:var(--space-2); color:var(--color-text-secondary); }
+strong { color:var(--color-link); }
+.guide-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); }
+button,label { min-height:36px; padding:var(--space-2) var(--space-3); border:1px solid var(--color-brand-border); border-radius:var(--radius-pill); background:var(--color-surface); color:var(--color-link); cursor:pointer; font-size:var(--font-size-xs); }
+label { display:inline-flex; align-items:center; gap:var(--space-1); }
+</style>

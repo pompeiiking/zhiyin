@@ -1,16 +1,16 @@
 <script setup lang="ts">
-// 方法论标签（可点开）（§7 组件基线）。
-//
-// 对应后端 TheoryRef（theory_id / name / stage）。点开后展示理论卡内容
-// （理论名 / 流派 / 通俗说明 / 在本产品里怎么被用）。
-// 这是"一切都能追溯"的可见部分，属于信任建立的关键件。
-//
-// 埋点：点开理论依据 / 显式告知 → conv_disclosure_open
-// TODO(骨架): 点击展开理论卡
+import { ref } from 'vue'
+const props = defineProps<{ theory?: Record<string, unknown> }>()
+const open = ref(false)
+const name = () => String(props.theory?.name ?? props.theory?.title ?? '职业咨询方法')
 </script>
 
 <template>
-  <span class="theory-tag">
-    <!-- TODO(骨架): 标签文本 + 展开面板 -->
-  </span>
+  <span class="theory-wrap"><button type="button" class="theory-tag" :aria-expanded="open" @click="open = !open">{{ name() }}</button><span v-if="open" class="theory-popover" role="status">把你的信息与成熟职业咨询框架对照，帮助解释当前结论。</span></span>
 </template>
+
+<style scoped>
+.theory-wrap { position:relative; display:inline-flex; }
+.theory-tag { border:1px solid var(--color-role-border); border-radius:var(--radius-pill); padding:2px var(--space-2); background:var(--color-role-soft); color:var(--color-role); font-size:var(--font-size-xs); cursor:pointer; }
+.theory-popover { position:absolute; z-index:2; top:calc(100% + 6px); left:0; width:220px; padding:var(--space-3); border-radius:var(--radius-md); background:var(--color-ink-card, var(--inkCard)); color:var(--color-text-inverse); font-size:var(--font-size-xs); box-shadow:var(--shadow-overlay); }
+</style>

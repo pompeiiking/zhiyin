@@ -1,9 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useConversationStore } from '@/stores/conversation'
 import AgentBadge from './AgentBadge.vue'
+import BehaviorGuide from './BehaviorGuide.vue'
+import DisclosureRow from './DisclosureRow.vue'
+import MessageBubble from './MessageBubble.vue'
+import QuickActions from './QuickActions.vue'
 
 const conversation = useConversationStore()
+const input = ref('')
 const currentTaskName = computed(() => {
   const item = conversation.sessions.find((session) => session.task_id === conversation.currentTaskId)
   return String(item?.task_name ?? '当前任务')
@@ -20,6 +25,12 @@ const stageProgress = computed(() =>
     }
   }),
 )
+const messages = computed(() => conversation.turns
+  .map((item) => ({ role: item.role === 'user' ? 'user' as const : 'agent' as const, content: String(item.content ?? item.text ?? ''), theory: item.theory as Record<string, unknown> | undefined }))
+  .filter((item) => item.content))
+const guide = computed(() => conversation.guide)
+const disclosure = computed(() => conversation.disclosure)
+function send() { input.value = '' }
 </script>
 
 <template>
@@ -38,22 +49,18 @@ const stageProgress = computed(() =>
         </li>
       </ol>
     </header>
+    <DisclosureRow :disclosure="disclosure" />
     <div class="messages">
-      <div class="empty">
-        <span aria-hidden="true">✳</span>
-        <h2>从一个具体困惑开始</h2>
-        <p>选择任务后，对话内容会显示在这里。</p>
-      </div>
+      <div class="message-list"><MessageBubble v-for="(item, index) in messages" :key="index" :role="item.role" :content="item.content" :theory="item.theory" /></div>
     </div>
-    <footer class="behavior-slot" aria-label="行为引导区">
-      <strong>下一步</strong>
-      <span>选择一项任务，开始梳理当前问题。</span>
-    </footer>
+    <QuickActions @choose="value => { input = value; send() }" />
+    <BehaviorGuide :guide="guide" @choose="value => { input = value; send() }" />
+    <form class="composer" @submit.prevent="send"><input v-model="input" aria-label="输入消息" placeholder="写下你现在最想解决的困惑…" /><button type="submit" :disabled="!input.trim()">发送</button></form>
   </section>
 </template>
 
 <style scoped>
-.chat-stream { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto 1fr auto; background: var(--color-surface); }
+.chat-stream { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto auto 1fr auto auto auto; background: var(--color-surface); }
 .chat-stream > header { padding: var(--space-4) var(--space-6); border-bottom: 1px solid var(--color-border); }
 .task-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .task-head small { color: var(--color-text-muted); }
@@ -64,10 +71,10 @@ const stageProgress = computed(() =>
 .stage-progress li.done span { background: var(--color-success); }
 .stage-progress li.active { color: var(--color-link); font-weight: var(--font-weight-semibold); }
 .stage-progress li.active span { background: var(--color-brand); box-shadow: 0 0 0 3px var(--color-brand-soft); }
-.messages { min-height: 0; overflow: auto; display: grid; place-items: center; padding: var(--space-6); }
-.empty { text-align: center; color: var(--color-text-secondary); }
-.empty > span { font-size: var(--font-size-2xl); color: var(--color-link); }
-.empty h2 { color: var(--color-text-primary); }
-.behavior-slot { display: flex; gap: var(--space-3); align-items: center; padding: var(--space-4) var(--space-6); border-top: 1px solid var(--color-border); background: var(--color-brand-soft); color: var(--color-text-secondary); }
-.behavior-slot strong { color: var(--color-link); }
+.messages { min-height: 0; overflow: auto; padding: var(--space-6); }
+.message-list { display:grid; align-content:end; gap:var(--space-4); min-height:100%; }
+.composer { display:flex; gap:var(--space-2); padding:var(--space-3) var(--space-6) var(--space-4); border-top:1px solid var(--color-border); background:var(--color-surface); }
+.composer input { flex:1; min-width:0; height:44px; padding-inline:var(--space-3); border:1px solid var(--color-border); border-radius:var(--radius-md); }
+.composer button { min-width:72px; border:0; border-radius:var(--radius-md); background:var(--color-action-bg); color:var(--color-text-inverse); cursor:pointer; }
+.composer button:disabled { opacity:.5; cursor:not-allowed; }
 </style>

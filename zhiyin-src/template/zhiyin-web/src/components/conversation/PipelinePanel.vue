@@ -8,18 +8,7 @@ import PipelineCard from './PipelineCard.vue'
 const conversation = useConversationStore()
 const session = useSessionStore()
 
-const fallbackPipeline: PipelineCardView[] = [
-  { stage: 'collect', title: '采集建模', status: 'in_progress', active: true },
-  { stage: 'diagnose', title: '诊断匹配', status: 'empty' },
-  { stage: 'decide', title: '决策', status: 'empty' },
-  { stage: 'act', title: '行动', status: 'empty' },
-  { stage: 'review', title: '复盘校准', status: 'empty' },
-]
-
-const pipeline = computed(() => {
-  if (!conversation.pipeline.length) return fallbackPipeline
-  return conversation.pipeline as unknown as PipelineCardView[]
-})
+const pipeline = computed(() => conversation.pipeline as unknown as PipelineCardView[])
 
 const title = computed(() => String(session.copyBundle['conv.pipeline_title'] ?? '微循环管线'))
 const leadName = computed(() => String(conversation.badge.name ?? '待分配'))
@@ -40,6 +29,7 @@ const leadName = computed(() => String(conversation.badge.name ?? '待分配'))
         :lead-name="card.active ? leadName : undefined"
       />
     </div>
+    <p v-if="!pipeline.length" class="empty-state">当前暂无管线数据，进入任务后会显示你的五环节进度。</p>
     <p class="loop-hint">完成复盘后，可带着新信息再次进入下一轮。</p>
   </aside>
 </template>
