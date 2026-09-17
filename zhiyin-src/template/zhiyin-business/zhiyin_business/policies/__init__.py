@@ -33,6 +33,10 @@ Orchestrator 或某个 Service 的方法体里，结果是规则改一处要动�
 （`intervention` / `profile_collection` / `routing` 三项 `confirmed`）。
 """
 
+from zhiyin_business.policies.axis_a import (
+    AxisAInferencePolicy,
+    RuleFirstAxisAInferencePolicy,
+)
 from zhiyin_business.policies.handoff import DefaultHandoffPolicy, HandoffPolicy
 from zhiyin_business.policies.impact import DependencyImpactPolicy, ImpactPolicy
 from zhiyin_business.policies.intervention import (
@@ -48,6 +52,8 @@ from zhiyin_business.policies.routing import (
 from zhiyin_business.policies.teaming import LeadPolicy, RegistryLeadPolicy
 
 __all__ = [
+    "AxisAInferencePolicy",
+    "RuleFirstAxisAInferencePolicy",
     "HandoffPolicy",
     "DefaultHandoffPolicy",
     "DependencyImpactPolicy",

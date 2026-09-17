@@ -66,6 +66,7 @@ def build_services(container: "Container") -> None:
         DependencyImpactPolicy,
         KeywordIntentPolicy,
         RegistryLeadPolicy,
+        RuleFirstAxisAInferencePolicy,
     )
     from zhiyin_business.services import (
         AgentDrivenLoopCoordinator,
@@ -128,9 +129,12 @@ def build_services(container: "Container") -> None:
         assets=container.asset_service,
         intent_policy=KeywordIntentPolicy(),
         stage_policy=DefaultStagePolicy(),
+        axis_a_policy=RuleFirstAxisAInferencePolicy(),
         lead_policy=RegistryLeadPolicy(container.registry),
         handoff_policy=DefaultHandoffPolicy(),
         agent_engine=container.agent_engine,
+        knowledge=container.knowledge,
+        state_store=container.state_store,
         sessions=container.sessions,
         registry=container.registry,
         event_bus=container.event_bus_primitive,
