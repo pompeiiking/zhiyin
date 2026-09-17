@@ -1,4 +1,4 @@
-"""ORM 表清单。
+"""M3 关系数据库 ORM 与完整表清单。
 
 本文件先固化「契约 → 表」的映射，DDL 与 ORM 类随后补齐。
 表结构必须与 zhiyin_kernel 一一对应，不得出现契约之外的表。
@@ -14,7 +14,8 @@
   B 前端动态内容表（《分层实现与接口设计》§4.1，13 张）
   C 后端动态配置与规则表（同文档 §4.2，25 张，与 A 组去重后净增 22 张）
 
-TODO(骨架): 按上表补齐 SQLAlchemy 模型。约束：
+已落地的运行时聚合表由本模块的 SQLAlchemy 模型声明；其余动态资源表仍由
+``TABLE_INVENTORY`` 固化名称并通过后续迁移逐步规范化。约束：
 - 所有表带 created_at / updated_at；
 - profile / asset_version / report / direction_plan / action_plan 带 version 列；
 - behavior_log 只允许 INSERT，不提供 UPDATE 路径；
@@ -26,6 +27,185 @@ TODO(骨架): 按上表补齐 SQLAlchemy 模型。约束：
 """
 
 from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+
+class Base(DeclarativeBase):
+    """职引关系库统一元数据。"""
+
+
+class ProfileRow(Base):
+    __tablename__ = "profile"
+
+    user_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    profile_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class BehaviorLogRow(Base):
+    __tablename__ = "behavior_log"
+
+    sequence: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+    __table_args__ = (Index("ix_behavior_user_time", "user_id", "occurred_at"),)
+
+
+class ConversationMemoryRow(Base):
+    __tablename__ = "conversation_memory"
+
+    user_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    task_key: Mapped[str] = mapped_column(String(128), primary_key=True, default="")
+    memory_id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    last_active_at: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
+class AssetVersionRow(Base):
+    __tablename__ = "asset_version"
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    asset_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "asset_type", "version", name="uq_asset_version"),
+        Index("ix_asset_latest", "user_id", "asset_type", "version"),
+    )
+
+
+class AssetContentRow(Base):
+    __tablename__ = "asset_content"
+
+    user_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(64), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    payload: Mapped[Any] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ReportHistoryRow(Base):
+    __tablename__ = "report"
+
+    user_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # report_id 标识同一份报告资产，可跨版本复用；历史唯一键是 (user_id, version)。
+    report_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class TaskSessionRow(Base):
+    __tablename__ = "task_session"
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    task_code: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
+class RegistryResourceRow(Base):
+    __tablename__ = "registry_resource"
+
+    kind: Mapped[str] = mapped_column(String(64), primary_key=True)
+    resource_key: Mapped[str] = mapped_column(String(255), primary_key=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="enabled")
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    bundle: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class UserAccountRow(Base):
+    __tablename__ = "user_account"
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    phone: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_login_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+
+class AuthSessionRow(Base):
+    __tablename__ = "auth_session"
+
+    token: Mapped[str] = mapped_column(String(512), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+
+class EmbedTaskRow(Base):
+    __tablename__ = "embed_task"
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    namespace: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    source_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    model: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    operation: Mapped[str] = mapped_column(String(16), nullable=False, default="upsert")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    next_retry_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_error: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "namespace", "source_id", "model", "content_hash", "operation",
+            name="uq_embed_task_idempotency",
+        ),
+    )
+
+
+class RetrievalLogRow(Base):
+    __tablename__ = "retrieval_log"
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    org_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    namespace: Mapped[str] = mapped_column(String(32), nullable=False)
+    channel: Mapped[str] = mapped_column(String(32), nullable=False)
+    top_k: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    degraded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    query_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 # --------------------------------------------------------------------------
 # A 核心业务表
@@ -54,6 +234,10 @@ CORE_TABLES: dict[str, str] = {
     "direction_plan": "方向方案（主攻/平行/保底）← contracts/assets.DirectionPlan",
     "action_plan": "行动计划 ← contracts/assets.ActionPlan",
     "action_task": "行动任务 ← contracts/assets.ActionTask",
+    "asset_content": "资产当前态聚合（报告/方向/行动计划正文）",
+    "registry_resource": "动态资源统一读模型（由明确 kind 隔离）",
+    "embed_task": "向量同步任务、重试与幂等记账",
+    "retrieval_log": "检索通道、耗时和降级审计（只存查询哈希）",
 }
 
 # --------------------------------------------------------------------------
@@ -134,11 +318,24 @@ CONTRACT_TO_TABLE: dict[str, str] = {
 }
 
 __all__ = [
+    "AssetContentRow",
+    "AssetVersionRow",
+    "AuthSessionRow",
     "BACKEND_DYNAMIC_TABLES",
+    "Base",
+    "BehaviorLogRow",
     "CONTRACT_TO_TABLE",
+    "ConversationMemoryRow",
     "CORE_TABLES",
+    "EmbedTaskRow",
     "FRONTEND_DYNAMIC_TABLES",
     "LOCAL_JSON_BACKED",
+    "ProfileRow",
+    "RegistryResourceRow",
+    "ReportHistoryRow",
+    "RetrievalLogRow",
     "SHARED_WITH_CORE",
     "TABLE_INVENTORY",
+    "TaskSessionRow",
+    "UserAccountRow",
 ]

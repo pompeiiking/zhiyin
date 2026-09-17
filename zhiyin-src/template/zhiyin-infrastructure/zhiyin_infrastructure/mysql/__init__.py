@@ -1,4 +1,4 @@
-"""MySQL 实现目录（**空抽屉**，尚未实现）。
+"""MySQL 数据适配器。
 
 一个目录 = 一套实现。本目录是 M3「真实存储」里程碑的落点：把
 `zhiyin_data_sdk` 的 7 个 Repository 与事务契约换成 MySQL 实现，业务层与接入层
@@ -27,4 +27,30 @@
 同目录的 `persistence/` 目前只有表清单与未实现的事务管理器；真正的 Repository
 实现放在本目录，不要写回 `local/`（那是内存实现的家）。
 """
+
+from zhiyin_infrastructure.mysql.raw_query import SqlAlchemyRawQueryGateway
+from zhiyin_infrastructure.mysql.repositories import (
+    DatabaseContext,
+    SqlAlchemyAssetRepository,
+    SqlAlchemyBehaviorRepository,
+    SqlAlchemyConversationMemoryRepository,
+    SqlAlchemyProfileRepository,
+    SqlAlchemyRegistryRepository,
+    SqlAlchemyTaskSessionRepository,
+    SqlAlchemyUserRepository,
+    build_repository_set,
+)
+
+__all__ = [
+    "DatabaseContext",
+    "SqlAlchemyAssetRepository",
+    "SqlAlchemyBehaviorRepository",
+    "SqlAlchemyConversationMemoryRepository",
+    "SqlAlchemyProfileRepository",
+    "SqlAlchemyRawQueryGateway",
+    "SqlAlchemyRegistryRepository",
+    "SqlAlchemyTaskSessionRepository",
+    "SqlAlchemyUserRepository",
+    "build_repository_set",
+]
 

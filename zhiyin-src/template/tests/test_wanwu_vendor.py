@@ -5,7 +5,6 @@ import json
 import os
 import shutil
 import subprocess
-import uuid
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -48,9 +47,8 @@ def git(repo: Path, *args: str) -> str:
 
 
 @pytest.fixture
-def workspace_source() -> Iterator[Path]:
-    source = REPO_ROOT / f".pytest-wanwu-source-{uuid.uuid4().hex}"
-    shutil.rmtree(source, ignore_errors=True)
+def workspace_source(tmp_path: Path) -> Iterator[Path]:
+    source = tmp_path / "wanwu-source"
     source.mkdir()
     try:
         yield source

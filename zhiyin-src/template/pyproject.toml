@@ -10,18 +10,45 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Proprietary" }
 
-# 运行依赖：只保留第一期真正用到的。
-# sqlalchemy 是可选的（仅启用 ZHIYIN_USE_MYSQL 时 import），因此放在 extra 里。
+# 运行依赖：HTTP Client 是 PAMI 生产适配器的基础依赖；其余中间件驱动按
+# M3 部署形态放在可选依赖组，默认的本地模式仍保持轻量。
 dependencies = [
     "fastapi>=0.110",
+    "httpx>=0.27,<1",
     "uvicorn>=0.29",
     "pydantic>=2.6",
     "redis>=5.0",
 ]
 
 [project.optional-dependencies]
-mysql = ["sqlalchemy>=2.0"]
+mysql = [
+    "sqlalchemy[asyncio]>=2.0,<3",
+    "asyncmy>=0.2.9,<1",
+    "pymysql>=1.1,<2",
+    "alembic>=1.13,<2",
+]
+vector = [
+    "asyncpg>=0.29,<1",
+    "pgvector>=0.3,<1",
+]
+pami-infra = [
+    "aiokafka>=0.11,<1",
+    "elasticsearch[async]>=8.12,<9",
+    "minio>=7.2,<8",
+]
+m3 = [
+    "sqlalchemy[asyncio]>=2.0,<3",
+    "asyncmy>=0.2.9,<1",
+    "pymysql>=1.1,<2",
+    "alembic>=1.13,<2",
+    "asyncpg>=0.29,<1",
+    "pgvector>=0.3,<1",
+    "aiokafka>=0.11,<1",
+    "elasticsearch[async]>=8.12,<9",
+    "minio>=7.2,<8",
+]
 dev = [
+    "aiosqlite>=0.20,<1",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "httpx>=0.27",

@@ -22,7 +22,7 @@ def test_compose_includes_wanwu_and_keeps_zhiyin_internal() -> None:
 
 def test_env_example_has_no_committed_secrets() -> None:
     text = (DEPLOY / ".env.example").read_text(encoding="utf-8")
-    assert "WANWU_PROJECT_DIR=./runtime\n" in text
+    assert "WANWU_PROJECT_DIR=../../deploy/runtime\n" in text
     assert "WANWU_ELASTIC_ADDRESS=es-wanwu:9200\n" in text
     for key in (
         "WANWU_MYSQL_PASSWORD",

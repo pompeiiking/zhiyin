@@ -1,0 +1,9 @@
+{
+  "version": "m3-v1",
+  "items": [
+    {"namespace": "theory", "query": "霍兰德职业兴趣类型", "expected_ids": ["theory:holland"]},
+    {"namespace": "occupation", "query": "软件开发工程师核心技能", "expected_ids": ["occupation:software-engineer"]},
+    {"namespace": "jd", "query": "后端开发 Python 岗位要求", "expected_ids": ["jd:backend-python"]},
+    {"namespace": "theory", "query": "高校毕业生就业支持政策", "expected_ids": ["policy:graduate-employment"]}
+  ]
+}

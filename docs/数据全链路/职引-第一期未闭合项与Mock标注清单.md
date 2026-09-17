@@ -7,12 +7,12 @@
 | 复核范围扩展 | `business-tao@dfd7f34`（业务分支，2026-09-15）：闭合 OPEN-5，新增 OPEN-6 |
 | 本轮更新 | `service-tao@6187923`（业务编排分支，2026-09-16）：闭合 OPEN-1、OPEN-2，并迁移为正式 e2e 回归 |
 | 与原记录的关系 | 《职引-数据能力全链路完成情况记录》的个人自评保持原样；**两份文档必须合读**，本文只补充其未覆盖的缺口 |
-| 当前状态 | OPEN-1、OPEN-2、OPEN-5 已闭合；仍有未闭合项 3 条（OPEN-3、OPEN-4、OPEN-6），Mock 标注问题 2 条（MOCK-1 ~ MOCK-2） |
+| 当前状态 | OPEN-1、OPEN-2、OPEN-3、OPEN-5 已闭合；仍有未闭合项 2 条（OPEN-4、OPEN-6），Mock 标注问题 2 条（MOCK-1 ~ MOCK-2） |
 | 清理约定 | 每项修好后，删除对应代码标记与 `tests/e2e/test_phase1_open_items.py` 中的用例，并把本文状态改为"已闭合" |
 
 > **当前结论**：OPEN-1、OPEN-2 已由业务编排链路接通并转为正式 e2e 回归；
-> OPEN-5 的服务状态守卫已经恢复；OPEN-3、OPEN-4、OPEN-6 与 MOCK-1 仍按本文继续跟踪。
-> 原始复核证据保留，避免覆盖问题历史。
+> OPEN-3 已按“预留能力位”决策闭合，OPEN-5 的服务状态守卫已经恢复；
+> OPEN-4、OPEN-6 与 MOCK-1 仍按本文继续跟踪。原始复核证据保留，避免覆盖问题历史。
 
 ---
 
@@ -49,7 +49,7 @@
 | 退出判据 | ②③ 的 `theory_refs` 至少有一条 `theory_id` 存在于 `data/knowledge/theory.json`；`test_open2_*` 由 xfail 变 XPASS 并删除标记 |
 | 代码标记 | `infrastructure/local/knowledge.py` |
 
-### OPEN-3 · Redis DB 1–6 六个域存储已装配、无消费方 —— 未闭合
+### OPEN-3 · Redis DB 1–6 六个域存储已装配、无消费方 —— 已闭合（2026-09-16）
 
 | 项 | 内容 |
 | --- | --- |
@@ -58,7 +58,9 @@
 | 同类项 | 采集管线的 `raw_store`（原始响应进短期缓存 / DB 4）只在测试里注入 `RawStore` 假实现，生产装配未接 |
 | 归属 | 数据侧（本期"基础能力可用"已达成；"被业务使用"未达成） |
 | 退出判据 | 六个域至少各有一个真实调用方，或明确降级为"预留能力位"并在装配报告里如实标注（二选一，需记录决策） |
-| 代码标记 | `zhiyin-boot/zhiyin_boot/container/gateways.py` · `infrastructure/crawl/pipeline.py` |
+| 闭合决策 | 采用退出判据的第二种方式：DB 1–6 明确降级为**预留能力位**。Boot 只装配 `RedisClientFactory` 与有真实消费方的 DB 0 缓存；具体域由后续真实 Adapter / Worker 在出现调用方时通过 `domain_store(env, domain)` 惰性创建，不再把无人消费、无降级兜底的六个对象塞入 `container.extra`。分库映射、键规范和 TTL 规则继续保留，不代表六个域已经接入业务链路。 |
+| 原始响应说明 | 采集管线 `raw_store` 仍是可选注入点；M3 生产采集 Runner 落地时才从工厂创建 `crawl` 域并注入。在此之前不虚构生产消费方。 |
+| 代码位置 | `zhiyin-boot/zhiyin_boot/container/gateways.py` · `infrastructure/redis/__init__.py` · `infrastructure/crawl/pipeline.py` |
 
 ### OPEN-4 · Mock 门面成为死配置，且与新契约不同步 —— 未闭合
 
@@ -127,7 +129,7 @@
 | 他的声明 | 核验结论 |
 | --- | --- |
 | M1 已完成 100% | ✅ 属实 |
-| M2 已完成（本人范围）100% / 三波 100% | ⚠️ **组件维度属实，链路维度偏高**：OPEN-1 / OPEN-2 / OPEN-3 三项均属"组件完成、未接线"，而清单里的判据用的是链路口径（"报告全文只读资产"、"诊断与决策能通过关键词检索引用来源"） |
+| M2 已完成（本人范围）100% / 三波 100% | ✅ 当前属实：OPEN-1 / OPEN-2 已随 service 合并接入编排主链，OPEN-3 已按“预留能力位”决策闭合；正式 E2E 已覆盖资产正文落库与知识引用 |
 | 装配 39 wired / 1 skeleton / 3 not_wired（43 个能力位） | ✅ 实测完全一致 |
 | 297 passed / 1 skipped；真实 Redis 13 passed；M2 门禁通过 | ✅ 实测完全一致 |
 | 契约 / 装配改动 | ⚠️ 按他自己的《开发须知》§11.1，新增或改变跨层契约方法应先升级确认；本轮向 Port 新增了抽象方法（`AssetRepository.save_snapshot`、`ConversationMemoryRepository.compare_and_swap`、`ObjectStoreGateway.compare_and_swap` + `StoredObject.etag`、`AssetService.save_*`、`StagePanel.task_id/lead_agent`），决策记录里只有 DEC-DATA-003（不新增能力位），没有"新增契约方法"的评审条目 |

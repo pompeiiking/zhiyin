@@ -144,6 +144,20 @@ async def test_asset_contract(repositories) -> None:
     )
     assert snapshot.version == 1
     assert (await repo.get_report("u2")).version == snapshot.version
+    second_snapshot = await repo.save_snapshot(
+        _asset("u2", AssetType.REPORT, ["major"], version=1),
+        report=Report(
+            id="report-u2",
+            user_id="u2",
+            version=1,
+            generated_at=_now(),
+            verdict=Verdict(title="诊断更新", summary="只重算受影响片段"),
+            swot=Swot(),
+        ),
+    )
+    assert second_snapshot.version == 2
+    assert (await repo.get_report("u2")).version == 2
+    assert (await repo.get_report("u2", 1)).verdict.title == "诊断"
 
     await repo.save_version(_asset("u1", AssetType.ACTION_PLAN, ["target_city"]))
     hit = await repo.list_affected_assets("u1", ["major"])
@@ -175,6 +189,10 @@ async def test_asset_contract(repositories) -> None:
             ),
         ],
     )
+    assert [plan.selected for plan in await repo.list_direction_plans("u1")] == [
+        False,
+        False,
+    ], "保存候选方向不得替用户自动选择"
     await repo.select_direction_plan("u1", "p1")
     assert [plan.selected for plan in await repo.list_direction_plans("u1")] == [True, False]
     await repo.select_direction_plan("u1", "p2")

@@ -71,37 +71,81 @@ def build_gateways(settings: Settings) -> dict[str, Any]:
             env=settings.env,
             fallback=InMemoryCache(),
         )
+        # DB 1–6 是分库策略，不是六个必须常驻的业务对象。保留统一工厂，等真实
+        # Adapter / Worker 出现调用方时再用 domain_store(env, domain) 惰性创建；
+        # 避免把无人消费且无降级兜底的连接误报成“已接线”。
         gateways["redis_factory"] = redis_factory
-        gateways["redis_session"] = redis_factory.domain_store(settings.env, "session")
-        gateways["redis_schedule"] = redis_factory.domain_store(settings.env, "schedule")
-        gateways["redis_guard"] = redis_factory.domain_store(settings.env, "guard")
-        gateways["redis_crawl"] = redis_factory.domain_store(settings.env, "crawl")
-        gateways["redis_knowledge"] = redis_factory.domain_store(settings.env, "knowledge")
-        gateways["redis_vector_sync"] = redis_factory.domain_store(settings.env, "vector-sync")
-        # TODO(第一期未闭合): OPEN-3 —— 上面 6 个域存储只被放进 container.extra，
-        # 全仓没有任何读取方（`rg "redis_schedule"` 只命中本文件）。
-        # 注意：RedisDomainStore 与 RedisCacheGateway 不同，**没有降级兜底**，
-        # Redis 不可用时直接抛异常；接线前请先确认故障策略。
-        # 归属与退出判据：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-3）。
 
     # ---------- pami 替换点（§十） ----------
-    # 未实现的分支在首次调用时抛 NotImplementedError，而不是静默回落本地 ——
-    # 静默回落会让"已经切到 pami"变成假象，问题推迟到线上才暴露。
     if settings.use_pami_llm:
         from zhiyin_infrastructure.pami.adapters import PamiLLMGateway
 
-        gateways["llm"] = PamiLLMGateway(settings.pami_base_url, settings.pami_api_key)
-    if settings.use_pami_knowledge:
-        from zhiyin_infrastructure.pami.adapters import PamiKnowledgeGateway
-
-        gateways["knowledge"] = PamiKnowledgeGateway(
-            settings.pami_base_url, settings.pami_api_key
+        gateways["llm"] = PamiLLMGateway(
+            settings.pami_base_url,
+            settings.pami_agent_api_key or settings.pami_api_key,
+            timeout_s=settings.pami_timeout_s,
         )
+    if settings.use_pami_embedding:
+        from zhiyin_infrastructure.pami.adapters import PamiEmbedGateway
+
+        gateways["embedding"] = PamiEmbedGateway(
+            settings.pami_base_url,
+            settings.pami_embedding_model_id,
+            timeout_s=settings.pami_timeout_s,
+        )
+    if settings.use_pami_knowledge:
+        from zhiyin_infrastructure.pami.adapters import (
+            PamiKnowledgeGateway,
+            PamiSearchGateway,
+        )
+
+        knowledge = PamiKnowledgeGateway(
+            settings.pami_base_url,
+            settings.pami_rag_api_key or settings.pami_api_key,
+            timeout_s=settings.pami_timeout_s,
+        )
+        gateways["knowledge"] = knowledge
+        gateways["search"] = PamiSearchGateway(knowledge)
     if settings.use_pami_auth:
         from zhiyin_infrastructure.pami.adapters import PamiAuthGateway
 
         gateways["auth"] = PamiAuthGateway(
-            settings.pami_base_url, settings.pami_jwt_secret
+            settings.pami_base_url,
+            settings.pami_jwt_secret,
+            org_id=settings.pami_org_id,
+            timeout_s=settings.pami_timeout_s,
+        )
+
+    if settings.use_pgvector:
+        from zhiyin_infrastructure.pgvector import PgVectorGateway
+
+        gateways["vector"] = PgVectorGateway(settings.vector_database_url)
+
+    if settings.use_pgvector and settings.use_pami_embedding:
+        from zhiyin_infrastructure.search import RrfHybridSearchGateway
+
+        gateways["search"] = RrfHybridSearchGateway(
+            gateways["search"],
+            gateways["embedding"],
+            gateways["vector"],
+            namespace=settings.vector_search_namespace,
+            rrf_k=settings.search_rrf_k,
+        )
+
+    if settings.use_mysql and settings.database_url:
+        from zhiyin_infrastructure.mysql import SqlAlchemyRawQueryGateway
+
+        gateways["raw_query"] = SqlAlchemyRawQueryGateway(settings.database_url)
+
+    if settings.use_minio:
+        from zhiyin_infrastructure.minio import MinioObjectStore
+
+        gateways["object_store"] = MinioObjectStore(
+            settings.minio_endpoint,
+            settings.minio_access_key,
+            settings.minio_secret_key,
+            bucket=settings.minio_bucket,
+            secure=settings.minio_secure,
         )
 
     return gateways

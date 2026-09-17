@@ -16,6 +16,7 @@ REPOSITORY_FACTORIES["mysql"] = {
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any, Callable
 
@@ -65,10 +66,35 @@ def _memory_gateways(tmp_path: Path) -> dict[str, GatewayFactory]:
     }
 
 
+def _sqlalchemy_repositories() -> dict[str, RepositoryFactory]:
+    from zhiyin_infrastructure.mysql import DatabaseContext, build_repository_set
+
+    context = DatabaseContext("sqlite+aiosqlite:///:memory:", auto_create=True)
+    repositories = build_repository_set(
+        context, registry_seed_dir=str(DATA_DIR / "registry")
+    )
+    return {name: (lambda value=value: value) for name, value in repositories.items()}
+
+
 # backend 名 → 该 backend 全部 Repository 构造器
 REPOSITORY_FACTORIES: dict[str, Callable[[], dict[str, RepositoryFactory]]] = {
     "in-memory": _memory_repositories,
+    "sqlalchemy": _sqlalchemy_repositories,
 }
+
+
+def _mysql_repositories() -> dict[str, RepositoryFactory]:
+    from zhiyin_infrastructure.mysql import DatabaseContext, build_repository_set
+
+    context = DatabaseContext(os.environ["ZHIYIN_TEST_MYSQL_URL"])
+    repositories = build_repository_set(
+        context, registry_seed_dir=str(DATA_DIR / "registry")
+    )
+    return {name: (lambda value=value: value) for name, value in repositories.items()}
+
+
+if os.environ.get("ZHIYIN_TEST_MYSQL_URL"):
+    REPOSITORY_FACTORIES["mysql-live"] = _mysql_repositories
 
 # backend 名 → 该 backend 全部 Gateway 构造器
 GATEWAY_FACTORIES: dict[str, Callable[[Path], dict[str, GatewayFactory]]] = {

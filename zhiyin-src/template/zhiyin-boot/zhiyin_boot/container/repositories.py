@@ -13,7 +13,20 @@ from zhiyin_boot.settings import Settings
 
 
 def build_repositories(settings: Settings) -> dict[str, Any]:
-    """按配置装配 Repository。第一期默认全走内存实现。"""
+    """按配置装配 Repository；启用 MySQL 时七类能力必须整体切换。"""
+    if settings.use_mysql:
+        if not settings.database_url:
+            raise ValueError("启用 MySQL Repository 时必须配置 ZHIYIN_DATABASE_URL")
+        from zhiyin_infrastructure.mysql import DatabaseContext, build_repository_set
+
+        context = DatabaseContext(settings.database_url, echo=settings.db_echo)
+        return {
+            **build_repository_set(
+                context, registry_seed_dir=settings.local_registry_dir
+            ),
+            "_database_context": context,
+        }
+
     from zhiyin_infrastructure.local.repository import (
         InMemoryAssetRepository,
         InMemoryBehaviorRepository,
