@@ -1,0 +1,293 @@
+syntax = "proto3";
+
+package assistant_service;
+
+import "google/protobuf/empty.proto";
+import "proto/common/common.proto";
+
+option go_package = "github.com/UnicomAI/wanwu/api/proto/assistant-service";
+
+service AssistantService {
+  rpc GetAssistantByIds(GetAssistantByIdsReq) returns (AppBriefList) {}   // 根据智能体id集合获取智能体列表
+  rpc AssistantCreate(AssistantCreateReq) returns (google.protobuf.Empty) {}
+  rpc AssistantUpdate(AssistantUpdateReq) returns (google.protobuf.Empty) {}
+  rpc AssistantConfigUpdate(AssistantConfigUpdateReq) returns (google.protobuf.Empty) {}
+  rpc AssistantDelete(AssistantDeleteReq) returns (google.protobuf.Empty) {}
+  rpc GetAssistantListMyAll(GetAssistantListMyAllReq) returns (AppBriefList) {}
+  rpc GetAssistantInfo(GetAssistantInfoReq) returns (AssistantInfo) {}
+  rpc AssistantWorkFlowCreate(AssistantWorkFlowCreateReq) returns (google.protobuf.Empty) {}
+  rpc AssistantWorkFlowDelete(AssistantWorkFlowDeleteReq) returns (google.protobuf.Empty) {}
+  rpc AssistantWorkFlowEnableSwitch(AssistantWorkFlowEnableSwitchReq) returns (google.protobuf.Empty) {}
+  rpc AssistantActionCreate(AssistantActionCreateReq) returns (AssistantActionCreateResp) {}
+  rpc AssistantActionDelete(AssistantActionDeleteReq) returns (google.protobuf.Empty) {}
+  rpc AssistantActionUpdate(AssistantActionUpdateReq) returns (google.protobuf.Empty) {}
+  rpc GetAssistantActionInfo(GetAssistantActionInfoReq) returns (GetAssistantActionInfoResp) {}
+  rpc AssistantActionEnableSwitch(AssistantActionEnableSwitchReq) returns (google.protobuf.Empty) {}
+  rpc ConversationCreate(ConversationCreateReq) returns (ConversationCreateResp) {}
+  rpc ConversationDelete(ConversationDeleteReq) returns (google.protobuf.Empty) {}
+  rpc GetConversationList(GetConversationListReq) returns (GetConversationListResp) {}
+  rpc GetConversationDetailList(GetConversationDetailListReq) returns (GetConversationDetailListResp) {}
+  rpc AssistantConversionStream(AssistantConversionStreamReq) returns (stream AssistantConversionStreamResp) {}
+}
+  
+message AssistantConversionStreamResp {
+  string content = 1;
+}
+
+message Identity {
+  string userId = 1;
+  string orgId = 2;
+}
+
+message GetAssistantByIdsReq{
+  repeated string assistantIdList = 1;
+  Identity identity = 2;
+}
+
+message AppBriefList{
+  repeated common.AppBrief assistantInfos = 1;
+}
+
+message AssistantCreateReq {
+  common.AppBriefConfig assistantBrief = 1;
+  Identity identity = 2;
+}
+
+message AssistantUpdateReq {
+  string assistantId = 1;
+  common.AppBriefConfig assistantBrief = 2;
+  Identity identity = 3;
+}
+
+message AssistantConfigUpdateReq {
+  string assistantId = 1;
+  string instructions = 2;
+  string prologue = 3;
+  repeated string recommendQuestion = 4;
+  common.AppModelConfig modelConfig = 5;                  // 模型配置
+  AssistantKnowledgeBaseConfig knowledgeBaseConfig = 6;         // 知识库
+  common.AppModelConfig rerankConfig = 7;                         // Rerank模型
+  AssistantOnlineSearchConfig onlineSearchConfig = 8;             // 在线搜索配置
+  Identity identity = 9;
+}
+
+message AssistantDeleteReq {
+  string assistantId = 1;
+  Identity identity = 2;
+}
+
+message AssistantKnowledgeBaseConfig {
+  repeated AssistantKnowledgeBase knowledgeBases = 1;   // 知识库信息
+  int32 maxHistory = 2;                           // 最长上下文
+  bool maxHistoryEnable = 3;                      // 是否启用最长上下文
+  float threshold = 4;                            // 过滤阈值
+  bool thresholdEnable = 5;                       // 是否启用过滤阈值
+  int32 topK = 6;                                 // topK
+  bool topKEnable = 7;                            // 是否启用topK
+}
+message AssistantKnowledgeBase {
+  string id = 1;
+  string name = 2;
+}
+
+message AssistantOnlineSearchConfig {
+  string searchUrl = 1;
+  string searchKey = 2;
+  bool enable = 3;
+  string searchRerankId = 4;
+}
+
+message GetAssistantListMyAllReq {
+  string name = 1;
+  Identity identity = 2;
+}
+
+message AssistantInfo {
+  string assistantId = 1;
+  common.AppBriefConfig assistantBrief = 2;
+  string prologue = 3;
+  string instructions = 4;
+  repeated string recommendQuestion = 5;
+  common.AppModelConfig modelConfig = 6;                  // 模型配置
+  AssistantKnowledgeBaseConfig knowledgeBaseConfig = 7;  // 知识库
+  common.AppModelConfig rerankConfig = 8;                  // Rerank模型  
+  AssistantOnlineSearchConfig onlineSearchConfig = 9;     // 在线搜索配置
+  int32 scope = 10;
+  repeated WorkFlowInfos workFlowInfos = 11;
+  repeated ActionInfos actionInfos = 12;
+  int64 creatTime = 13;
+  int64 updateTime = 14;
+}
+
+message ActionInfos{
+  string actionId = 1;
+  string apiName = 2;
+  bool enable = 3;
+}
+
+message WorkFlowInfos{
+  string id = 1;
+  string workFlowId = 2;
+  string apiName = 3;
+  bool enable = 4;
+}
+
+message GetAssistantInfoReq {
+  string assistantId = 1;
+  Identity identity = 2;
+}
+
+
+message AssistantWorkFlowCreateReq {
+  string assistantId = 1;
+  string schema = 2;
+  string workFlowId = 3;
+  Identity identity = 4;
+}
+
+message AssistantWorkFlowDeleteReq {
+  string workFlowId = 1;
+  Identity identity = 2;
+}
+
+message AssistantWorkFlowEnableSwitchReq {
+  string workFlowId = 1;
+  Identity identity = 2;
+}
+
+message AssistantActionCreateReq {
+  string assistantId = 1;
+  string schema = 2;
+  ApiAuthWebRequest apiAuth = 3;
+  Identity identity = 4;
+}
+message AssistantActionCreateResp{
+  string actionId = 1;
+  repeated ActionApi list = 2;
+}
+message ApiAuthWebRequest{
+  string type = 1;
+  string apiKey = 2;
+  string customHeaderName = 3;
+  string authType = 4;
+}
+
+message AssistantActionDeleteReq {
+  string actionId = 1;
+  Identity identity = 2;
+}
+
+message AssistantActionUpdateReq {
+  string actionId = 1;
+  string schema = 2;
+  ApiAuthWebRequest apiAuth = 3;
+  Identity identity = 4;
+}
+
+message GetAssistantActionInfoReq {
+  string actionId = 1;
+  Identity identity = 2;
+}
+
+message GetAssistantActionInfoResp {
+  string actionId = 1;
+  string schema = 2;
+  string schemaType = 3;
+  ApiAuthWebRequest apiAuth = 4;
+  repeated ActionApi list = 5;
+}
+message ActionApi{
+  string name = 1;
+  string method = 2;
+  string path = 3;
+}
+
+message AssistantActionEnableSwitchReq {
+  string actionId = 1;
+  Identity identity = 2;
+}
+
+message ConversationCreateReq {
+  string assistantId = 1;
+  string prompt = 2;
+  Identity identity = 3;
+}
+
+message ConversationCreateResp {
+  string conversationId = 1;
+}
+
+message ConversationDeleteReq {
+  string conversationId = 1;
+  Identity identity = 2;
+}
+
+message GetConversationListReq {
+  string assistantId = 1;
+  int32 pageSize = 2;
+  int32 pageNo = 3;
+  Identity identity = 4;
+}
+
+message GetConversationListResp {
+  repeated ConversationInfo data = 1;
+  int64 total = 2;
+  int32 pageSize = 3;
+  int32 pageNo = 4;
+}
+
+message ConversationInfo{
+  string conversationId = 1;
+  string assistantId = 2;
+  string title = 3;
+  int64 creatTime = 4;
+}
+
+message GetConversationDetailListReq {
+  string conversationId = 1;
+  int32 pageSize = 2;
+  int32 pageNo = 3;
+  Identity identity = 4;
+}
+
+message GetConversationDetailListResp {
+  repeated ConversionDetailInfo data = 1;
+  int64 total = 2;
+  int32 pageSize = 3;
+  int32 pageNo = 4;
+}
+
+message ConversionDetailInfo{
+  string id = 1;
+  string assistantId = 2;
+  string conversationId = 3;
+  string prompt = 4;
+  string sysPrompt = 5;
+  string algPrompt = 6;
+  repeated string requestFileUrls = 7;
+  string response = 8;
+  string searchList = 9;
+  int32 qaType = 10;
+  string createdBy = 11;
+  int64 createdAt = 12;
+  int64 updatedAt = 13;
+  string fileName = 14;
+  string fileFormat = 15;
+  int64 fileSize = 16;
+}
+
+message AssistantConversionStreamReq {
+  string assistantId = 1;
+  string conversationId = 2;
+  ConversionStreamFile fileInfo = 3;
+  bool trial = 4;
+  string prompt = 5;
+  string appPublishType = 6;
+  Identity identity = 7;
+}
+
+message ConversionStreamFile{
+  string fileName = 1;
+  int64 fileSize = 2;
+  string fileUrl = 3;
+}

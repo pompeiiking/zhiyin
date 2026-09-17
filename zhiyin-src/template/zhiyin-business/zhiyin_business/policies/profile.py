@@ -2,6 +2,14 @@
 
 规则参数来自动态资源 ``profile_collection``。本模块只解释参数并计算结果，
 不读取 Repository，也不负责判断采集流程是否结束。
+
+TODO(第一期未闭合): OPEN-6 —— 本规则目前只被 `DefaultProfileService.overall_confidence`
+使用，而它在生产路径上没有调用方：工作台面板的覆盖率与整体置信度仍由
+`zhiyin-api/zhiyin_api/dto/mappers.py::workspace_page_view` 内联计算（全字段等权），
+因此决策 5 的口径在产品上看不到效果，且同一口径存在两处实现。
+收敛需要同时改冻结契约（`WorkspaceView` / `ProfileService`）与共享写点 `mappers.py`，
+按 `AGENTS.md` §2 / §11.2 先协调再动。
+清单：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-6）。
 """
 
 from __future__ import annotations

@@ -172,7 +172,9 @@ Pydantic 契约默认 `extra="forbid"`。不要为了吞掉未知字段而私自
 - 已有事件包括 `profile_field_updated`、`asset_version_changed`、`loop_stage_changed`、`behavior_logged`、`task_stall_detected`。
 - 新增事件或改变事件载荷属于契约变更，必须先询问并同步订阅方、测试和文档。
 
-当前 `behavior_logged` 尚无独立 Payload 模型。实现前必须先确认统一载荷形状，不能由发布方与订阅方各自猜测。
+`behavior_logged` 的统一载荷模型是 `zhiyin-business/zhiyin_business/events.py::BehaviorLoggedPayload`。
+发布方与订阅方都必须使用它，不得再各自解析 `BehaviorLog` 的裸 dump；修改其字段属于契约变更，
+必须同步发布方、订阅方、测试与文档。
 
 ## 8. 动态资源与配置
 
@@ -259,11 +261,13 @@ Facade 只组织业务调用并把结果交给 Mapper，不直接访问数据库
 
 ## 12. 已知漂移与实现前检查
 
-- `services/orchestrator.py` 顶部仍写着四项口径未定、规则参数为 draft；该说明已过期。业务决策记录和 `data/registry/policy_params.json` 均已标记 confirmed。
 - 旧接口设计文档中的 `/zhiyin/api/...` 只是历史示例，真实接口统一为 `/api/v1/...`。
 - `Orchestrator.infer_axis_a()` 已冻结，但当前 `policies/` 没有独立的阶段推断 Policy，构造函数也没有该依赖；不得在 Orchestrator 中悄悄内联规则或私自新增契约，开始实现前先确认处理方式。
-- `behavior_logged` 尚无独立 Payload 模型；实现发布和订阅前先确认载荷契约。
-- 当前部分落位守卫仍断言业务类为 skeleton；能力完成后必须协调更新状态、装配和守卫，不能只删除 `NotImplementedError`。
+- 画像口径（覆盖率 / 整体置信度）当前有两处实现：`zhiyin-business/policies/profile.py`（决策 5 口径）与
+  `zhiyin-api/zhiyin_api/dto/mappers.py` 的内联公式；工作台实际取值仍来自后者。收敛需要同时改冻结的
+  `WorkspaceView` / `ProfileService` 契约与共享写点 `mappers.py`，先协调再动。
+- 落位守卫现在要求每个服务能力位如实声明 `skeleton` 或 `wired`；能力完成后必须把实现状态、装配表和守卫
+  作为同一次变更协调更新，不能只删除 `NotImplementedError`。
 
 ## 13. 验证要求
 

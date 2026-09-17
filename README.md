@@ -46,6 +46,24 @@ python -m zhiyin_boot                    # 启动：http://127.0.0.1:8000/api/v1
 
 前端见 [zhiyin-src/template/zhiyin-web/README.md](zhiyin-src/template/zhiyin-web/README.md)。
 
+## 内置 pami/zhiyinbase 部署基线
+
+zhiyinbase 源码位于 `platform/wanwu/`，职引后端与 zhiyinbase 通过 `wanwu-net` 内部网络运行。
+
+```powershell
+python deploy/init_env.py
+pwsh deploy/up.ps1
+pwsh deploy/verify.ps1
+pwsh deploy/down.ps1
+```
+
+当前交付包含 zhiyinbase 源码快照、独立构建、统一 Compose 和原生接口路由。
+zhiyinbase 原生接口从 `http://127.0.0.1:8081` 的 Nginx/BFF 入口访问，继续使用
+zhiyinbase 自身的 JWT、API Key 和权限规则。职引 `/api/v1/*` 不透明代理这些接口。
+
+`ZHIYIN_USE_PAMI_*` 保持关闭，`zhiyin-infrastructure/pami/` 仅保留生产替换
+骨架；本交付不宣称真实账号、模型、知识库、Agent、RAG 或工作流已经联通。
+
 **接口字段怎么做到前后端不漂移**（三段链路，任一环断裂 CI 就红）：
 
 ```text

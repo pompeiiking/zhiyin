@@ -1,0 +1,147 @@
+include .env
+include .env.image.${WANWU_ARCH}
+
+run-all-middleware:
+	make run-mysql & sleep 10
+	make run-mysql-worker & sleep 10
+	make run-redis & sleep 10
+	make run-minio & sleep 10
+	make run-kafka & sleep 10
+	make run-es-setup & sleep 10
+	make run-es & sleep 10
+
+stop-all-middleware:
+	make stop-es
+	make stop-es-setup
+	make stop-kafka
+	make stop-minio
+	make stop-redis
+	make stop-mysql-worker
+	make stop-mysql
+
+unzip-frontend:
+	@find frontend -maxdepth 1 -type f -name "*.tar.gz" | while read gzfile; do \
+		tar -zxvf $$gzfile -C frontend; \
+	done
+
+update-frontend:
+	rm -rf $(WANWU_PROJECT_DIR)/nginx/html/*
+	cp -r frontend/* $(WANWU_PROJECT_DIR)/nginx/html
+
+# --- nginx ---
+run-nginx:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		up -d nginx
+
+stop-nginx:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		down nginx
+
+# --- bff-service ---
+run-bff: # 启动bff后自动重启下nginx
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		up -d bff-service
+	docker restart ${WANWU_NGINX_HOST}
+
+stop-bff:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		down bff-service
+
+# --- iam-service ---
+run-iam:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		up -d iam-service
+
+stop-iam:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		down iam-service
+
+# --- model-service ---
+run-model:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		up -d model-service
+
+stop-model:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		down model-service
+
+# --- mcp-service ---
+run-mcp:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		up -d mcp-service
+
+stop-mcp:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		down mcp-service
+
+# --- app-service ---
+run-app:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		up -d app-service
+
+stop-app:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		down app-service
+
+# --- rag-service ---
+run-rag:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		up -d rag-service
+
+stop-rag:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		down rag-service
+		
+# --- knowledge-base-service ---
+run-knowledge:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		up -d knowledge-service
+
+stop-knowledge:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		down knowledge-service
+
+# --- assistant-service ---
+run-assistant:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		up -d assistant-service
+
+stop-assistant:
+	docker-compose -f docker-compose-develop.yaml \
+		--env-file .env.image.${WANWU_ARCH} \
+		--env-file .env \
+		down assistant-service

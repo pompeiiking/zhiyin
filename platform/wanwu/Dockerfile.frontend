@@ -1,0 +1,23 @@
+ARG WANWU_ARCH
+
+# --- 第一阶段：构建阶段 ---
+FROM --platform=linux/$WANWU_ARCH node:14 AS builder
+ARG WANWU_ARCH
+WORKDIR /app
+COPY web .
+
+ENV npm_config_registry=https://registry.npmmirror.com
+ENV npm_config_unsafe_perm=true
+
+RUN set -euo && npm install
+RUN set -euo && npm run build
+
+# --- 第二阶段：运行阶段 ---
+FROM --platform=linux/$WANWU_ARCH nginx:1.27
+ARG WANWU_ARCH
+
+COPY ./configs/middleware/nginx/conf.d /etc/nginx/conf.d
+
+COPY --from=builder /app/dist /usr/share/nginx/html/aibase
+
+CMD ["nginx", "-g", "daemon off;"]

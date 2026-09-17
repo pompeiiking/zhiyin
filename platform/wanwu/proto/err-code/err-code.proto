@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package err_code;
+
+option go_package = "github.com/UnicomAI/wanwu/api/proto/err-code";
+
+enum Code {
+  OK = 0;
+
+  // --- bff-service ---
+  // [110000, 119999]
+  BFFGeneral = 110000; // 通用错误
+  BFFInvalidArg = 110001; // 参数错误
+  BFFJWT = 110002; // JWT错误
+  BFFAuth = 110003; // Auth错误
+
+  // --- iam-service ---
+  // [120000, 129999]
+  IAMGeneral = 120000; // 通用错误
+  IAMInternal = 120001; // 内部错误
+  IAMCaptcha = 120002; // 验证码错误
+  IAMLogin = 120003; // 登录相关错误
+  IAMOrg = 120011; // 组织相关错误
+  IAMRole = 120021; // 角色相关错误
+  IAMUser = 120031; // 用户相关错误
+
+  // --- perm-service ---
+  // [120000, 129999]
+  PermGeneral = 130000; // 通用错误
+  PermRBAC = 130001; // 权限校验错误
+  PermRBACReLogin = 130002; // 权限校验错误(需要重新登录)
+
+  // --- rag-service ---
+  // [150000, 159999]
+  RagGeneral = 150000;      // 通用错误
+  RagRole = 150001;         // 角色权限错误
+  RagInfoNotExist = 150002; // rag信息不存在
+  RagDeleteErr = 150003; // 删除rag错误
+  RagGetErr = 150004; // 获取rag错误
+  RagListErr = 150005; // 获取rag列表错误
+  RagCreateErr = 150006; // rag创建错误
+  RagUpdateErr = 150007; // rag更新错误
+  RagChatErr = 150008; // rag流式传输问答错误
+
+  // --- assistant-service ---
+  // [160000, 169999]
+  AssistantGeneral = 160000; // 通用错误
+  AssistantErr = 160001; // 智能体相关错误
+  AssistantActionErr = 160002; // 智能体action相关错误
+  AssistantWorkflowErr = 160003; // 智能体workflow相关错误
+  AssistantConversationErr = 160004; // 智能体对话相关错误
+
+  // --- model-service ---
+  ModelGeneral = 250000; // 通用错误
+  ModelImportedModel = 250001; // 导入模型错误
+  ModelGetModelById = 250002;  // 根据模型ID查询错误
+  ModelUpdateModel = 250003;  // 模型更新错误
+  ModelDeleteModel = 250004;  // 模型删除错误
+  ModelGetModel = 250005;      // 模型查询错误
+  ModelListModels = 250006;    // 模型列表错误
+  ModelChangeModelStatus = 250007;   // 模型启用/关停错误
+  ModelListTypeModels = 250008; // 模型llm/rerank/embedding列表错误
+  ModelGetModelByIds = 250009; // 根据模型ID列表查询错误
+
+  // --- knowledge-base-service ---
+  KnowledgeGeneral = 140000;     // 系统异常，请稍后重试
+  KnowledgeBaseCreateFailed = 141001; // 新建知识库失败，请稍后重试
+  KnowledgeBaseDeleteFailed = 141002; // 删除知识库失败，请稍后重试
+  KnowledgeBaseUpdateFailed = 141003; // 修改知识库失败，请稍后重试
+  KnowledgeBaseFetchFailed = 141004; // 获取知识库失败，请稍后重试
+  KnowledgeBaseAccessDenied = 141005; // 没有操作该知识库的权限
+  KnowledgeBaseDeleteDuringUpload = 141006; // 知识库正在上传文档，不可删除
+  KnowledgeBaseDeleteDuringParse = 141007; // 知识库正在解析文档，不可删除
+  KnowledgeBaseDuplicateName = 141008; // 已存在同名知识库
+  KnowledgeBaseSelectFailed = 141009; // 查询知识库列表失败，请稍后重试
+  KnowledgeDocDeleteDuringParse = 142001; // 文档正在解析文档，不可删除
+  KnowledgeDocDeleteFailed = 142002; // 文档删除失败，请稍后重试
+  KnowledgeDocSegmentStatusUpdateFail = 142003; // 修改文档分段状态失败，请稍后重试
+  KnowledgeDocImportFail = 142004; // 文档导入失败，请稍后重试
+  KnowledgeDocSplitFailed = 142005; // 文档分片查询失败，请稍后重试
+  KnowledgeDocUpdateStatusFailed = 142006; // 更新文档状态失败，请稍后重试
+  KnowledgeDocImportUrlFailed = 142007; // 获取上传文档失败，请稍后重试
+
+
+  // --- app-service ---
+  // [300000, 309999]
+  AppGeneral = 300000; // 通用错误
+  AppApikey = 300001; // ApiKey相关错误
+  AppExploration = 300002; // APP应用广场相关错误
+
+  // --- mcp-service ---
+  MCPGeneral = 310000; // 通用错误
+  MCPGetSquareMCPErr = 310001; // 获取广场MCP详情错误
+  MCPCreateCustomMCPErr = 310002; // 创建自定义MCP错误
+  MCPGetCustomMCPErr = 310003; // 获取自定义MCP详情错误
+  MCPDeleteCustomMCPErr = 310004; // 删除自定义MCP错误
+  MCPGetCustomMCPListErr = 310005; // 获取自定义MCP列表错误
+  MCPGetMCPAvatarErr = 310006; // 获取MCP头像错误
+}
+
