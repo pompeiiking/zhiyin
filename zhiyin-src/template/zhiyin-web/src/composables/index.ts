@@ -1,18 +1,15 @@
-/**
- * 组合式函数（composables）落位。
- *
- * 这里放**跨组件复用的前端逻辑**，不放业务规则（业务规则在后端 `policies/`）：
- *
- * | 计划中的组合式函数 | 用途 | 状态 |
- * | --- | --- | --- |
- * | `useGuestGuard` | 游客拦截：达到 2 问上限或访问工作台时拉起登录 Modal，**不跳走**（§3.2 返回与恢复、§5.3 游客拦截点） | 待实现 |
- * | `usePagination` / `useCollapse` | 工作台分层折叠与历史版本分页 | 待实现 |
- * | `useSse` | 第二期真实推送通道（第一期用轮询/请求响应，不建此文件） | 第二期 |
- *
- * 约定：
- * - 组合式函数只做"状态 + 副作用编排"，不发明文请求——请求一律经 `src/api/endpoints.ts`；
- * - 涉及权限与可见性的判断以 `store.session` 的身份与 `featureFlags` 为准，
- *   不要在组件里各写一遍。
- */
+import { ApiError, ErrorCode } from '@/api/client'
+import { useSessionStore } from '@/stores/session'
 
-export {}
+/** 仅处理后端给出的游客限制，不在前端推断问题次数或权限。 */
+export function useGuestGuard() {
+  const session = useSessionStore()
+  function handleGuestError(error: unknown): boolean {
+    if (!(error instanceof ApiError)) return false
+    if (error.code !== ErrorCode.UNAUTHORIZED && error.code !== ErrorCode.GUEST_LIMIT) return false
+    session.identity = { ...session.identity, role: 'guest' }
+    session.openLogin(error.code === ErrorCode.GUEST_LIMIT ? '本次体验已达到游客上限，登录后继续。' : '请登录后继续。')
+    return true
+  }
+  return { handleGuestError }
+}

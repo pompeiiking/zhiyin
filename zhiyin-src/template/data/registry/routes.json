@@ -3,7 +3,7 @@
   "items": [
     { "code": "home", "path": "/", "page_code": "screen-home", "require_login": false, "status": "enabled", "sort_order": 1 },
     { "code": "auth", "path": "/auth", "page_code": "screen-auth", "require_login": false, "status": "enabled", "sort_order": 2 },
-    { "code": "conversation", "path": "/conv", "page_code": "screen-conv", "require_login": true, "status": "enabled", "sort_order": 3 },
+    { "code": "conversation", "path": "/conv", "page_code": "screen-conv", "require_login": false, "status": "enabled", "sort_order": 3 },
     { "code": "workspace", "path": "/wb", "page_code": "screen-wb", "require_login": true, "status": "enabled", "sort_order": 4 },
     { "code": "report", "path": "/report", "page_code": "screen-report", "require_login": true, "status": "enabled", "sort_order": 5 }
   ]

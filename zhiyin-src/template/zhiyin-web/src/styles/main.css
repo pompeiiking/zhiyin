@@ -1,10 +1,7 @@
 /**
- * 全局样式基线。
- *
- * TODO(骨架): reset + 布局基线。组件级样式一律写在各自的 .vue 内，
- * 本文件只放全局重置与少量原子类。
+ * 全局重置与少量通用工具类。颜色等取值统一引用 tokens.css。
+ * 顶栏、弹窗、三栏布局及页面断点留在各自 .vue 内，避免覆盖其他域。
  */
-
 *,
 *::before,
 *::after {
@@ -17,4 +14,117 @@ body,
   margin: 0;
   padding: 0;
   height: 100%;
+}
+
+html {
+  font-family: var(--font-family-base);
+  line-height: var(--line-height-normal);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-base);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 不全局清除标题、段落和列表间距，保留报告等正文的默认可读性。 */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+select,
+input[type="checkbox"],
+input[type="radio"] {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+}
+
+textarea {
+  resize: vertical;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-action-bg);
+}
+
+a {
+  color: var(--color-link);
+  text-underline-offset: 0.2em;
+}
+
+/* 不清除默认 outline；键盘导航使用统一、可见的焦点框。 */
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus);
+  outline-offset: var(--focus-ring-offset);
+}
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
+}
+
+/* 显式使用工具类才约束宽度，不给每个页面强加容器。 */
+.container {
+  width: 100%;
+  max-width: var(--content-max-width);
+  margin-inline: auto;
+  padding-inline: var(--page-gutter);
+}
+
+/* 供图标按钮等提供屏幕阅读器文本；可聚焦内容获得焦点时恢复可见。 */
+.sr-only:not(:focus):not(:active) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 用户要求减少动效时，避免页面引入的平滑滚动造成不适。 */
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+}
+
+/* 滚动叙事（§2.5）：区块进入视口时淡入上移，由页面用 IntersectionObserver 加 .is-revealed。 */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity var(--duration-slow) var(--ease-standard),
+    transform var(--duration-slow) var(--ease-standard);
+}
+
+.reveal.is-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce), (prefers-reduced-data: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
