@@ -24,6 +24,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -255,3 +256,83 @@ async def test_acceptance_7_stall_triggers_coach_message() -> None:
     assert len(messages) == 1
     assert messages[0]["body"]
     assert messages[0]["action"]["type"] == "resume_review"
+
+
+@pytest.mark.asyncio
+async def test_acceptance_8_orchestrator_persists_full_assets_and_knowledge() -> None:
+    """编排器必须保存正文，并只展示本地知识库真实命中的理论引用。"""
+    from zhiyin_api.dto.conversation import MessageRequest, TaskEnterRequest
+    from zhiyin_kernel.enums import AssetType
+
+    container = _container()
+    user_id = "e2e_orchestrator_assets"
+
+    diagnose_session = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code="verify_direction")
+    )
+    diagnose_turn = await container.facade.send_message(
+        user_id,
+        MessageRequest(
+            task_id=diagnose_session.task_id,
+            message="我想验证这个方向适不适合我",
+        ),
+    )
+    report_versions = await container.asset_service.list_versions(
+        user_id, AssetType.REPORT
+    )
+    report = await container.asset_service.get_report(user_id)
+    assert report is not None
+    assert report_versions and report.version == report_versions[-1].version
+    assert report.sources
+
+    known_theories = json.loads(
+        (DATA_DIR / "knowledge" / "theory.json").read_text(encoding="utf-8")
+    )
+    known_ids = {item["id"] for item in known_theories["items"]}
+    cited_ids = {
+        item["theory_id"] for item in diagnose_turn.badge["theory_refs"]
+    }
+    assert cited_ids and cited_ids <= known_ids
+
+    decide_session = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code="undecided")
+    )
+    decide_turn = await container.facade.send_message(
+        user_id,
+        MessageRequest(
+            task_id=decide_session.task_id,
+            message="几个方向拿不准，我该选哪个",
+        ),
+    )
+    assert {
+        item["theory_id"] for item in decide_turn.badge["theory_refs"]
+    } <= known_ids
+    directions = await container.asset_service.list_direction_plans(user_id)
+    assert directions and all(item.report_id == report.id for item in directions)
+    assert all(
+        not gap.current_state and not gap.suggestion
+        for direction in directions
+        for gap in direction.gaps
+    )
+    selected = await container.asset_service.select_direction_plan(
+        user_id, directions[0].id
+    )
+
+    act_session = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code="how_to_act")
+    )
+    await container.facade.send_message(
+        user_id,
+        MessageRequest(
+            task_id=act_session.task_id,
+            message="方向定了但不知道怎么行动",
+        ),
+    )
+    action_plan = await container.asset_service.get_action_plan(user_id)
+    assert action_plan is not None and action_plan.plan_id == selected.id
+    assert action_plan.reminders_synced is False
+
+    workspace = await container.workspace_service.build_view(user_id)
+    assert workspace.report is not None
+    assert workspace.direction_plans
+    assert workspace.action_plan is not None

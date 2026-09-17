@@ -5,13 +5,14 @@
 | 文档用途 | 把第一期"代码已实现、但未接入可运行链路"的缺口与 Mock 内容显式标记出来，避免被"门禁通过 / 测试全绿"掩盖 |
 | 产生方式 | 对 `data-yuan@93f85f3` 的独立复核（2026-09-15），复核命令与实测结果见本文第四节 |
 | 复核范围扩展 | `business-tao@dfd7f34`（业务分支，2026-09-15）：闭合 OPEN-5，新增 OPEN-6 |
+| 本轮更新 | `service-tao@6187923`（业务编排分支，2026-09-16）：闭合 OPEN-1、OPEN-2，并迁移为正式 e2e 回归 |
 | 与原记录的关系 | 《职引-数据能力全链路完成情况记录》的个人自评保持原样；**两份文档必须合读**，本文只补充其未覆盖的缺口 |
-| 当前状态 | 未闭合项 5 条（OPEN-1 ~ OPEN-4、OPEN-6），Mock 标注问题 2 条（MOCK-1 ~ MOCK-2）；**OPEN-5 已闭合** |
+| 当前状态 | OPEN-1、OPEN-2、OPEN-5 已闭合；仍有未闭合项 3 条（OPEN-3、OPEN-4、OPEN-6），Mock 标注问题 2 条（MOCK-1 ~ MOCK-2） |
 | 清理约定 | 每项修好后，删除对应代码标记与 `tests/e2e/test_phase1_open_items.py` 中的用例，并把本文状态改为"已闭合" |
 
-> **一句话结论**：数据层的**实现质量**与**测试强度**都达到了第一期要求（门禁全绿、真实 Redis 实例验证通过），
-> 但其中 5 项能力只完成了"组件可选"，没有完成"链路上可选"——组件有实现、有测试，
-> 却没有调用方，因此从产品功能看仍是空的。
+> **当前结论**：OPEN-1、OPEN-2 已由业务编排链路接通并转为正式 e2e 回归；
+> OPEN-5 的服务状态守卫已经恢复；OPEN-3、OPEN-4、OPEN-6 与 MOCK-1 仍按本文继续跟踪。
+> 原始复核证据保留，避免覆盖问题历史。
 
 ---
 
@@ -19,7 +20,11 @@
 
 状态图例：**未闭合** = 组件已实现且测试通过，但主链路没有调用方；**部分闭合** = 链路可用但有一环仍是占位。
 
-### OPEN-1 · 资产正文从未落库，报告页 / 工作台 ②③④ 读不到内容 —— 未闭合
+### OPEN-1 · 资产正文从未落库，报告页 / 工作台 ②③④ 读不到内容 —— 已闭合
+
+闭环说明：`DefaultOrchestrator._persist_output` 已分别调用 `save_report`、
+`save_direction_plans`、`save_action_plan`；正文与版本元数据由资产服务原子保存。
+原 xfail 已迁移为 `tests/e2e/test_main_path.py::test_acceptance_8_orchestrator_persists_full_assets_and_knowledge`。
 
 | 项 | 内容 |
 | --- | --- |
@@ -30,7 +35,11 @@
 | 退出判据 | 诊断环节结束后 `get_report()` 非空且版本与 `list_versions(REPORT)[-1]` 一致；`tests/e2e/test_phase1_open_items.py::test_open1_*` 由 xfail 变 XPASS 并删除标记 |
 | 代码标记 | `business/services/orchestrator.py` · `business/services/asset.py` |
 
-### OPEN-2 · 本地知识检索未接入诊断 / 决策链路 —— 未闭合
+### OPEN-2 · 本地知识检索未接入诊断 / 决策链路 —— 已闭合
+
+闭环说明：诊断、决策现在读取当前主理的动态理论卡，调用
+`KnowledgeGateway.search(namespace="theory")`，把命中注入 Agent 上下文，并只将真实命中转换为 TheoryRef。
+同一正式 e2e 同时校验引用 ID 属于 `data/knowledge/theory.json`。
 
 | 项 | 内容 |
 | --- | --- |
@@ -144,6 +153,6 @@
 
 ## 五、清理约定
 
-1. 修好某项后：删除对应代码里的 `TODO(第一期未闭合)` / `TODO(Mock 标注)` 标记，删除 `tests/e2e/test_phase1_open_items.py` 中该用例，并把本文该项状态改为"已闭合（提交号）"。
+1. 修好某项后：删除 `tests/e2e/test_phase1_open_items.py` 中对应 xfail，把目标行为迁移为正式回归，并把本文状态改为“已闭合”。归属方文件中若仍保留历史 TODO，应由对应负责人复核后清理，避免跨负责人顺带修改实现文件。
 2. `tests/e2e/test_phase1_open_items.py` 里的用例是 `xfail(strict=True)`：**修好后它们会变红（XPASS）**，这是故意的提醒，不是回归。
 3. 本文只做标记与核验，不改动任何业务逻辑；原始自评文档不改写。

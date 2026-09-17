@@ -1,7 +1,7 @@
 """编排器实现。
 
 落位：`business/services/orchestrator.py` —— 业务编排负责人。
-依赖：黑板四件套 Port + `policies/` 四条规则 + AgentEngine + Registry / 会话 Repository。
+依赖：黑板四件套 Port + `policies/` 规则 + AgentEngine + Registry / 会话 Repository。
 
 已落实的第一期决策
 ------------------
@@ -15,9 +15,8 @@
 本类保持"读黑板 → 调规则 → 落库 → 发事件"的装配式编排，
 规则本身写在 `policies/`，**本类不得内联任何业务规则**。
 
-`policies/` 里已有对应 ABC（`IntentPolicy` / `StagePolicy` / `LeadPolicy` /
-`HandoffPolicy`），构造参数就是它们——规则实现与编排实现可以两个人并行做，
-各自对着 ABC 交付。
+`policies/` 里已有对应 ABC（含独立的 `AxisAInferencePolicy`），构造参数就是
+它们——规则实现与编排实现可以并行交付，各自对着 ABC 验收。
 """
 
 from __future__ import annotations
@@ -26,14 +25,20 @@ import asyncio
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from pydantic import BaseModel, ConfigDict
+
+from zhiyin_business.contracts.act import ActOutput
 from zhiyin_business.contracts.common import (
     AgentBadge,
-    AssetUpdateDraft,
     BehaviorEventDraft,
     BehaviorGuide,
     ConversationMessage,
+    TheoryRef,
 )
+from zhiyin_business.contracts.decide import DecideOutput
+from zhiyin_business.contracts.diagnose import DiagnoseOutput
 from zhiyin_business.events import LOOP_STAGE_CHANGED, LoopStageChangedPayload
+from zhiyin_business.policies.axis_a import AxisAInferencePolicy
 from zhiyin_business.policies.handoff import HandoffPolicy
 from zhiyin_business.policies.routing import IntentPolicy, StagePolicy
 from zhiyin_business.policies.teaming import LeadPolicy
@@ -54,16 +59,34 @@ from zhiyin_business.ports.orchestrator import (
     TurnResult,
 )
 from zhiyin_business.services.loop import STAGE_OUTPUT_CONTRACTS, default_conclusion_builder
+from zhiyin_data_sdk.gateways.ai import KnowledgeGateway, KnowledgeHit
 from zhiyin_data_sdk.repositories import RegistryRepository, TaskSessionRepository
-from zhiyin_kernel.blackboard import TaskSession
+from zhiyin_kernel.assets import ActionPlan, DirectionPlan, PlanGap, Report
+from zhiyin_kernel.blackboard import AssetVersion, TaskSession
 from zhiyin_kernel.enums import (
     AssetType,
     AxisAStage,
     BehaviorEventType,
     LoopStage,
+    PathFocus,
     TaskStatus,
 )
-from zhiyin_orchestration import AgentEngine, AgentRequest, DomainEvent, EventBus
+from zhiyin_orchestration import (
+    AgentEngine,
+    AgentRequest,
+    DomainEvent,
+    EventBus,
+    StateStore,
+)
+
+
+class _AxisAInferenceResult(BaseModel):
+    """模型兜底的最小结构化产出，不属于公开业务契约。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    stage: AxisAStage
+    reason: str = ""
 
 
 class DefaultOrchestrator(Orchestrator):
@@ -80,9 +103,12 @@ class DefaultOrchestrator(Orchestrator):
         assets: AssetService,
         intent_policy: IntentPolicy,
         stage_policy: StagePolicy,
+        axis_a_policy: AxisAInferencePolicy,
         lead_policy: LeadPolicy,
         handoff_policy: HandoffPolicy,
         agent_engine: AgentEngine,
+        knowledge: KnowledgeGateway,
+        state_store: StateStore,
         sessions: TaskSessionRepository,
         registry: RegistryRepository,
         event_bus: EventBus,
@@ -93,9 +119,12 @@ class DefaultOrchestrator(Orchestrator):
         self._assets = assets
         self._intent_policy = intent_policy
         self._stage_policy = stage_policy
+        self._axis_a_policy = axis_a_policy
         self._lead_policy = lead_policy
         self._handoff_policy = handoff_policy
         self._agent_engine = agent_engine
+        self._knowledge = knowledge
+        self._state_store = state_store
         self._sessions = sessions
         self._registry = registry
         self._event_bus = event_bus
@@ -124,9 +153,7 @@ class DefaultOrchestrator(Orchestrator):
         blackboard = await self.read_blackboard(user_id, "")
         return await self._intent_policy.classify(message=message, blackboard=blackboard)
 
-    async def detect_stage(
-        self, user_id: str, task_id: str, intent: IntentType
-    ) -> StageDecision:
+    async def detect_stage(self, user_id: str, task_id: str, intent: IntentType) -> StageDecision:
         blackboard = await self.read_blackboard(user_id, task_id)
         return await self._stage_policy.decide(
             blackboard=blackboard,
@@ -134,18 +161,111 @@ class DefaultOrchestrator(Orchestrator):
             message=intent.value,
         )
 
+    async def _detect_stage_for_message(
+        self,
+        *,
+        user_id: str,
+        task_id: str,
+        intent: IntentType,
+        message: str,
+    ) -> StageDecision:
+        decision = await self._stage_policy.decide(
+            blackboard=await self.read_blackboard(user_id, task_id),
+            intent=intent,
+            message=message,
+        )
+        return await self._apply_routing_fallback(user_id, task_id, decision)
+
+    async def _apply_routing_fallback(
+        self,
+        user_id: str,
+        task_id: str,
+        decision: StageDecision,
+    ) -> StageDecision:
+        state_key = f"orchestrator:routing-clarify:{user_id}:{task_id or '_'}"
+        if not decision.need_clarify and decision.stage is not None:
+            self._state_store.delete(state_key)
+            return decision
+
+        params = await self._registry.get_policy_params("routing")
+        if params is None or params.status != "confirmed":
+            raise RuntimeError("routing 规则参数缺失或尚未确认")
+        attempts = params.value.get("clarify_attempts")
+        fallback_value = params.value.get("fallback_stage")
+        if isinstance(attempts, bool) or not isinstance(attempts, int) or attempts < 0:
+            raise RuntimeError("routing.clarify_attempts 必须是非负整数")
+        try:
+            fallback_stage = LoopStage(str(fallback_value))
+        except ValueError as exc:
+            raise RuntimeError("routing.fallback_stage 不是有效环节") from exc
+
+        current = self._state_store.read(state_key)
+        current_attempts = 0
+        if current is not None and isinstance(current.value, dict):
+            stored_attempts = current.value.get("attempts", 0)
+            if isinstance(stored_attempts, int) and not isinstance(stored_attempts, bool):
+                current_attempts = max(stored_attempts, 0)
+        if current_attempts < attempts:
+            self._state_store.write(
+                state_key,
+                {"attempts": current_attempts + 1},
+                expected_version=current.version if current is not None else 0,
+            )
+            return decision.model_copy(update={"stage": None, "need_clarify": True})
+
+        self._state_store.delete(state_key)
+        return StageDecision(
+            stage=fallback_stage,
+            confidence=0.0,
+            need_clarify=False,
+            clarify_question=None,
+        )
+
     async def infer_axis_a(self, user_id: str, task_id: str) -> AxisAStage:
         blackboard = await self.read_blackboard(user_id, task_id)
-        event_types = {item.event_type for item in blackboard.recent_behaviors}
-        if BehaviorEventType.REVIEW in event_types:
-            return AxisAStage.ADAPT
-        if BehaviorEventType.TASK_DONE in event_types:
-            return AxisAStage.SPRINT_ACTION
-        if blackboard.profile is not None and any(
-            field.key == "target_direction" for field in blackboard.profile.fields
-        ):
-            return AxisAStage.VERIFY_DIRECTION
-        return AxisAStage.EXPLORE_SELF
+        session = await self._sessions.get(task_id) if task_id else None
+        path_focus = (
+            session.path_focus if session is not None and session.user_id == user_id else None
+        )
+        inferred = self._axis_a_policy.infer(
+            blackboard=blackboard,
+            path_focus=path_focus,
+        )
+        if inferred is not None:
+            return inferred
+        return await self._infer_axis_a_with_model(blackboard, path_focus)
+
+    async def _infer_axis_a_with_model(
+        self,
+        blackboard: BlackboardView,
+        path_focus: PathFocus | None,
+    ) -> AxisAStage:
+        agents = await self._registry.list_agents()
+        inference_agent = next(
+            (agent for agent in agents if "super_life_stage" in agent.theory_packages),
+            None,
+        )
+        if inference_agent is None:
+            return AxisAStage.EXPLORE_SELF
+        theory_cards = await self._registry.list_theory_cards(inference_agent.theory_packages)
+        result = await self._agent_engine.invoke(
+            AgentRequest(
+                agent_id=inference_agent.id,
+                stage="axis_a_inference",
+                blackboard=blackboard.model_dump(mode="json"),
+                prompt_vars={
+                    "path_focus": path_focus.value if path_focus is not None else None,
+                    "theory_context": [card.model_dump(mode="json") for card in theory_cards],
+                },
+                output_schema=_AxisAInferenceResult.model_json_schema(),
+            )
+        )
+        if not result.valid:
+            return AxisAStage.EXPLORE_SELF
+        try:
+            return _AxisAInferenceResult.model_validate(result.structured).stage
+        except ValueError:
+            return AxisAStage.EXPLORE_SELF
 
     async def select_lead(
         self,
@@ -168,7 +288,6 @@ class DefaultOrchestrator(Orchestrator):
         session = await self._sessions.get(task_id)
         if session is None or session.user_id != user_id:
             raise LookupError(f"任务会话不存在：{task_id}")
-        blackboard = await self.read_blackboard(user_id, task_id)
         lead = await self.select_lead(
             user_id,
             task_id,
@@ -176,24 +295,41 @@ class DefaultOrchestrator(Orchestrator):
             to_stage,
             IntentType.FREE_CHAT,
         )
-        decision = self._handoff_policy.decide(
-            blackboard=blackboard,
-            from_stage=session.loop_stage,
-            from_agent=session.lead_agent,
+        return await self._perform_handoff(
+            user_id=user_id,
+            session=session,
             to_stage=to_stage,
             reason=reason,
             to_agent=lead.lead_agent,
         )
-        await self._sessions.update_stage(task_id, to_stage, decision.to_agent)
+
+    async def _perform_handoff(
+        self,
+        *,
+        user_id: str,
+        session: TaskSession,
+        to_stage: LoopStage,
+        reason: str,
+        to_agent: str,
+    ) -> HandoffDecision:
+        decision = self._handoff_policy.decide(
+            blackboard=await self.read_blackboard(user_id, session.id),
+            from_stage=session.loop_stage,
+            from_agent=session.lead_agent,
+            to_stage=to_stage,
+            reason=reason,
+            to_agent=to_agent,
+        )
+        await self._sessions.update_stage(session.id, to_stage, decision.to_agent)
         await self._memories.upsert(
             user_id,
-            task_id,
+            session.id,
             loop_stage=to_stage,
             lead_agent=decision.to_agent,
         )
         payload = LoopStageChangedPayload(
             user_id=user_id,
-            task_id=task_id,
+            task_id=session.id,
             from_stage=session.loop_stage.value,
             to_stage=to_stage.value,
             from_agent=session.lead_agent,
@@ -206,22 +342,39 @@ class DefaultOrchestrator(Orchestrator):
                 event_type=LOOP_STAGE_CHANGED,
                 occurred_at=datetime.now(timezone.utc),
                 payload=payload.model_dump(mode="json"),
-                idempotency_key=f"handoff:{task_id}:{session.loop_stage.value}:{to_stage.value}",
+                idempotency_key=(
+                    f"handoff:{session.id}:{session.loop_stage.value}:{to_stage.value}:"
+                    f"{session.lead_agent}:{decision.to_agent}"
+                ),
             )
         )
         return decision
 
     async def handle_message(self, request: TurnRequest) -> TurnResult:
-        intent = await self.detect_intent(request.user_id, request.message)
-        decision = await self.detect_stage(request.user_id, request.task_id, intent)
         existing = await self._sessions.get(request.task_id)
+        if existing is not None and existing.user_id != request.user_id:
+            raise PermissionError(f"会话 {request.task_id} 不属于用户 {request.user_id}")
+        intent = await self.detect_intent(request.user_id, request.message)
+        decision = await self._detect_stage_for_message(
+            user_id=request.user_id,
+            task_id=request.task_id,
+            intent=intent,
+            message=request.message,
+        )
         if decision.need_clarify or decision.stage is None:
             if existing is None:
                 existing = await self._create_session(
                     request.user_id, request.task_id, LoopStage.COLLECT, intent
                 )
             descriptor = await self._registry.get_agent(existing.lead_agent)
-            question = decision.clarify_question or "你希望先从哪件事开始？"
+            question = decision.clarify_question
+            if not question:
+                raise RuntimeError("路由策略要求澄清，但未提供澄清文案")
+            await self._record_turn(
+                user_id=request.user_id,
+                session=existing,
+                message=request.message,
+            )
             return TurnResult(
                 task_id=existing.id,
                 session=existing,
@@ -232,9 +385,7 @@ class DefaultOrchestrator(Orchestrator):
                     role_summary=descriptor.role_summary if descriptor else "",
                 ),
                 messages=[
-                    ConversationMessage(
-                        role="agent", text=question, agent_id=existing.lead_agent
-                    )
+                    ConversationMessage(role="agent", text=question, agent_id=existing.lead_agent)
                 ],
                 guide=BehaviorGuide(kind="question", text=question, question=question),
             )
@@ -252,11 +403,13 @@ class DefaultOrchestrator(Orchestrator):
                 request.user_id, request.task_id, stage, intent, lead.lead_agent
             )
             handoff = None
-        elif existing.user_id != request.user_id:
-            raise PermissionError(f"会话 {request.task_id} 不属于用户 {request.user_id}")
         elif existing.loop_stage is not stage or existing.lead_agent != lead.lead_agent:
-            handoff = await self.handoff(
-                request.user_id, existing.id, stage, lead.reason
+            handoff = await self._perform_handoff(
+                user_id=request.user_id,
+                session=existing,
+                to_stage=stage,
+                reason=lead.reason,
+                to_agent=lead.lead_agent,
             )
             session = await self._sessions.get(existing.id)
         else:
@@ -266,13 +419,22 @@ class DefaultOrchestrator(Orchestrator):
             raise RuntimeError("会话创建后无法读取")
 
         blackboard = await self.read_blackboard(request.user_id, session.id)
+        knowledge_hits = await self._load_knowledge_context(
+            message=request.message,
+            agent_id=session.lead_agent,
+            stage=stage,
+        )
         contract = STAGE_OUTPUT_CONTRACTS[stage]
         agent_result = await self._agent_engine.invoke(
             AgentRequest(
                 agent_id=session.lead_agent,
                 stage=stage.value,
                 blackboard=blackboard.model_dump(mode="json"),
-                prompt_vars={"user_input": request.message, "intent": intent.value},
+                prompt_vars={
+                    "user_input": request.message,
+                    "intent": intent.value,
+                    "knowledge_hits": [hit.model_dump(mode="json") for hit in knowledge_hits],
+                },
                 output_schema=contract.model_json_schema(),
             )
         )
@@ -281,41 +443,41 @@ class DefaultOrchestrator(Orchestrator):
             output = None
             guide = BehaviorGuide(kind="question", text=question, question=question)
             messages = [
-                ConversationMessage(
-                    role="agent", text=question, agent_id=session.lead_agent
-                )
+                ConversationMessage(role="agent", text=question, agent_id=session.lead_agent)
             ]
             theory_refs = []
         else:
             output = contract.model_validate(agent_result.structured)
+            if stage in {LoopStage.DIAGNOSE, LoopStage.DECIDE}:
+                theory_refs = self._theory_refs_from_hits(knowledge_hits, stage)
+                output = output.model_copy(update={"theory_refs": theory_refs})
+            else:
+                theory_refs = list(getattr(output, "theory_refs", []))
             guide = output.guide
             conclusion = default_conclusion_builder(stage, output)
-            theory_refs = list(getattr(output, "theory_refs", []))
-            messages = [
-                ConversationMessage(
-                    role="agent",
-                    text=conclusion,
-                    agent_id=session.lead_agent,
-                    theory_refs=theory_refs,
-                )
-            ] if conclusion else []
+            messages = (
+                [
+                    ConversationMessage(
+                        role="agent",
+                        text=conclusion,
+                        agent_id=session.lead_agent,
+                        theory_refs=theory_refs,
+                    )
+                ]
+                if conclusion
+                else []
+            )
 
         created_versions = await self._persist_output(
-            request.user_id, stage, output
-        )
-        await self._behaviors.log(
             request.user_id,
-            BehaviorEventDraft(
-                event_type=BehaviorEventType.ANSWER,
-                payload={"task_id": session.id, "stage": stage.value},
-            ),
+            stage,
+            output,
+            knowledge_hits=knowledge_hits,
         )
-        await self._memories.upsert(
-            request.user_id,
-            session.id,
-            loop_stage=stage,
-            lead_agent=session.lead_agent,
-            summary_delta=request.message[:200],
+        await self._record_turn(
+            user_id=request.user_id,
+            session=session,
+            message=request.message,
         )
         descriptor = await self._registry.get_agent(session.lead_agent)
         return TurnResult(
@@ -334,6 +496,62 @@ class DefaultOrchestrator(Orchestrator):
             asset_versions=created_versions,
         )
 
+    async def _load_knowledge_context(
+        self,
+        *,
+        message: str,
+        agent_id: str,
+        stage: LoopStage,
+    ) -> list[KnowledgeHit]:
+        if stage not in {LoopStage.DIAGNOSE, LoopStage.DECIDE}:
+            return []
+        descriptor = await self._registry.get_agent(agent_id)
+        theory_cards = (
+            await self._registry.list_theory_cards(descriptor.theory_packages)
+            if descriptor is not None and descriptor.theory_packages
+            else []
+        )
+        query_parts = [message]
+        for card in theory_cards:
+            query_parts.extend((card.name, card.summary))
+        query = " ".join(part.strip() for part in query_parts if part.strip())
+        if not query:
+            return []
+        return await self._knowledge.search(query, top_k=5, namespace="theory")
+
+    @staticmethod
+    def _theory_refs_from_hits(hits: list[KnowledgeHit], stage: LoopStage) -> list[TheoryRef]:
+        return [
+            TheoryRef(
+                theory_id=hit.doc_id,
+                name=hit.title or hit.doc_id,
+                stage=stage.value,
+            )
+            for hit in hits
+        ]
+
+    async def _record_turn(
+        self,
+        *,
+        user_id: str,
+        session: TaskSession,
+        message: str,
+    ) -> None:
+        await self._behaviors.log(
+            user_id,
+            BehaviorEventDraft(
+                event_type=BehaviorEventType.ANSWER,
+                payload={"task_id": session.id, "stage": session.loop_stage.value},
+            ),
+        )
+        await self._memories.upsert(
+            user_id,
+            session.id,
+            loop_stage=session.loop_stage,
+            lead_agent=session.lead_agent,
+            summary_delta=message[:200],
+        )
+
     async def _create_session(
         self,
         user_id: str,
@@ -347,7 +565,7 @@ class DefaultOrchestrator(Orchestrator):
                 await self.select_lead(
                     user_id,
                     task_id,
-                    AxisAStage.EXPLORE_SELF,
+                    await self.infer_axis_a(user_id, task_id),
                     stage,
                     intent,
                 )
@@ -367,7 +585,14 @@ class DefaultOrchestrator(Orchestrator):
             )
         )
 
-    async def _persist_output(self, user_id: str, stage: LoopStage, output) -> list:
+    async def _persist_output(
+        self,
+        user_id: str,
+        stage: LoopStage,
+        output,
+        *,
+        knowledge_hits: list[KnowledgeHit],
+    ) -> list[AssetVersion]:
         if output is None:
             return []
         if stage is LoopStage.COLLECT:
@@ -382,31 +607,106 @@ class DefaultOrchestrator(Orchestrator):
                 )
             await self._profiles.replace_gaps(user_id, output.remaining_gaps)
             return []
-        asset_type = {
-            LoopStage.DIAGNOSE: AssetType.REPORT,
-            LoopStage.DECIDE: AssetType.DIRECTION_PLAN,
-            LoopStage.ACT: AssetType.ACTION_PLAN,
-        }.get(stage)
-        if asset_type is None:
-            return []
         profile = await self._profiles.get(user_id)
-        dependencies = [field.key for field in profile.fields] if profile else []
-        # TODO(第一期未闭合): OPEN-1 —— 这里只落"版本元数据"，把 output 里的正文
-        # （DiagnoseOutput.verdict/swot/dimensions、DecideOutput.plans、ActOutput.phases）
-        # 丢掉了。因此资产有版本号、但没有正文：报告页 404、工作台 ②③④ 显示"尚未生成…"。
-        # 接线点就是下面这次调用：应改为 assets.save_report / save_direction_plans /
-        # save_action_plan（这三个 API 已实现且已通过契约测试）。
-        # 归属与退出判据：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-1）。
-        return [
-            await self._assets.save_version(
-                user_id,
-                AssetUpdateDraft(
-                    asset_type=asset_type,
-                    depends_on_profile_keys=dependencies,
-                    reason=f"{stage.value} 环节产生新资产",
+        dependencies = list(dict.fromkeys(field.key for field in profile.fields)) if profile else []
+
+        if stage is LoopStage.DIAGNOSE:
+            if not isinstance(output, DiagnoseOutput):
+                raise TypeError("诊断环节产出类型不正确")
+            report = Report(
+                id=f"rpt_{uuid4().hex[:12]}",
+                user_id=user_id,
+                version=1,
+                generated_at=datetime.now(timezone.utc),
+                verdict=output.verdict,
+                swot=output.swot,
+                dimensions=output.dimensions,
+                gap_claims=[],
+                sources=self._report_sources(output, knowledge_hits),
+                methodologies=list(
+                    dict.fromkeys(ref.name or ref.theory_id for ref in output.theory_refs)
                 ),
             )
-        ]
+            return [
+                await self._assets.save_report(
+                    user_id,
+                    report,
+                    depends_on_profile_keys=dependencies,
+                    reason=f"{stage.value} 环节产生新资产",
+                )
+            ]
+
+        if stage is LoopStage.DECIDE:
+            if not isinstance(output, DecideOutput):
+                raise TypeError("决策环节产出类型不正确")
+            report = await self._assets.get_report(user_id)
+            plans = [
+                DirectionPlan(
+                    id=option.option_id,
+                    report_id=report.id if report is not None else None,
+                    role=option.role,
+                    name=option.name,
+                    target_desc=option.target_desc,
+                    match_score=option.match_score,
+                    gaps=[
+                        PlanGap(
+                            requirement=gap,
+                            current_state="",
+                            suggestion="",
+                        )
+                        for gap in option.gaps
+                    ],
+                    fit_reason=option.fit_reason,
+                    main_risk=option.main_risk,
+                )
+                for option in output.plans
+            ]
+            return [
+                await self._assets.save_direction_plans(
+                    user_id,
+                    plans,
+                    depends_on_profile_keys=dependencies,
+                    reason=f"{stage.value} 环节产生新资产",
+                )
+            ]
+
+        if stage is LoopStage.ACT:
+            if not isinstance(output, ActOutput):
+                raise TypeError("行动环节产出类型不正确")
+            directions = await self._assets.list_direction_plans(user_id)
+            selected = next((item for item in directions if item.selected), None)
+            plan = ActionPlan(
+                id=f"act_{uuid4().hex[:12]}",
+                plan_id=selected.id if selected is not None else None,
+                phases=output.phases,
+                reminders_synced=(
+                    bool(output.reminders)
+                    and all(item.calendar_synced for item in output.reminders)
+                ),
+            )
+            return [
+                await self._assets.save_action_plan(
+                    user_id,
+                    plan,
+                    depends_on_profile_keys=dependencies,
+                    reason=f"{stage.value} 环节产生新资产",
+                )
+            ]
+        return []
+
+    @staticmethod
+    def _report_sources(
+        output: DiagnoseOutput,
+        knowledge_hits: list[KnowledgeHit],
+    ) -> list[str]:
+        candidates: list[str] = []
+        for hit in knowledge_hits:
+            source = hit.metadata.get("source_url") or hit.metadata.get("source")
+            if source:
+                candidates.append(str(source))
+        candidates.extend(item.source for item in output.facts if item.source)
+        candidates.extend(item.source for item in output.evidences if item.source)
+        return list(dict.fromkeys(item.strip() for item in candidates if item.strip()))
 
 
 __all__ = ["DefaultOrchestrator"]
