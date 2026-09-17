@@ -48,6 +48,11 @@ def test_ci_renders_compose_from_the_wanwu_project_directory() -> None:
     assert "docker compose --project-directory platform/wanwu" in ci
 
 
+def test_ci_installs_m3_dependencies_before_collecting_full_suite() -> None:
+    ci = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert 'pip install -e ".[dev,m3]"' in ci
+
+
 def test_init_env_generates_passwords_without_changing_public_values() -> None:
     import importlib.util
 

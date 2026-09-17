@@ -21,7 +21,7 @@ cd zhiyin-src/template
 python -m venv .venv
 . .venv/Scripts/activate        # Windows；macOS/Linux 用 source .venv/bin/activate
 
-pip install -e ".[dev]"          # 需要 MySQL 时再加 ".[mysql]"
+pip install -e ".[dev,m3]"       # 全量测试包含 M3 数据基础设施用例
 
 # 1. 装配检查：打印每一层实际装了什么，不启动服务
 python -m zhiyin_boot --check            # 信息输出，恒退出 0
