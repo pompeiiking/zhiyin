@@ -17,8 +17,11 @@ COPY zhiyin-data-sdk ./zhiyin-data-sdk
 COPY zhiyin-infrastructure ./zhiyin-infrastructure
 COPY zhiyin-boot ./zhiyin-boot
 COPY data ./data
+COPY alembic.ini ./alembic.ini
+COPY migrations ./migrations
 
-RUN python -m pip install . && chown -R zhiyin:zhiyin /app
+RUN python -m pip install ".[m3]" && chown -R zhiyin:zhiyin /app
+COPY --chown=zhiyin:zhiyin scripts ./scripts
 
 USER zhiyin
 EXPOSE 8000

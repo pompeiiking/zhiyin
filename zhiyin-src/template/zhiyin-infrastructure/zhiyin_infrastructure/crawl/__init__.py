@@ -7,6 +7,11 @@ from zhiyin_infrastructure.crawl.pipeline import (
     KnowledgeSourceAdapter,
     ReviewDecision,
 )
+from zhiyin_infrastructure.crawl.production import (
+    CrawlMode,
+    CrawlPausedError,
+    ProductionCrawlRunner,
+)
 
 __all__ = [
     "CrawlReport",
@@ -14,4 +19,7 @@ __all__ = [
     "KnowledgeSource",
     "KnowledgeSourceAdapter",
     "ReviewDecision",
+    "CrawlMode",
+    "CrawlPausedError",
+    "ProductionCrawlRunner",
 ]

@@ -10,8 +10,14 @@ build
 dist
 *.egg-info
 tests
+!tests/
+tests/*
+!tests/contracts/
+!tests/contracts/**
 contracts
-scripts
+scripts/*
+!scripts/verify_m3_runtime.py
+!scripts/run_mysql_contracts.py
 zhiyin-web/node_modules
 zhiyin-web/dist
 data/objects

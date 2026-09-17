@@ -23,8 +23,9 @@ fi
 echo "启动 Flask 服务..."
 nohup python netsearch_server.py >> "$LOG_FILE" 2>&1 &
 
-# 保存进程 ID 到 pid 文件（可选）
-echo $! > net_search.pid
+# PID 与日志统一写入运行目录，禁止污染受控源码快照。
+PID_FILE="$LOG_DIR/net_search.pid"
+echo $! > "$PID_FILE"
 
 echo "服务已启动，日志写入：$LOG_FILE"
-echo "PID: $(cat net_search.pid)"
+echo "PID: $(cat "$PID_FILE")"

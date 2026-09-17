@@ -113,19 +113,33 @@ def build_container(settings: Optional[Settings] = None) -> Container:
     """构造完整容器：Gateways → Repositories → 编排原语 → 服务 → Worker。"""
     settings = settings or Settings.from_env()
     gateway_values = build_gateways(settings)
+    repository_values = build_repositories(settings)
     redis_extras = {
         key: gateway_values.pop(key)
         for key in list(gateway_values)
         if key.startswith("redis_")
     }
+    database_context = repository_values.pop("_database_context", None)
     container = Container(
         settings=settings,
         transactions=build_transactions(settings),
         feature_flags=build_feature_flags(settings),
         **gateway_values,
-        **build_repositories(settings),
+        **repository_values,
     )
     container.extra.update(redis_extras)
+    if database_context is not None:
+        container.extra["database_context"] = database_context
+        configure_audit = getattr(container.search, "configure_audit", None)
+        if callable(configure_audit):
+            from zhiyin_infrastructure.persistence.retrieval_logs import RetrievalLogStore
+
+            retrieval_logs = RetrievalLogStore(database_context)
+            container.extra["retrieval_logs"] = retrieval_logs
+            configure_audit(
+                retrieval_logs,
+                org_id=settings.pami_org_id or "default",
+            )
     build_orchestration(container)
     build_services(container)
     build_workers(container)
@@ -225,6 +239,19 @@ def wire_application(container: Optional[Container] = None) -> Any:
             redis_factory = container.extra.get("redis_factory")
             if redis_factory is not None:
                 await redis_factory.close()
+            close_vector = getattr(container.vector, "close", None)
+            if callable(close_vector):
+                await close_vector()
+            close_raw_query = getattr(container.raw_query, "close", None)
+            if callable(close_raw_query):
+                await close_raw_query()
+            close_transactions = getattr(container.transactions, "close", None)
+            if callable(close_transactions):
+                close_transactions()
+            database_context = container.extra.get("database_context")
+            close_database = getattr(database_context, "close", None)
+            if callable(close_database):
+                await close_database()
 
     return create_app(
         title=f"{container.settings.app_name} API",

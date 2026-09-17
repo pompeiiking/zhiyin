@@ -42,16 +42,35 @@ class Settings:
 
     # ---------- 能力开关：决定装配 local 还是 pami ----------
     use_pami_llm: bool = False
+    use_pami_embedding: bool = False
     use_pami_knowledge: bool = False
     use_pami_auth: bool = False
     use_mysql: bool = False
+    use_pgvector: bool = False
+    use_minio: bool = False
     # 前端联调预留：真实 Facade 已实现；Mock Facade 仍保留为可选测试替身。
     mock_facade: bool = False
 
     # ---------- pami 接入 ----------
     pami_base_url: str = ""
+    # 旧的通用 Key 仅为兼容已有环境；Agent / RAG 同时启用时必须分别配置。
     pami_api_key: str = ""
+    pami_agent_api_key: str = ""
+    pami_rag_api_key: str = ""
     pami_jwt_secret: str = ""
+    pami_org_id: str = ""
+    pami_embedding_model_id: str = ""
+    pami_timeout_s: float = 60.0
+
+    # ---------- M3 数据基础设施 ----------
+    vector_database_url: str = ""
+    vector_search_namespace: str = "theory"
+    search_rrf_k: int = 60
+    minio_endpoint: str = ""
+    minio_access_key: str = ""
+    minio_secret_key: str = ""
+    minio_bucket: str = "zhiyin-assets"
+    minio_secure: bool = False
 
     # ---------- 本地实现参数 ----------
     local_data_dir: str = "data"
@@ -87,13 +106,29 @@ class Settings:
                 _env("ZHIYIN_REDIS_SOCKET_TIMEOUT_S", "2.0")
             ),
             use_pami_llm=_env_bool("ZHIYIN_USE_PAMI_LLM"),
+            use_pami_embedding=_env_bool("ZHIYIN_USE_PAMI_EMBEDDING"),
             use_pami_knowledge=_env_bool("ZHIYIN_USE_PAMI_KNOWLEDGE"),
             use_pami_auth=_env_bool("ZHIYIN_USE_PAMI_AUTH"),
             use_mysql=_env_bool("ZHIYIN_USE_MYSQL"),
+            use_pgvector=_env_bool("ZHIYIN_USE_PGVECTOR"),
+            use_minio=_env_bool("ZHIYIN_USE_MINIO"),
             mock_facade=_env_bool("ZHIYIN_MOCK"),
             pami_base_url=_env("ZHIYIN_PAMI_BASE_URL"),
             pami_api_key=_env("ZHIYIN_PAMI_API_KEY"),
+            pami_agent_api_key=_env("ZHIYIN_PAMI_AGENT_API_KEY"),
+            pami_rag_api_key=_env("ZHIYIN_PAMI_RAG_API_KEY"),
             pami_jwt_secret=_env("ZHIYIN_PAMI_JWT_SECRET"),
+            pami_org_id=_env("ZHIYIN_PAMI_ORG_ID"),
+            pami_embedding_model_id=_env("ZHIYIN_PAMI_EMBEDDING_MODEL_ID"),
+            pami_timeout_s=float(_env("ZHIYIN_PAMI_TIMEOUT_S", "60")),
+            vector_database_url=_env("ZHIYIN_VECTOR_DATABASE_URL"),
+            vector_search_namespace=_env("ZHIYIN_VECTOR_SEARCH_NAMESPACE", "theory"),
+            search_rrf_k=int(_env("ZHIYIN_SEARCH_RRF_K", "60")),
+            minio_endpoint=_env("ZHIYIN_MINIO_ENDPOINT"),
+            minio_access_key=_env("ZHIYIN_MINIO_ACCESS_KEY"),
+            minio_secret_key=_env("ZHIYIN_MINIO_SECRET_KEY"),
+            minio_bucket=_env("ZHIYIN_MINIO_BUCKET", "zhiyin-assets"),
+            minio_secure=_env_bool("ZHIYIN_MINIO_SECURE"),
             local_data_dir=_env("ZHIYIN_DATA_DIR", "data"),
             local_object_dir=_env("ZHIYIN_OBJECT_DIR", "data/objects"),
             local_registry_dir=_env("ZHIYIN_REGISTRY_DIR", "data/registry"),

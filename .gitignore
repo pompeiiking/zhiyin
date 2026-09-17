@@ -68,6 +68,7 @@ platform/wanwu/.env.*
 platform/wanwu/.cache/
 platform/wanwu/output/
 platform/wanwu/runtime/
+deploy/runtime/
 platform/wanwu/**/*.log
 platform/wanwu/**/*.pid
 deploy/.env

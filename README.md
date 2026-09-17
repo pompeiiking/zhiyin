@@ -35,7 +35,7 @@ zhiyin-src/template/      第一期工程骨架
 cd zhiyin-src/template
 
 python -m venv .venv && . .venv/Scripts/activate    # Windows；macOS/Linux 用 source
-pip install -e ".[dev]"
+pip install -e ".[dev,m3]"              # 全量测试包含 M3 数据基础设施用例
 
 python -m pytest -q                      # 架构守卫 + 契约测试 + 单元测试
 python -m ruff check .                   # 静态检查

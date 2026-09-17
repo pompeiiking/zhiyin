@@ -1,0 +1,9 @@
+FROM zhiyin/backend:dev
+
+USER root
+COPY --chown=zhiyin:zhiyin tests/contracts ./tests/contracts
+COPY --chown=zhiyin:zhiyin scripts/run_mysql_contracts.py ./scripts/run_mysql_contracts.py
+RUN python -m pip install ".[dev]"
+
+USER zhiyin
+CMD ["python", "scripts/run_mysql_contracts.py"]

@@ -20,7 +20,9 @@ jobs:
         with:
           python-version: "3.11"
       - name: 安装
-        run: pip install -e ".[dev]"
+        # 全量测试会收集 M3 数据基础设施用例；必须同时安装 SQLAlchemy、
+        # pgvector 等 M3 可选依赖，避免干净 CI 环境在收集阶段失败。
+        run: pip install -e ".[dev,m3]"
       - name: 测试（AST 依赖守卫 + Port 契约测试 + 单元测试）
         run: python -m pytest -q
       - name: 静态检查

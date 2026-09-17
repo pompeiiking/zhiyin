@@ -86,9 +86,9 @@ class KnowledgeIngestionPipeline:
 
     knowledge_dir: Path
     on_index_updated: Callable[[str], None] | None = None
-    # TODO(第一期未闭合): OPEN-3 —— 生产装配未接线 raw_store（原始响应进短期缓存 / Redis DB 4），
-    # 目前只有测试注入假实现；`redis_crawl` 域存储装配后也无消费方。
-    # 归属与退出判据：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-3）。
+    # raw_store 是生产采集 Runner 的可选注入点。OPEN-3 已决定将 Redis DB 4
+    # 降级为预留能力位；Runner 落地时通过 RedisClientFactory.domain_store(...,
+    # "crawl") 惰性创建，在此之前不在 Boot 中装配无人消费的对象。
     raw_store: Any | None = None
     raw_ttl_s: int = 3_600
     reviewer: Optional[Reviewer] = None

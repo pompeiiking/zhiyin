@@ -1,13 +1,17 @@
-"""pami 平台真实适配器。
+"""PAMI 平台适配器的稳定导出面。"""
 
-pami 为自有工程，由平台团队维护。本包是职引侧唯一的 pami 依赖出入口，
-上层不感知 pami 的接口形状。
+from zhiyin_infrastructure.pami.adapters import (
+    PamiAuthGateway,
+    PamiEmbedGateway,
+    PamiKnowledgeGateway,
+    PamiLLMGateway,
+    PamiSearchGateway,
+)
 
-已知待确认项（开工前需与 pami 团队对齐，见《接口.md》）：
-1. 应用 1:1 的 OpenAPI APIKey 与 JWT 服务账号两类认证的凭证发放；
-2. 资源权限导致的 403 是否已修复；
-3. Python 节点是否仍为单节点（影响并发与超时策略）；
-4. 工作流重复发布问题是否已修复。
-"""
-
-__all__ = ["adapters"]
+__all__ = [
+    "PamiAuthGateway",
+    "PamiEmbedGateway",
+    "PamiKnowledgeGateway",
+    "PamiLLMGateway",
+    "PamiSearchGateway",
+]

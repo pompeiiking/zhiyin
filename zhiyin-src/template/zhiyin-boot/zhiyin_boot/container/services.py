@@ -180,6 +180,28 @@ def build_workers(container: "Container") -> None:
                 notifier=container.notifier_primitive,
             )
         )
+    database_context = container.extra.get("database_context")
+    if (
+        database_context is not None
+        and container.settings.use_pgvector
+        and container.settings.use_pami_embedding
+    ):
+        from zhiyin_infrastructure.persistence.embed_tasks import EmbedTaskStore
+        from zhiyin_infrastructure.workers.vector_sync import (
+            VectorSyncPlanner,
+            VectorSyncWorker,
+        )
+
+        task_store = EmbedTaskStore(database_context)
+        container.extra["embed_tasks"] = task_store
+        container.extra["vector_sync_planner"] = VectorSyncPlanner(
+            task_store,
+            container.vector,
+            model=container.embedding.model_id,
+        )
+        container.workers.append(
+            VectorSyncWorker(task_store, container.embedding, container.vector)
+        )
 
 
 __all__ = ["build_orchestration", "build_services", "build_workers"]

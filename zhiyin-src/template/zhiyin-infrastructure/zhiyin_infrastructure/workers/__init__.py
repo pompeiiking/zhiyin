@@ -32,6 +32,6 @@
 `workers.vector_sync` 随即从 `not_wired` 变为 `wired`。
 """
 
-from zhiyin_infrastructure.workers.vector_sync import VectorSyncWorker
+from zhiyin_infrastructure.workers.vector_sync import VectorSyncPlanner, VectorSyncWorker
 
-__all__ = ["VectorSyncWorker"]
+__all__ = ["VectorSyncPlanner", "VectorSyncWorker"]

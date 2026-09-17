@@ -52,7 +52,7 @@ async def test_vector_contract(gateways) -> None:
     assert hits[0].source_id == "doc-a", "命中必须能回到来源文档"
 
     # 命名空间隔离
-    assert await store.search("profession", [1.0, 0.0], model=model) == []
+    assert await store.search("theory", [1.0, 0.0], model=model) == []
 
     # 模型版本路由：换了嵌入模型后，旧向量不参与比较（而不是给一个错的相似度）
     assert await store.search("occupation", [1.0, 0.0], model="another-model") == []

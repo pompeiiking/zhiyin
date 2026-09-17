@@ -22,7 +22,7 @@ def test_compose_includes_wanwu_and_keeps_zhiyin_internal() -> None:
 
 def test_env_example_has_no_committed_secrets() -> None:
     text = (DEPLOY / ".env.example").read_text(encoding="utf-8")
-    assert "WANWU_PROJECT_DIR=./runtime\n" in text
+    assert "WANWU_PROJECT_DIR=../../deploy/runtime\n" in text
     assert "WANWU_ELASTIC_ADDRESS=es-wanwu:9200\n" in text
     for key in (
         "WANWU_MYSQL_PASSWORD",
@@ -46,6 +46,11 @@ def test_lifecycle_scripts_do_not_delete_volumes() -> None:
 def test_ci_renders_compose_from_the_wanwu_project_directory() -> None:
     ci = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     assert "docker compose --project-directory platform/wanwu" in ci
+
+
+def test_ci_installs_m3_dependencies_before_collecting_full_suite() -> None:
+    ci = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert 'pip install -e ".[dev,m3]"' in ci
 
 
 def test_init_env_generates_passwords_without_changing_public_values() -> None:

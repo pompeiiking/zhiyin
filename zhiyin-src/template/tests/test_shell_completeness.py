@@ -249,9 +249,12 @@ def test_service_declares_valid_status(port: str) -> None:
 
 
 @pytest.mark.parametrize("port", sorted(set(WORKER_SHELL) - WIRED_WORKER_PORTS))
-def test_worker_skeleton_declares_its_status(port: str) -> None:
+def test_optional_worker_declares_valid_status(port: str) -> None:
     module, class_name = WORKER_SHELL[port]
-    assert getattr(_load(module, class_name), "IMPLEMENTATION_STATUS", None) == "skeleton"
+    assert getattr(_load(module, class_name), "IMPLEMENTATION_STATUS", None) in {
+        "skeleton",
+        "wired",
+    }
 
 
 def _test_settings():
@@ -267,8 +270,8 @@ def _test_settings():
     )
 
 
-def test_first_phase_is_wired_and_later_worker_stays_pending() -> None:
-    """M2 能力全部装配；M3 向量同步仍如实保持未装配。"""
+def test_first_phase_is_wired_and_m3_worker_requires_m3_configuration() -> None:
+    """M2 默认装配完整；M3 Worker 只在真实存储配置下装配。"""
     from zhiyin_boot import build_container, describe_assembly
 
     report = describe_assembly(build_container(_test_settings()))
