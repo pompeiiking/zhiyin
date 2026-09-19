@@ -123,11 +123,11 @@ class DefaultAssetService(AssetService):
             )
         )
 
-    # TODO(第一期未闭合): OPEN-1 —— save_report / save_direction_plans / save_action_plan
-    # 是本轮新增的**正文写入** API，但全仓没有生产调用方（`rg "save_report"` 只有测试）：
-    # 编排器 DefaultOrchestrator._persist_output 仍只写版本元数据，
-    # 于是 /app/report/full-text 返回 404，工作台 ②③④ 面板出现"有版本、无内容"。
-    # 归属与退出判据：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-1）。
+    # OPEN-1 已闭合：这三个正文写入 API 现在有生产调用方——
+    # `DefaultOrchestrator._persist_output` 在诊断/决策/行动环节分别调用
+    # `save_report` / `save_direction_plans` / `save_action_plan`（见 orchestrator.py），
+    # 正文与版本元数据一起落库，`/app/report/full-text` 因此可读。
+    # 依据：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-1）。
     async def save_report(
         self,
         user_id: str,

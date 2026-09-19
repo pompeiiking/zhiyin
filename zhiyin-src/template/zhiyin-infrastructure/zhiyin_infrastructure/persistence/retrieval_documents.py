@@ -145,6 +145,26 @@ class RetrievalDocumentStore:
             )
         return HydrationOutcome(hits=hydrated, checked=len(hits), dropped=dropped)
 
+    def demo_namespaces(self) -> list[str]:
+        """权威表里**含演示文档**的 namespace（D12 的装配期信号）。
+
+        为什么装配期信号要问权威表、而不是问检索通道：
+        通道实现会换。切到 PAMI 之后，本地演示语料通道**不再在链路上**，
+        于是"看通道实现在服务什么"的判断就报出了 `demo_content=[]`——而权威表里
+        22 行**全是** `demo=true`，系统仍在用演示内容，`/healthz` 却说一切正常。
+        权威表是内容的**事实来源**，问它才不随通道漂移。
+
+        （命中侧的 `metadata["demo"]` 仍然由权威行提供，两者同源。）
+        """
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(RetrievalDocumentRow.namespace)
+                .where(RetrievalDocumentRow.status == "enabled")
+                .where(RetrievalDocumentRow.metadata_json["demo"].as_boolean().is_(True))
+                .distinct()
+            ).all()
+        return sorted({str(row) for row in rows})
+
     def expire_due(self, *, now: datetime | None = None) -> list[str]:
         """把**已过截止时间**的文档落成 `expired`，并标记为历史样本。
 

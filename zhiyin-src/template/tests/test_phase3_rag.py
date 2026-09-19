@@ -320,6 +320,52 @@ async def test_eval_set_expectations_are_not_yet_covered_by_the_corpus() -> None
     ), f"D11 回退：通道返回了裸 id {[hit.evidence_id for hit in hits]}"
 
 
+@pytest.mark.asyncio
+async def test_demo_namespaces_are_detected_from_the_authority_store(tmp_path: Path) -> None:
+    """权威表要能回答"哪些 namespace 的内容是演示的"（D12 装配期信号）。
+
+    为什么这条重要：装配期信号原先只看检索通道实现，切到 PAMI 后本地通道退出链路，
+    于是 `/healthz` 报 `demo_content=[]`、`status=ok`，而权威表里全是 demo——系统仍在
+    用演示内容却自称没事。检测必须落在**内容的事实来源**上。
+    """
+    database_url = f"sqlite+aiosqlite:///{(tmp_path / 'demo.sqlite3').as_posix()}"
+    sync_url = f"sqlite:///{(tmp_path / 'demo.sqlite3').as_posix()}"
+    engine = create_engine(sync_url)
+    from zhiyin_infrastructure.persistence.models import Base
+
+    Base.metadata.create_all(engine)
+    engine.dispose()
+
+    store = RetrievalDocumentStore(database_url)
+    store.upsert(
+        document_id="theory:demo-doc",
+        namespace=RetrievalNamespace.THEORY,
+        source_id="demo-doc",
+        content="演示理论卡",
+        metadata={"demo": True},
+    )
+    store.upsert(
+        document_id="theory:real-doc",
+        namespace=RetrievalNamespace.THEORY,
+        source_id="real-doc",
+        content="真实来源",
+        metadata={"demo": False},
+    )
+    store.upsert(
+        document_id="occupation:demo-occ",
+        namespace=RetrievalNamespace.OCCUPATION,
+        source_id="demo-occ",
+        content="演示职业条目",
+        metadata={"demo": True},
+    )
+    assert store.demo_namespaces() == ["occupation", "theory"]
+
+    # 过期/禁用后不再计入（演示内容下架后信号应消失）
+    store.expire_by_source("demo-occ")
+    assert store.demo_namespaces() == ["theory"]
+    store.close()
+
+
 def test_fixed_evaluation_set_has_100_nonempty_cases_and_full_coverage() -> None:
     payload = json.loads(
         (ROOT / "data/evaluation/retrieval_cases.json").read_text(encoding="utf-8")

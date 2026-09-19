@@ -57,10 +57,27 @@ class AssemblyReport:
     但**不参与启动硬校验**——内容缺失不等于服务不可用。
     """
 
+    demo_namespaces: list[str] = field(default_factory=list)
+    """含演示内容的 namespace（如 `["theory", "occupation"]`），供运维直接定位范围。"""
+
+    demo_content_unknown: bool = False
+    """演示内容检测**未能完成**（权威表查不出来）。
+
+    为什么单独成一项：查不出来时既不能报"干净"（那是把"不知道"伪装成"没事"），
+    也不能当作故障中断启动，所以显式记成"未知"并让 `/healthz` 降级。
+    """
+
     @property
     def serves_fabricated_content(self) -> bool:
-        """是否在对外提供**虚构内容**（占位实现或演示语料）。供 `/healthz` 降级使用。"""
-        return bool(self.placeholders) or bool(self.demo_content)
+        """是否在对外提供**虚构内容**（占位实现、演示语料，或检测不出结论）。
+
+        最后一项是有意的：**举证不了"内容是真的"，就不算干净**。
+        """
+        return (
+            bool(self.placeholders)
+            or bool(self.demo_content)
+            or self.demo_content_unknown
+        )
 
     @property
     def healthy(self) -> bool:
@@ -94,6 +111,8 @@ class AssemblyReport:
             "skeletons": list(self.skeletons),
             "placeholders": list(self.placeholders),
             "demo_content": list(self.demo_content),
+            "demo_namespaces": list(self.demo_namespaces),
+            "demo_content_unknown": self.demo_content_unknown,
         }
 
 

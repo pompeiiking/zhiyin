@@ -93,6 +93,23 @@ def describe_assembly(container: "Container") -> "AssemblyReport":
         if getattr(value, "serves_demo_content", False):
             report.demo_content.append(name)
 
+    # 光问通道实现还不够：通道会换。切到 PAMI 后本地演示语料通道不在链路上，
+    # 上面那句就报不出东西，而权威表里仍是演示内容——`/healthz` 于是谎报"一切正常"。
+    # 所以**只要有权威表就一定问它**（不做"通道已报就跳过"的短路：那会让"查不出来"
+    # 无法发现，也让 namespace 范围永远为空）。代价是 /healthz 多一次很小的查询。
+    authority = (getattr(container, "extra", None) or {}).get("retrieval_authority")
+    if authority is not None:
+        try:
+            demo_namespaces = authority.demo_namespaces()
+        except Exception:  # noqa: BLE001
+            # 查不出来时**不能**当作"内容是真的"：那是把"不知道"伪装成"干净"。
+            report.demo_content_unknown = True
+        else:
+            if demo_namespaces:
+                if "search" not in report.demo_content:
+                    report.demo_content.append("search")
+                report.demo_namespaces = demo_namespaces
+
     for name in REPOSITORY_PORTS:
         report.repositories[name] = _status_of(
             getattr(container, name, None), skeleton_markers=(".persistence.",)

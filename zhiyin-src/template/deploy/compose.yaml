@@ -155,6 +155,19 @@ services:
     env_file:
       - ../../zhiyin-src/template/deploy/.env
     command: ["python", "-m", "zhiyin_boot", "rerank-bridge"]
+    # 基础镜像的 HEALTHCHECK 探的是 API 的 8000 端口，本服务听 8100——**必须覆盖**，
+    # 否则容器会一直显示 unhealthy（实测 FailingStreak 已累积到 320），
+    # 而任何 `depends_on: service_healthy` 都会因此永远等不到。
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/healthz', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     expose:
       - "8100"
     networks:

@@ -106,6 +106,65 @@ def test_demo_knowledge_is_reported_without_blocking_startup(
     assert_minimum_viable(container)
 
 
+def test_demo_content_is_detected_from_the_authority_store_not_the_channel(
+    settings: Settings,
+) -> None:
+    """装配期必须能发现"权威表里是演示内容"——**哪怕检索通道不是本地通道**。
+
+    这是切到 PAMI 之后暴露的真实回归：原来只问"本地演示通道在不在链路上"，
+    换成 PAMI 后本地通道退出链路 → `demo_content` 报空、`/healthz` 报 `ok`，
+    而权威表里 22 行全是 `demo=true`——系统仍在用演示内容却自称没事。
+
+    所以检测要问**内容的权威来源**（`retrieval_document`）。本用例用一个假的
+    authority 替身来锁这个口径（真实 store 的查询由 `test_phase3_rag` 覆盖）。
+    """
+    container = build_container(settings)
+    # 把检索通道换成一个**不自述演示**的替身（模拟"已切到 PAMI，本地通道退出链路"）
+    container.search = type("NonDemoChannel", (), {})()
+
+    class DemoAuthority:
+        def demo_namespaces(self) -> list[str]:
+            return ["theory", "occupation"]
+
+    container.extra["retrieval_authority"] = DemoAuthority()
+    report = describe_assembly(container)
+    assert report.demo_content == ["search"], "通道不报，也要从权威表查出来"
+    assert report.demo_namespaces == ["theory", "occupation"]
+    assert report.serves_fabricated_content is True, "/healthz 必须降级"
+    # 仍然不阻断启动：内容缺失不等于服务不可用（D12 选 A）
+    assert_minimum_viable(container)
+
+
+def test_demo_detection_failure_does_not_claim_clean(settings: Settings) -> None:
+    """权威表查不出来时**不得**当作"内容是真的"。
+
+    "不知道"与"干净"是两件事；把前者当后者，正是 D12 要根治的那类谎报。
+    这里也不中断启动，而是显式记成未知并让 `/healthz` 降级。
+    """
+    container = build_container(settings)
+
+    class BrokenAuthority:
+        def demo_namespaces(self) -> list[str]:
+            raise RuntimeError("数据库连不上")
+
+    container.extra["retrieval_authority"] = BrokenAuthority()
+    report = describe_assembly(container)
+    assert report.demo_content_unknown is True
+    assert report.serves_fabricated_content is True
+    assert_minimum_viable(container)
+
+
+def test_no_authority_means_no_false_positive(settings: Settings) -> None:
+    """没有权威表（如纯本地/无 MySQL）时**不得**凭空报"演示内容"。"""
+    container = build_container(settings)
+    container.extra.pop("retrieval_authority", None)
+    report = describe_assembly(container)
+    assert report.demo_content_unknown is False
+    # 本地通道自述演示（仓库语料），所以这里仍应是 search——但来源是通道自述
+    assert report.demo_content == ["search"]
+    assert report.demo_namespaces == [], "没有权威表就不该编出 namespace 范围"
+
+
 def test_real_corpus_is_not_flagged_as_demo(settings: Settings, tmp_path) -> None:
     """反向用例：语料自述不是演示数据时**不得**误报（避免"到处都标红"而失效）。"""
     from dataclasses import replace
