@@ -586,6 +586,67 @@ async def test_handoff_is_the_only_stage_transition_path() -> None:
 
 
 @pytest.mark.asyncio
+async def test_report_source_versions_trace_to_a_recorded_source() -> None:
+    """最终资产必须能追溯到来源**和版本**（D7 ⑥）。
+
+    `Report.sources` 只有来源字符串，而权威文档唯一键是 `(namespace, source_id, version)`——
+    没有版本就指不到具体那一版，"可追溯"只做到一半。本用例锁两件事：
+    1. 版本按与 `sources` **相同**的键取（`source_url or source_id or evidence_id`），
+       否则两个字段对不上；
+    2. 同一来源多版证据取最大版本（报告依据的是当时看到的最新一版）。
+    """
+    from zhiyin_business.services.orchestrator import DefaultOrchestrator
+    from zhiyin_kernel.enums import RetrievalNamespace
+    from zhiyin_kernel.retrieval import RetrievalEvidence
+
+    hits = [
+        RetrievalEvidence(
+            evidence_id="theory:parsons_self",
+            namespace=RetrievalNamespace.THEORY,
+            content="a",
+            source_id="registry/theory_cards",
+            source_url="https://example.invalid/theory/parsons",
+            version=2,
+        ),
+        RetrievalEvidence(
+            evidence_id="theory:holland",
+            namespace=RetrievalNamespace.THEORY,
+            content="b",
+            source_id="registry/theory_cards",
+            source_url="https://example.invalid/theory/parsons",
+            version=5,
+        ),
+        RetrievalEvidence(
+            evidence_id="occupation:occ-2",
+            namespace=RetrievalNamespace.OCCUPATION,
+            content="c",
+            source_id="job-platform/occupation",
+            version=3,
+        ),
+    ]
+    versions = DefaultOrchestrator._report_source_versions(hits)  # noqa: SLF001
+    assert versions == {
+        "https://example.invalid/theory/parsons": 5,  # 同来源取最大版本
+        "job-platform/occupation": 3,
+    }
+    # 键与 `sources` 的取法一致：sources 里的每一项都应能在 versions 里找到对应键
+    from zhiyin_business.contracts.diagnose import DiagnoseOutput
+
+    output = DiagnoseOutput.model_validate(
+        {
+            "verdict": {"title": "t", "summary": "s"},
+            "swot": {"strength": ["a", "b"], "weakness": ["c", "d"],
+                     "opportunity": ["e", "f"], "risk": ["g", "h"]},
+            "guide": {"kind": "question", "text": "?"},
+        }
+    )
+    sources = DefaultOrchestrator._report_sources(output, hits)  # noqa: SLF001
+    assert set(sources) <= set(versions), (
+        f"资产记录了来源 {sources}，但其中有些没有版本：{sorted(set(sources) - set(versions))}"
+    )
+
+
+@pytest.mark.asyncio
 async def test_report_carries_a_frozen_profile_snapshot() -> None:
     """报告里的「个人画像」必须是**生成当时的快照**，不随画像继续变化（D2）。
 

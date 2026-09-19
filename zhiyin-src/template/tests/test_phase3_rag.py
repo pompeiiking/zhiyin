@@ -255,6 +255,56 @@ async def test_document_expiry_worker_reports_how_many_it_expired(tmp_path: Path
     engine.dispose()
 
 
+def test_eval_set_expectations_are_not_yet_covered_by_the_corpus() -> None:
+    """登记现状：评测集期望**尚未**被语料覆盖，因此现在算不出质量指标（D7 ⑦）。
+
+    这是一条**状态记录型**断言，不是质量断言。它锁的事实：
+    `data/evaluation/retrieval_cases.json` 里 100 条期望 id（`namespace:xxx`）
+    指向一份"测试知识快照"，而该快照**不在仓库里**（`data/knowledge/` 只有
+    3 条 theory + 3 条 occupation，且 id 是**裸 id**，没有 namespace 前缀）。
+
+    为什么要写成测试：它会在"真实内容进索引 / 补上知识快照 / 统一 id 口径"之后
+    立刻变红，提醒把基准与门槛真正跑起来并更新本记录——否则这件事会一直悬着，
+    而 `evaluate_retrieval()` 也会继续没有调用方。
+    """
+    dataset = json.loads(
+        (ROOT / "data/evaluation/retrieval_cases.json").read_text(encoding="utf-8")
+    )
+    expected: list[tuple[str, str]] = [
+        (str(case["namespace"]), str(item))
+        for case in dataset["items"]
+        for item in case.get("expected_ids", [])
+    ]
+    assert expected, "评测集必须有非空期望"
+
+    corpus: dict[str, set[str]] = {}
+    for path in sorted((ROOT / "data/knowledge").glob("*.json")):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        items = payload if isinstance(payload, list) else (payload.get("items") or [])
+        for item in items:
+            if not item.get("id"):
+                continue
+            namespace = str(item.get("namespace") or path.stem)
+            corpus.setdefault(namespace, set()).update(
+                {str(item["id"]), f"{namespace}:{item['id']}"}
+            )
+
+    covered = [pair for pair in expected if pair[1] in corpus.get(pair[0], set())]
+    assert not covered, (
+        f"评测集期望已被语料覆盖 {len(covered)} 条——说明真实内容或测试知识快照已就位。"
+        "请跑 `python scripts/eval_retrieval.py` 出新的基准报告，并按第三期 §12.3 "
+        "冻结质量门槛，然后更新本用例与《检索质量基准》文档。"
+    )
+
+    # 同时把 id 口径不一致记录下来：期望带 namespace 前缀，语料里是裸 id。
+    assert all(":" in item for _, item in expected), "评测集期望应统一为 namespace:id"
+    bare = {item for values in corpus.values() for item in values if ":" not in item}
+    assert bare, (
+        "语料 id 已统一为 namespace:id —— 说明本地关键词通道的口径可能已经改了，"
+        "请复核 `LocalSearchGateway.evidence_id` 与 RRF 去重键，并更新本记录"
+    )
+
+
 def test_fixed_evaluation_set_has_100_nonempty_cases_and_full_coverage() -> None:
     payload = json.loads(
         (ROOT / "data/evaluation/retrieval_cases.json").read_text(encoding="utf-8")

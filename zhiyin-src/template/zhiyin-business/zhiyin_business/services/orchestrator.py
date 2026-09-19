@@ -766,6 +766,7 @@ class DefaultOrchestrator(Orchestrator):
                 dimensions=output.dimensions,
                 gap_claims=[],
                 sources=self._report_sources(output, evidence_packet.evidences),
+                source_versions=self._report_source_versions(evidence_packet.evidences),
                 methodologies=list(
                     dict.fromkeys(ref.name or ref.theory_id for ref in output.theory_refs)
                 ),
@@ -871,6 +872,30 @@ class DefaultOrchestrator(Orchestrator):
             if item.source and item.source in allowed
         )
         return list(dict.fromkeys(item.strip() for item in candidates if item.strip()))
+
+    @staticmethod
+    def _report_source_versions(
+        knowledge_hits: list[RetrievalEvidence],
+    ) -> dict[str, int]:
+        """来源 → 版本号，供最终资产回答"这条结论依据的是哪一版资料"（D7 ⑥）。
+
+        为什么需要它：`Report.sources` 只记来源字符串，而权威文档的唯一键是
+        `(namespace, source_id, version)`——没有版本就指不到具体那一版，
+        "可追溯"只做到一半。这里把证据里的版本一并记进资产。
+
+        键的取法与 `_report_sources` **完全一致**（`source_url or source_id or evidence_id`），
+        否则两个字段对不上，反而更难查。同一来源出现在多版证据里时取**最大版本**：
+        报告依据的是它当时看到的最新一版。
+        """
+        versions: dict[str, int] = {}
+        for hit in knowledge_hits:
+            canonical = hit.source_url or hit.source_id or hit.evidence_id
+            if not canonical:
+                continue
+            key = str(canonical).strip()
+            version = max(int(hit.version or 1), 1)
+            versions[key] = max(versions.get(key, 0), version)
+        return versions
 
 
 __all__ = ["DefaultOrchestrator"]

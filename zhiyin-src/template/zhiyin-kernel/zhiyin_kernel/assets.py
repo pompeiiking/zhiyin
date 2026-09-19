@@ -100,6 +100,14 @@ class Report(BaseModel):
         default_factory=list,
         description="本版本生成时的画像快照（冻结，不随画像继续变化）",
     )
+    source_versions: dict[str, int] = Field(
+        default_factory=dict,
+        description=(
+            "检索来源 → 版本号。`sources` 只记了来源、没有版本；而权威文档的唯一键是"
+            "(namespace, source_id, version)，所以只有来源时**指不到具体那一版**，"
+            "无法回答「这条结论当时依据的是哪一版资料」。本字段补上这一环（可审计）"
+        ),
+    )
 
 
 class PlanGap(BaseModel):
