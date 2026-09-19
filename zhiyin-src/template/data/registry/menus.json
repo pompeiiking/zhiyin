@@ -1,8 +1,9 @@
 {
-  "_note": "职引 · 顶层导航菜单（DEMO）。属动态资源：改本文件不需要前端或后端发版。口径见《前端设计 v1.0》§3.2：顶层导航只允许「首页 / 核心对话页 / 智能工作台」三条主线，功能块不进主线导航。",
+  "_note": "职引 · 顶层导航菜单（DEMO）。属动态资源：改本文件不需要前端或后端发版。口径见《前端设计 v1.0》§3.2：顶层导航为「首页 / 核心对话页 / 智能工作台 / 完整报告页」四个 P0 页面互达；功能块（导出 / 日历 / 成就 / 导师 / 身份 / 演示、智能体小队）不进主线导航。前端在 bootstrap 未返回菜单时会用同一份清单兜底（components/common/TopBar.vue），两处必须同值。",
   "items": [
     { "code": "home", "label": "首页", "route": "/", "visible": true, "status": "enabled", "sort_order": 1 },
     { "code": "conversation", "label": "核心对话页", "route": "/conv", "visible": true, "status": "enabled", "sort_order": 2 },
-    { "code": "workspace", "label": "智能工作台", "route": "/wb", "visible": true, "status": "enabled", "sort_order": 3 }
+    { "code": "workspace", "label": "智能工作台", "route": "/wb", "visible": true, "status": "enabled", "sort_order": 3 },
+    { "code": "report", "label": "完整报告页", "route": "/report", "visible": true, "status": "enabled", "sort_order": 4 }
   ]
 }
