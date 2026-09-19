@@ -115,7 +115,7 @@ async function selectTask(code: string) {
       </div>
       <div class="hero-float" aria-hidden="true">
         <span class="float-chip f-1 lg">霍兰德 · RIASEC</span>
-        <span class="float-chip f-2 sm">画像覆盖度 4 / 6</span>
+        <span class="float-chip f-2 sm">画像逐字段沉淀</span>
         <span class="float-chip f-3">五环节闭环</span>
         <span class="float-chip f-4">SMART 目标</span>
         <span class="float-chip f-5 sm">长期跟踪</span>
@@ -128,7 +128,7 @@ async function selectTask(code: string) {
         <p class="hero-sub">上传简历 <b>或直接对话</b>，AI 边聊边<em>沉淀你的个人画像</em>，输出<b>个人分析报告、方向方案与行动计划</b>，并长期跟踪、随成长持续校准。</p>
         <div class="hero-cta">
           <button class="btn btn-pri btn-lg" :disabled="busy" @click="startChat">开始和 AI 聊职业 →</button>
-          <button class="btn btn-ghost btn-lg" @click="openReport">先看示例报告 →</button>
+          <button class="btn btn-ghost btn-lg" @click="openReport">打开完整报告 →</button>
         </div>
         <p class="hero-note">从「不知道自己适合什么」到「有路径、能执行」｜画像由对话引导生成，不前置表单</p>
 
@@ -136,11 +136,15 @@ async function selectTask(code: string) {
           <div class="hp-shadow-a" aria-hidden="true"></div>
           <div class="hp-shadow-b" aria-hidden="true"></div>
           <div class="hp-card">
-            <div class="hp-top"><span class="dot-live"></span><b>职业顾问 · 建档分析师</b><span class="hp-live">对话中</span></div>
-            <div class="hp-msg ai"><span class="mtag">帕森斯 · 了解自我</span><p>先问「学业」——你的学校、专业、年级和成绩排名是？</p></div>
-            <div class="hp-msg user"><p>沈阳建筑大学 · 土木工程 · 大四 · GPA 3.2 / 前 30%</p></div>
-            <div class="hp-msg ai"><p>收到，已沉淀到「学业」。想亲手体验完整建档？下滑到「采集建模」环节试试 ↓</p></div>
-            <div class="hp-progress"><span>个人画像覆盖度</span><div class="bar"><i style="width: 66%"></i></div><b>4 / 6</b></div>
+            <div class="hp-top"><span class="dot-live"></span><b>你的核心对话</b></div>
+            <!-- 这里曾放一张"对话预览卡"，里面的问答与画像覆盖度都是编造的。
+                 改为如实说明真实对话在哪里发生。 -->
+            <div class="hp-msg ai">
+              <p>真实对话在「核心对话页」发生：你说自己的情况，系统边聊边沉淀画像，并逐环节产出报告、方向方案与行动计划。</p>
+            </div>
+            <div class="hp-msg ai">
+              <p>页面不预置任何示例结论；打开工作台与完整报告页看到的就是你账号的真实产出。</p>
+            </div>
           </div>
         </div>
       </div>
