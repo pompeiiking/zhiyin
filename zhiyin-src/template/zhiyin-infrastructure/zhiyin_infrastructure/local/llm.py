@@ -8,6 +8,16 @@
 这是"Mock 先行"的落点：链路上所有下游在模型未接入时也能开发与联调。
 合成器刻意做成**schema 驱动**而不是按环节返回硬编码 JSON —— 后者会在产出契约
 变更时静默失效，前者永远跟契约同步。
+
+⚠️ 部署环境不装配本类：`ZHIYIN_USE_PAMI_LLM=1` 时 `build_gateways` 会用
+   `PamiLLMGateway` 覆盖它。本类保留为**本地/测试实现**。
+
+⚠️ 未收口的风险：本类没有声明 `IMPLEMENTATION_STATUS`，装配报告会按兜底逻辑把它
+   报成 `wired`；它只在 `LLMResult.degraded=True` 里自述降级，而该标记目前没有
+   消费方。也就是说**漏配 `ZHIYIN_USE_PAMI_LLM` 的环境，占位产出不会被门禁、
+   装配报告或界面任何一处拦住**。改法与取舍见
+   docs/数据全链路/04-实施与验收/职引-待决问题与改法选项-v1.0.md（D1）——
+   在拍板前不要自行改状态或加标注。
 """
 
 from __future__ import annotations
@@ -19,13 +29,8 @@ from typing import Any, Optional
 
 from zhiyin_data_sdk.gateways.ai import LLMGateway, LLMMessage, LLMResult
 
-# TODO(Mock 标注): MOCK-1 —— 占位串单点定义在这里（好），但**后端没有把"内容来源"
-# 透出给前端**：任何 DTO 都没有 source/is_mock 字段，前端 MockBadge.vue 只能靠字符串
-# 匹配判断，而它自己也还是空骨架（文案资源 data/registry/copies.json:mock.source_notice 已就绪）。
-# 该占位串目前已流到用户可见字段：对话正文、主理徽标 theory_refs、行为引导、
-# 画像字段值、工作台依赖图 from_asset/via_profile_keys。
-# 现状清单与退出判据：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（MOCK-1 / MOCK-2）。
 _PLACEHOLDER_TEXT = "（第一期 Mock 产出，未接真实模型）"
+"""占位串单点定义。仅由本地合成实现产出；部署环境走 PAMI 真实模型，不会生成它。"""
 
 
 def synthesize_from_schema(schema: Optional[dict[str, Any]]) -> Any:

@@ -176,22 +176,6 @@
       "status": "enabled",
       "sort_order": 35,
       "note": "同上"
-    },
-    {
-      "code": "demo.data_notice",
-      "text": "以下为演示数据，仅用于展示流程",
-      "bundle": "zh-CN",
-      "status": "enabled",
-      "sort_order": 7,
-      "note": "历史文案：演示数据已按「不允许保留 Mock」清除，本键保留仅为兼容旧引用"
-    },
-    {
-      "code": "mock.source_notice",
-      "text": "本期为 Mock 产出，未接真实模型",
-      "bundle": "zh-CN",
-      "status": "enabled",
-      "sort_order": 8,
-      "note": "历史文案：Mock 产出已归零，本键保留仅为兼容旧引用"
     }
   ]
 }
