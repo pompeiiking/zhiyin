@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from zhiyin_orchestration import (
+    AgentRequest,
     ContractAgentEngine,
     ContractViolationError,
     DomainEvent,
@@ -356,6 +357,41 @@ async def test_agent_engine_passes_schema_to_llm() -> None:
     engine = ContractAgentEngine(llm)
     await engine.invoke(_request(schema))
     assert llm.calls[0][1] == schema
+
+
+async def test_instruction_is_rendered_as_prose_not_as_a_json_field() -> None:
+    """业务层任务指令必须以散文出现在消息最前面。
+
+    没有这条约定时，指令会被当作 `prompt_vars` 的一个普通字段塞进 JSON 转储里，
+    模型只看到一堆裸 JSON 与输出 Schema，就会自行猜测该产出什么
+    （实测表现为采集环节自造画像字段名、关键字段永远覆盖不到）。
+    """
+    llm = _StubLLM({"text": "ok"})
+    engine = ContractAgentEngine(llm)
+    await engine.invoke(
+        AgentRequest(
+            agent_id="profile_analyst",
+            stage="collect",
+            blackboard={"stage": "collect"},
+            prompt_vars={"instruction": "【本轮任务】抽取画像字段。", "user_input": "我是大四学生"},
+        )
+    )
+    content = llm.calls[0][0][-1].content
+    assert content.startswith("【本轮任务】")
+    assert "user_input" in content
+    assert '"instruction"' not in content
+
+
+async def test_prompt_without_instruction_keeps_json_only_shape() -> None:
+    """没有指令时保持原有形状，不引入空散文块。"""
+    llm = _StubLLM({"text": "ok"})
+    engine = ContractAgentEngine(llm)
+    await engine.invoke(
+        AgentRequest(agent_id="a1", prompt_vars={"user_input": "hi"}, blackboard={"k": "v"})
+    )
+    content = llm.calls[0][0][-1].content
+    assert content.startswith("【输入变量】")
+    assert "【共享状态】" in content
 
 
 def _request(schema):

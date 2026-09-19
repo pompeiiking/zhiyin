@@ -28,7 +28,7 @@ IO 边界（全仓统一口径）
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Mapping, Optional
+from typing import Any, Awaitable, Callable, Mapping, Optional, Sequence
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -116,6 +116,113 @@ def next_stage_after(stage: LoopStage) -> Optional[LoopStage]:
     if index + 1 >= len(STAGE_SEQUENCE):
         return None
     return STAGE_SEQUENCE[index + 1]
+
+
+STAGE_LABELS: dict[LoopStage, str] = {
+    LoopStage.COLLECT: "① 采集建模",
+    LoopStage.DIAGNOSE: "② 诊断匹配",
+    LoopStage.DECIDE: "③ 决策",
+    LoopStage.ACT: "④ 行动",
+    LoopStage.REVIEW: "⑤ 复盘校准",
+}
+"""环节中文标签，仅用于模型指令中的环节自述，不作为前端展示文案。"""
+
+_STAGE_DUTIES: dict[LoopStage, str] = {
+    LoopStage.COLLECT: (
+        "从用户本轮表述中抽取**已经明确表达**的画像信息，只补事实、不下判断；"
+        "guide 一次只问一个最关键的缺口问题。"
+    ),
+    LoopStage.DIAGNOSE: (
+        "基于画像字段与检索证据给出诊断结论。"
+        "每条结论都要能对应到画像字段或检索证据；没有证据就写明缺少依据，不得编造外部事实。"
+    ),
+    LoopStage.DECIDE: (
+        "基于诊断结论给出可撤回的方向方案候选（主攻 / 平行 / 保底各一档）。"
+        "不得替用户选定方向——一旦把某个候选标成已选，用户就被系统代做了决定。"
+    ),
+    LoopStage.ACT: (
+        "把已选方向拆成带时间点的行动计划与可勾选任务。"
+        "只做拆解，不评判方向对错。"
+    ),
+    LoopStage.REVIEW: (
+        "基于真实行为日志与已完成资产做复盘归因，给出下一步校准建议。"
+        "纯浏览、登录或页面停留不算有效行动。"
+    ),
+}
+
+
+def build_stage_instruction(
+    stage: LoopStage,
+    *,
+    agent_name: str = "",
+    role_summary: str = "",
+    not_to_do: Sequence[str] = (),
+    key_fields: Sequence[str] = (),
+    coverage_threshold: Optional[float] = None,
+    confidence_threshold: Optional[float] = None,
+    gap_confidence_floor: Optional[float] = None,
+) -> str:
+    """组装某一环节发给模型的**任务指令**。
+
+    存在理由：`ContractAgentEngine` 只把 `prompt_vars` 与黑板序列化成 JSON 交给模型，
+    本身不含任何任务语义（R-ORC-001）。如果业务层不给出指令，模型只拿到一堆裸 JSON
+    和一份输出 Schema，只能自行猜测该抽什么，实测会产出自由命名的画像字段，
+    使六个关键字段永远覆盖不到、采集环节无法收口。
+
+    - 环节职责取自本模块 `_STAGE_DUTIES`（第一期参考口径）；
+    - 关键字段清单与阈值**必须**由调用方从 `policy_params.profile_collection` 传入，
+      本函数不内建任何字段名或阈值，避免与决策 5 口径漂移。
+    """
+    if stage not in _STAGE_DUTIES:
+        raise ValueError(f"未知环节：{stage!r}")
+
+    lines: list[str] = []
+    label = STAGE_LABELS[stage]
+    if agent_name:
+        lines.append(f"你是本环节（{label}）的主理：{agent_name}。")
+    else:
+        lines.append(f"你是本环节（{label}）的主理。")
+    if role_summary:
+        lines.append(f"你的职责：{role_summary}")
+    if not_to_do:
+        lines.append("你明确不做：" + "；".join(str(item) for item in not_to_do) + "。")
+
+    lines.append("")
+    lines.append("【本轮任务】")
+    lines.append(_STAGE_DUTIES[stage])
+
+    if stage is LoopStage.COLLECT:
+        lines.append("")
+        lines.append("【画像字段口径】")
+        if key_fields:
+            lines.append(
+                "field_updates[].key 必须从下列关键字段中取值，不要自造字段名："
+                + "、".join(key_fields)
+                + "。"
+            )
+            lines.append(
+                "每个关键字段：用户已经明确表达 → 写进 field_updates（confidence 反映把握程度，"
+                "evidence 放用户原话）；用户没有表达 → 写进 remaining_gaps，不要凭空填值。"
+            )
+        if coverage_threshold is not None and confidence_threshold is not None:
+            lines.append(
+                f"只有关键字段覆盖率达到 {coverage_threshold} 且整体置信度不低于 "
+                f"{confidence_threshold} 时，才把 ready_to_handoff 置为 true；"
+                "否则保持 false 并继续追问。"
+            )
+        if gap_confidence_floor is not None:
+            lines.append(
+                f"置信度低于 {gap_confidence_floor} 的关键字段视为缺口，应出现在 remaining_gaps 中。"
+            )
+        lines.append("confidence_overall 反映当前整体画像置信度，必须如实填写。")
+
+    lines.append("")
+    lines.append(
+        "【输出要求】只输出一个符合给定 JSON Schema 的 JSON 对象；"
+        "不要输出 Markdown 代码块、解释或多余文字。"
+        "所有文本使用简体中文。没有依据的内容不要编造。"
+    )
+    return "\n".join(lines)
 
 
 class AgentDrivenLoopCoordinator(LoopCoordinator):
@@ -381,8 +488,10 @@ def _utcnow() -> datetime:
 
 __all__ = [
     "AgentDrivenLoopCoordinator",
+    "STAGE_LABELS",
     "STAGE_OUTPUT_CONTRACTS",
     "STAGE_SEQUENCE",
+    "build_stage_instruction",
     "default_conclusion_builder",
     "next_stage_after",
 ]

@@ -22,13 +22,13 @@ from zhiyin_kernel.registry import PolicyParamSet
 PROFILE_COLLECTION_POLICY = "profile_collection"
 
 
-def calculate_overall_confidence(
-    fields: Sequence[ProfileField], params: PolicyParamSet
-) -> float:
-    """计算已采集关键字段的等权平均置信度。
+def key_fields_from_params(params: PolicyParamSet) -> list[str]:
+    """校验并返回关键字段清单。
 
-    缺失关键字段不参与平均；覆盖率由采集流程使用同一份 ``key_fields``
-    独立判断。没有任何已采集关键字段时返回 ``0.0``。
+    关键字段的**唯一来源**是动态资源 ``policy_params.profile_collection``：
+    覆盖率、整体置信度、缺口判定和采集提示词都必须用同一份清单，
+    任何一处另写一份都会随阈值调整而漂移。读不到或形状非法时显式报错，
+    不静默回落成默认清单。
     """
     if params.code != PROFILE_COLLECTION_POLICY:
         raise ValueError(
@@ -46,6 +46,18 @@ def calculate_overall_confidence(
         or len(set(raw_key_fields)) != len(raw_key_fields)
     ):
         raise ValueError("画像置信度参数 key_fields 必须是非空且不重复的字符串列表")
+    return list(raw_key_fields)
+
+
+def calculate_overall_confidence(
+    fields: Sequence[ProfileField], params: PolicyParamSet
+) -> float:
+    """计算已采集关键字段的等权平均置信度。
+
+    缺失关键字段不参与平均；覆盖率由采集流程使用同一份 ``key_fields``
+    独立判断。没有任何已采集关键字段时返回 ``0.0``。
+    """
+    raw_key_fields = key_fields_from_params(params)
 
     confidence_by_key = {field.key: field.confidence for field in fields}
     present = [
@@ -58,4 +70,8 @@ def calculate_overall_confidence(
     return sum(present) / len(present)
 
 
-__all__ = ["PROFILE_COLLECTION_POLICY", "calculate_overall_confidence"]
+__all__ = [
+    "PROFILE_COLLECTION_POLICY",
+    "calculate_overall_confidence",
+    "key_fields_from_params",
+]

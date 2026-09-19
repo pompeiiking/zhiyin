@@ -22,6 +22,7 @@ from zhiyin_business.services import (
     AgentDrivenLoopCoordinator,
     next_stage_after,
 )
+from zhiyin_business.services.loop import build_stage_instruction
 
 from zhiyin_infrastructure.local.repository import (
     InMemoryTaskSessionRepository,
@@ -272,3 +273,78 @@ async def test_contract_lookup_is_per_stage_not_per_agent(sessions, registry) ->
 
     # 取不到的 (agent_id, stage) 组合返回 None，不抛异常（由调用方回落）
     assert await registry.get_output_contract("profile_analyst", LoopStage.REVIEW) is None
+
+
+# --------------------------------------------------------------------------
+# 环节指令组装（五环节没有提示词时，真实模型只能自造画像字段名）
+# --------------------------------------------------------------------------
+
+
+def test_stage_instruction_carries_role_and_boundary() -> None:
+    text = build_stage_instruction(
+        LoopStage.DIAGNOSE,
+        agent_name="职业顾问",
+        role_summary="画像与目标要求对齐",
+        not_to_do=["不替用户执行"],
+    )
+    assert "职业顾问" in text
+    assert "画像与目标要求对齐" in text
+    assert "不替用户执行" in text
+    # 只输出 JSON 的硬要求必须随每条指令下发
+    assert "JSON" in text
+
+
+def test_collect_instruction_lists_key_fields_and_thresholds() -> None:
+    """关键字段清单与阈值由调用方从 policy_params 传入，指令里必须原样出现。"""
+    key_fields = ["career_interest", "ability_strength", "value_anchor"]
+    text = build_stage_instruction(
+        LoopStage.COLLECT,
+        agent_name="建档分析师",
+        key_fields=key_fields,
+        coverage_threshold=0.8,
+        confidence_threshold=0.7,
+        gap_confidence_floor=0.6,
+    )
+    for key in key_fields:
+        assert key in text, f"指令必须列出关键字段 {key}"
+    assert "0.8" in text and "0.7" in text and "0.6" in text
+    assert "field_updates" in text and "remaining_gaps" in text
+
+
+def test_collect_instruction_does_not_invent_key_fields() -> None:
+    """没有传入关键字段时不得凭空编造——否则就是绕过动态资源口径。"""
+    text = build_stage_instruction(LoopStage.COLLECT, agent_name="建档分析师")
+    for leaked in ("career_interest", "ability_strength", "value_anchor"):
+        assert leaked not in text
+
+
+def test_non_collect_instruction_has_no_profile_field_block() -> None:
+    text = build_stage_instruction(LoopStage.ACT, agent_name="路径规划师")
+    assert "field_updates" not in text
+    assert "remaining_gaps" not in text
+
+
+def test_key_fields_from_params_requires_confirmed_params() -> None:
+    from zhiyin_business.policies.profile import (
+        PROFILE_COLLECTION_POLICY,
+        key_fields_from_params,
+    )
+    from zhiyin_kernel.registry import PolicyParamSet
+
+    good = PolicyParamSet(
+        code=PROFILE_COLLECTION_POLICY,
+        value={"key_fields": ["a", "b"]},
+        status="confirmed",
+    )
+    assert key_fields_from_params(good) == ["a", "b"]
+
+    for bad in (
+        PolicyParamSet(code=PROFILE_COLLECTION_POLICY, value={"key_fields": []}, status="confirmed"),
+        PolicyParamSet(code=PROFILE_COLLECTION_POLICY, value={"key_fields": ["a", "a"]}, status="confirmed"),
+        PolicyParamSet(code=PROFILE_COLLECTION_POLICY, value={"key_fields": "a"}, status="confirmed"),
+        PolicyParamSet(code=PROFILE_COLLECTION_POLICY, value={"key_fields": ["a"]}, status="draft"),
+        PolicyParamSet(code="other", value={"key_fields": ["a"]}, status="confirmed"),
+    ):
+        with pytest.raises(ValueError):
+            key_fields_from_params(bad)
+

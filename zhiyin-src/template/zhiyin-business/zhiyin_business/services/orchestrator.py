@@ -59,7 +59,15 @@ from zhiyin_business.ports.orchestrator import (
     TurnRequest,
     TurnResult,
 )
-from zhiyin_business.services.loop import STAGE_OUTPUT_CONTRACTS, default_conclusion_builder
+from zhiyin_business.policies.profile import (
+    PROFILE_COLLECTION_POLICY,
+    key_fields_from_params,
+)
+from zhiyin_business.services.loop import (
+    STAGE_OUTPUT_CONTRACTS,
+    build_stage_instruction,
+    default_conclusion_builder,
+)
 from zhiyin_data_sdk.gateways.ai import SearchGateway
 from zhiyin_data_sdk.repositories import RegistryRepository, TaskSessionRepository
 from zhiyin_kernel.assets import ActionPlan, DirectionPlan, PlanGap, Report
@@ -163,6 +171,40 @@ class DefaultOrchestrator(Orchestrator):
             blackboard=blackboard,
             intent=intent,
             message=intent.value,
+        )
+
+    async def _build_stage_instruction(self, stage: LoopStage, agent_id: str) -> str:
+        """组装本轮交给模型的任务指令。
+
+        `ContractAgentEngine` 只负责把 `prompt_vars` 与黑板序列化后交给模型，
+        本身不含任务语义（R-ORC-001）；指令必须由业务层给出，否则模型只拿到
+        裸 JSON 与输出 Schema，会自行猜测该抽什么。
+
+        指令骨架取自 `services/loop.py`；**关键字段清单与阈值一律从动态资源读取**，
+        编排器不内建任何画像字段名或阈值（与决策 5 共用同一份口径）。
+        """
+        descriptor = await self._registry.get_agent(agent_id)
+        key_fields: list[str] = []
+        coverage_threshold = confidence_threshold = gap_floor = None
+        if stage is LoopStage.COLLECT:
+            params = await self._registry.get_policy_params(PROFILE_COLLECTION_POLICY)
+            if params is None:
+                raise RuntimeError("缺少动态规则参数：profile_collection")
+            key_fields = key_fields_from_params(params)
+            coverage_threshold = _optional_float(params.value.get("coverage_threshold"))
+            confidence_threshold = _optional_float(
+                params.value.get("overall_confidence_threshold")
+            )
+            gap_floor = _optional_float(params.value.get("gap_confidence_floor"))
+        return build_stage_instruction(
+            stage,
+            agent_name=descriptor.name if descriptor else agent_id,
+            role_summary=descriptor.role_summary if descriptor else "",
+            not_to_do=descriptor.not_to_do if descriptor else (),
+            key_fields=key_fields,
+            coverage_threshold=coverage_threshold,
+            confidence_threshold=confidence_threshold,
+            gap_confidence_floor=gap_floor,
         )
 
     async def _detect_stage_for_message(
@@ -431,12 +473,14 @@ class DefaultOrchestrator(Orchestrator):
             user_id=request.user_id,
         )
         contract = STAGE_OUTPUT_CONTRACTS[stage]
+        instruction = await self._build_stage_instruction(stage, session.lead_agent)
         agent_result = await self._agent_engine.invoke(
             AgentRequest(
                 agent_id=session.lead_agent,
                 stage=stage.value,
                 blackboard=blackboard.model_dump(mode="json"),
                 prompt_vars={
+                    "instruction": instruction,
                     "user_input": request.message,
                     "intent": intent.value,
                     "evidence_packet": evidence_packet.model_dump(mode="json"),
@@ -791,6 +835,17 @@ class DefaultOrchestrator(Orchestrator):
             if item.source and item.source in allowed
         )
         return list(dict.fromkeys(item.strip() for item in candidates if item.strip()))
+
+
+def _optional_float(value: object) -> float | None:
+    """把动态资源里的数取成 float；形状不对时返回 None，由调用方决定口径。
+
+    动态资源是外部配置，不能假设它一定是数值：这里只做形状收敛，
+    不编默认值——缺参数时指令里会自然省略对应句，而不是用一个假阈值冒充。
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
 
 
 __all__ = ["DefaultOrchestrator"]

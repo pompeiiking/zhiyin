@@ -66,9 +66,23 @@ def _to_channel(raw: str) -> NotifyChannel:
 
 
 def _render_prompt(prompt_vars: dict[str, Any], blackboard: dict[str, Any]) -> str:
+    """把提示词变量与共享状态渲染成一条消息。
+
+    `instruction` 是业务层给出的**任务指令**，以散文放在最前面：它不是数据，
+    混进 JSON 转储里会被模型当成又一个字段。其余变量与黑板仍按 JSON 附在后面，
+    供模型读取事实。本函数不认识任何业务语义，只认这一个约定的键名。
+    """
     blocks = []
-    if prompt_vars:
-        blocks.append("【输入变量】\n" + json.dumps(prompt_vars, ensure_ascii=False, indent=2))
+    instruction = prompt_vars.get("instruction") if prompt_vars else None
+    if isinstance(instruction, str) and instruction.strip():
+        blocks.append(instruction.strip())
+    rest = (
+        {key: value for key, value in prompt_vars.items() if key != "instruction"}
+        if prompt_vars
+        else {}
+    )
+    if rest:
+        blocks.append("【输入变量】\n" + json.dumps(rest, ensure_ascii=False, indent=2))
     if blackboard:
         blocks.append("【共享状态】\n" + json.dumps(blackboard, ensure_ascii=False, indent=2))
     return "\n\n".join(blocks)
