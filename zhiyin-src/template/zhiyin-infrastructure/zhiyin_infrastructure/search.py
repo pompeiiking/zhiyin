@@ -11,6 +11,19 @@ from zhiyin_data_sdk.gateways.vector import VectorGateway
 from zhiyin_kernel.retrieval import RetrievalEvidence, RetrievalQuery
 
 
+def _qualified(namespace: str, record_id: str) -> str:
+    """把向量库的记录 id 规范成 `namespace:id`（D11）。
+
+    为什么在**读**的时候做、而不是只改写入方：向量库里可能已经存在裸 id 的行
+    （历史数据），读时兜底才能立刻让两通道对同一篇文档用同一个键，RRF 去重才成立。
+
+    幂等：已经是 `namespace:` 前缀的（新写入或平台侧自带）不再叠加，避免出现
+    `theory:theory:x`。
+    """
+    prefix = f"{namespace}:"
+    return record_id if record_id.startswith(prefix) else f"{prefix}{record_id}"
+
+
 class RrfHybridSearchGateway(SearchGateway):
     """用 Reciprocal Rank Fusion 合并关键词与向量结果。
 
@@ -71,7 +84,7 @@ class RrfHybridSearchGateway(SearchGateway):
         )
         return [
             RetrievalEvidence(
-                evidence_id=hit.id,
+                evidence_id=_qualified(request.namespace.value, hit.id),
                 namespace=request.namespace,
                 content=hit.text,
                 score=hit.score,

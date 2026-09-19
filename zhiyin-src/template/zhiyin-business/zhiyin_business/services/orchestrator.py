@@ -92,6 +92,25 @@ class _AxisAInferenceResult(BaseModel):
     reason: str = ""
 
 
+def _theory_card_id(hit: RetrievalEvidence) -> str:
+    """取**理论卡 id**，而不是检索证据的地址（D11）。
+
+    `TheoryRef.theory_id` 的契约是"理论卡 id，指向 theory_card"；而 `evidence_id`
+    在 D11 之后是 `namespace:id` 形式的**检索地址**。两者不是一回事，早期实现把
+    `theory_id=hit.evidence_id` 直接赋值只是巧合能跑——一旦证据 id 统一加上
+    namespace 前缀，卡片引用就会变成 `theory:clover` 这种"卡片不认得的 id"。
+
+    因此这里显式取卡片 id：优先用通道回传的原始 `id`（本地/权威通道都会带在
+    metadata 里），否则退回去掉 namespace 前缀的证据 id（PAMI 通道没有原始 id，
+    此时只能降级，且它的 id 本就不是卡片 id——这一点在 PAMI 适配器里已写明）。
+    """
+    raw = hit.metadata.get("id")
+    if raw:
+        return str(raw)
+    prefix = f"{hit.namespace.value}:"
+    return hit.evidence_id.removeprefix(prefix)
+
+
 class DefaultOrchestrator(Orchestrator):
     """编排器默认实现：只做读黑板、调规则、调用 Agent、落库与发事件。"""
 
@@ -665,7 +684,7 @@ class DefaultOrchestrator(Orchestrator):
     ) -> list[TheoryRef]:
         return [
             TheoryRef(
-                theory_id=hit.evidence_id,
+                theory_id=_theory_card_id(hit),
                 name=hit.title or hit.source_id or hit.evidence_id,
                 stage=stage.value,
             )

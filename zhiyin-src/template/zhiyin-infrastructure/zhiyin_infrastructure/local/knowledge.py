@@ -53,7 +53,11 @@ class LocalSearchGateway(SearchGateway):
                     (
                         score,
                         RetrievalEvidence(
-                            evidence_id=str(raw.get("id") or f"{space}-{index}"),
+                            # `evidence_id` 必须带 namespace（D11）：评测集、权威文档存储
+                            # （`RetrievalDocumentStore` 的 `document_id`）与跨通道 RRF 去重
+                            # 都按 `namespace:id` 取键；这里若只写裸 id，同一篇文档会因
+                            # 通道不同而被当成两篇，且评测期望永远匹配不上。
+                            evidence_id=f"{space}:{raw.get('id') or f'{space}-{index}'}",
                             namespace=request.namespace,
                             source_id=str(raw.get("source_id") or raw.get("id") or ""),
                             source_url=str(raw.get("source_url") or ""),

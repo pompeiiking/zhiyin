@@ -13,6 +13,7 @@ from zhiyin_boot.settings import Settings
 from zhiyin_business.policies.retrieval import RetrievalPlanningPolicy
 from zhiyin_kernel.enums import LoopStage, RetrievalNamespace
 from zhiyin_kernel.retrieval import RetrievalEvidence, RetrievalQuery
+from zhiyin_infrastructure.local.knowledge import LocalSearchGateway
 from zhiyin_infrastructure.persistence.models import RetrievalDocumentRow
 from zhiyin_infrastructure.persistence.retrieval_documents import RetrievalDocumentStore
 from zhiyin_infrastructure.retrieval_content import (
@@ -255,17 +256,22 @@ async def test_document_expiry_worker_reports_how_many_it_expired(tmp_path: Path
     engine.dispose()
 
 
-def test_eval_set_expectations_are_not_yet_covered_by_the_corpus() -> None:
+@pytest.mark.asyncio
+async def test_eval_set_expectations_are_not_yet_covered_by_the_corpus() -> None:
     """登记现状：评测集期望**尚未**被语料覆盖，因此现在算不出质量指标（D7 ⑦）。
 
     这是一条**状态记录型**断言，不是质量断言。它锁的事实：
     `data/evaluation/retrieval_cases.json` 里 100 条期望 id（`namespace:xxx`）
     指向一份"测试知识快照"，而该快照**不在仓库里**（`data/knowledge/` 只有
-    3 条 theory + 3 条 occupation，且 id 是**裸 id**，没有 namespace 前缀）。
+    3 条 theory + 3 条 occupation，且它们是**演示卡片**）。
 
-    为什么要写成测试：它会在"真实内容进索引 / 补上知识快照 / 统一 id 口径"之后
-    立刻变红，提醒把基准与门槛真正跑起来并更新本记录——否则这件事会一直悬着，
-    而 `evaluate_retrieval()` 也会继续没有调用方。
+    为什么要写成测试：它会在"真实内容进索引 / 补上知识快照"之后立刻变红，提醒把
+    基准与门槛真正跑起来并更新本记录——否则这件事会一直悬着，而
+    `evaluate_retrieval()` 也会继续没有调用方。
+
+    ⚠️ 本用例过去还顺带记录"id 口径不一致"，但**读的是语料 JSON 而不是通道**，
+    于是 D11 修好之后它仍然通过（两种形态都在语料里，裸 id 永远非空）——
+    典型的"记录型断言的观测对象错了"。现在改为**实测通道返回的 id 形态**。
     """
     dataset = json.loads(
         (ROOT / "data/evaluation/retrieval_cases.json").read_text(encoding="utf-8")
@@ -285,9 +291,7 @@ def test_eval_set_expectations_are_not_yet_covered_by_the_corpus() -> None:
             if not item.get("id"):
                 continue
             namespace = str(item.get("namespace") or path.stem)
-            corpus.setdefault(namespace, set()).update(
-                {str(item["id"]), f"{namespace}:{item['id']}"}
-            )
+            corpus.setdefault(namespace, set()).add(f"{namespace}:{item['id']}")
 
     covered = [pair for pair in expected if pair[1] in corpus.get(pair[0], set())]
     assert not covered, (
@@ -296,13 +300,18 @@ def test_eval_set_expectations_are_not_yet_covered_by_the_corpus() -> None:
         "冻结质量门槛，然后更新本用例与《检索质量基准》文档。"
     )
 
-    # 同时把 id 口径不一致记录下来：期望带 namespace 前缀，语料里是裸 id。
+    # D11 已收口：期望与**通道实测**口径一致（都在此锁定，防止回退成裸 id）
     assert all(":" in item for _, item in expected), "评测集期望应统一为 namespace:id"
-    bare = {item for values in corpus.values() for item in values if ":" not in item}
-    assert bare, (
-        "语料 id 已统一为 namespace:id —— 说明本地关键词通道的口径可能已经改了，"
-        "请复核 `LocalSearchGateway.evidence_id` 与 RRF 去重键，并更新本记录"
+    gateway = LocalSearchGateway(str(ROOT / "data/knowledge"))
+    hits = await gateway.search(
+        RetrievalQuery(
+            query="霍兰德", namespace=RetrievalNamespace.THEORY, top_k=3
+        )
     )
+    assert hits, "本地语料应能召回（用于观测通道 id 口径）"
+    assert all(
+        hit.evidence_id.startswith("theory:") for hit in hits
+    ), f"D11 回退：通道返回了裸 id {[hit.evidence_id for hit in hits]}"
 
 
 def test_fixed_evaluation_set_has_100_nonempty_cases_and_full_coverage() -> None:

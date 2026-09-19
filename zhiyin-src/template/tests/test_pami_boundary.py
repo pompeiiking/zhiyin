@@ -107,6 +107,8 @@ async def test_pami_rag_maps_unified_search_hits() -> None:
     assert hits[0].metadata["provider"] == "pami-rag"
     assert hits[0].metadata["namespace"] == "theory"
     assert hits[0].content == "兴趣理论"
+    # D11：三条通道（本地关键词 / PAMI / 向量）统一按 `namespace:id` 出 id
+    assert hits[0].evidence_id.startswith("theory:"), hits[0].evidence_id
 
 
 @pytest.mark.asyncio

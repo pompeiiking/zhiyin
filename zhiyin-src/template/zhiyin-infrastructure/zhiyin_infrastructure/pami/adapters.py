@@ -285,7 +285,11 @@ def _search_hits(body: dict[str, Any], request: RetrievalQuery) -> list[Retrieva
         ).hexdigest()[:24]
         hits.append(
             RetrievalEvidence(
-                evidence_id=f"pami:{stable or index}",
+                # 与本地关键词通道、向量通道统一为 `namespace:id`（D11）。PAMI 只回
+                # title/snippet，没有稳定文档 id，故这里的 id 是内容哈希——它**不能**
+                # 与向量通道的同一篇文档对上（PAMI 不回我们的 source_id 时无法跨通道
+                # 去重），这是数据侧的已知限制，不要误当"已经对齐"。
+                evidence_id=f"{request.namespace.value}:{stable or index}",
                 namespace=request.namespace,
                 source_id=str(item.get("source_id") or item.get("doc_id") or ""),
                 source_url=str(item.get("source_url") or item.get("url") or ""),

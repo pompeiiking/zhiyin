@@ -151,14 +151,21 @@ def test_transaction_manager_commits_and_rolls_back(tmp_path: Path) -> None:
 
 
 class FakeKeywordSearch(SearchGateway):
+    """模拟真实关键词通道：同样按 `namespace:id` 出 id（D11 后的统一口径）。
+
+    裸 id 是 D11 之前的本地实现行为；假件必须跟真实通道保持同一口径，否则这里
+    会掩盖跨通道去重失效的问题。
+    """
+
     async def search(self, request: RetrievalQuery) -> list[RetrievalEvidence]:
+        prefix = request.namespace.value
         return [
             RetrievalEvidence(
-                evidence_id="shared", namespace=request.namespace,
+                evidence_id=f"{prefix}:shared", namespace=request.namespace,
                 content="共同命中", score=10
             ),
             RetrievalEvidence(
-                evidence_id="keyword", namespace=request.namespace,
+                evidence_id=f"{prefix}:keyword", namespace=request.namespace,
                 content="关键词命中", score=9
             ),
         ][:request.top_k]
@@ -185,9 +192,38 @@ async def test_rrf_hybrid_search_merges_both_channels() -> None:
         )
     )
 
-    assert hits[0].evidence_id == "shared"
+    # 两条通道都用 `namespace:id`：同一篇文档（shared）必须**只出现一次**且带上
+    # 两条通道的排名——这就是 D11 要锁的不变式。裸 id 时代它会变成两条重复证据。
+    assert hits[0].evidence_id == "theory:shared"
     assert hits[0].metadata["retrieval"]["ranks"] == {"keyword": 1, "vector": 1}
-    assert {hit.evidence_id for hit in hits} == {"shared", "keyword", "vector"}
+    assert [hit.evidence_id for hit in hits] == [
+        "theory:shared", "theory:keyword", "theory:vector",
+    ]
+    assert len({hit.evidence_id for hit in hits}) == len(hits)
+
+
+@pytest.mark.asyncio
+async def test_bare_vector_ids_are_namespace_qualified_idempotently() -> None:
+    """向量库里的**裸 id 旧数据**读出来要自动补齐 namespace，且不会叠加两次。"""
+    embedding = LocalHashEmbedder(dim=4, model_id="test-model")
+    vector = LocalVectorStore()
+    vec, = await embedding.embed(["目标"])
+    await vector.upsert(
+        "theory",
+        [
+            VectorRecord(id="legacy-bare", vector=vec, text="旧数据裸 id"),
+            VectorRecord(id="theory:already", vector=vec, text="已带前缀"),
+        ],
+        model=embedding.model_id,
+    )
+    search = RrfHybridSearchGateway(EmptyKeywordSearch(), embedding, vector, rrf_k=60)
+    hits = await search.search(
+        RetrievalQuery(query="目标", namespace=RetrievalNamespace.THEORY, top_k=5)
+    )
+    ids = {hit.evidence_id for hit in hits}
+    assert "theory:legacy-bare" in ids
+    assert "theory:already" in ids, "已带前缀的 id 不得变成 theory:theory:already"
+    assert not any(hit.evidence_id.startswith("theory:theory:") for hit in hits)
 
 
 class FailingKeywordSearch(SearchGateway):
@@ -301,8 +337,8 @@ async def test_keyword_channel_fault_degrades_to_vector_only() -> None:
         RetrievalQuery(query="目标", namespace=RetrievalNamespace.THEORY, top_k=3)
     )
     ids = {hit.evidence_id for hit in hits}
-    assert "vector" in ids, "向量通道仍在工作，应能召回"
-    assert "keyword" not in ids, "关键词通道已故障，不应出现它的命中"
+    assert "theory:vector" in ids, "向量通道仍在工作，应能召回"
+    assert "theory:keyword" not in ids, "关键词通道已故障，不应出现它的命中"
     retrieval = hits[0].metadata["retrieval"]
     assert retrieval["degraded_channels"] == ["keyword"]
     assert retrieval["degraded_reasons"] == {"keyword": "RuntimeError"}
@@ -383,7 +419,7 @@ async def test_embedding_fault_degrades_to_keyword_only() -> None:
     hits = await search.search(
         RetrievalQuery(query="目标", namespace=RetrievalNamespace.THEORY, top_k=3)
     )
-    assert {hit.evidence_id for hit in hits} == {"shared", "keyword"}
+    assert {hit.evidence_id for hit in hits} == {"theory:shared", "theory:keyword"}
     assert hits[0].metadata["retrieval"]["degraded_channels"] == ["vector"]
     assert hits[0].metadata["retrieval"]["degraded_reasons"] == {"vector": "RuntimeError"}
 
@@ -398,7 +434,7 @@ async def test_pgvector_fault_degrades_to_keyword_only() -> None:
     hits = await search.search(
         RetrievalQuery(query="目标", namespace=RetrievalNamespace.THEORY, top_k=3)
     )
-    assert {hit.evidence_id for hit in hits} == {"shared", "keyword"}
+    assert {hit.evidence_id for hit in hits} == {"theory:shared", "theory:keyword"}
     assert hits[0].metadata["retrieval"]["degraded_channels"] == ["vector"]
     assert hits[0].metadata["retrieval"]["degraded_reasons"] == {"vector": "RuntimeError"}
 
