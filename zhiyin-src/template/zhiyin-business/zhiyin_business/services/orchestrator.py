@@ -111,6 +111,20 @@ def _theory_card_id(hit: RetrievalEvidence) -> str:
     return hit.evidence_id.removeprefix(prefix)
 
 
+def _is_demo_evidence(hit: RetrievalEvidence) -> bool:
+    """这条证据是否来自**演示语料**（D12）。
+
+    为什么要在引用侧拦：`_report_sources()` 原本只校验"模型引用的来源是否出现在
+    证据包里"，**不校验证据本身是不是演示数据**。于是演示卡片可以被当成真实依据写进
+    报告——报告看起来有出处，出处却是本地演示 JSON。
+
+    标记由检索通道打在 `metadata["demo"]`（`LocalSearchGateway` 按语料 `_note` 判定）。
+    没有该键一律按"真实证据"处理：宁可漏标一条，也不要因为字段缺失把真实内容判成
+    演示内容而丢掉真实引用。
+    """
+    return hit.metadata.get("demo") is True
+
+
 class DefaultOrchestrator(Orchestrator):
     """编排器默认实现：只做读黑板、调规则、调用 Agent、落库与发事件。"""
 
@@ -420,6 +434,14 @@ class DefaultOrchestrator(Orchestrator):
             return ""
         return str(bundle.get("notice.placeholder_output", "")).strip()
 
+    async def _demo_evidence_notice(self) -> str:
+        """证据里出现演示语料时的应答提示（D12）；同样取自动态资源。"""
+        try:
+            bundle = await self._registry.get_copy_bundle()
+        except NotImplementedError:
+            return ""
+        return str(bundle.get("notice.demo_evidence", "")).strip()
+
     async def handle_message(self, request: TurnRequest) -> TurnResult:
         existing = await self._sessions.get(request.task_id)
         if existing is not None and existing.user_id != request.user_id:
@@ -544,6 +566,23 @@ class DefaultOrchestrator(Orchestrator):
             # 此前这个标记在成功路径上被直接丢弃，于是"看起来正常的演示产出"会被当成
             # 诊断结论——这正是待决问题 D1 要堵的坑。现在显式在应答里说明一次。
             notice = await self._placeholder_notice()
+            if notice:
+                if messages:
+                    messages[-1] = messages[-1].model_copy(
+                        update={"text": f"{messages[-1].text}\n{notice}"}
+                    )
+                else:
+                    messages = [
+                        ConversationMessage(
+                            role="agent", text=notice, agent_id=session.lead_agent
+                        )
+                    ]
+
+        if any(_is_demo_evidence(hit) for hit in evidence_packet.evidences):
+            # 本轮检索命中了**演示语料**（D12）。上面已经把演示证据挡在报告引用之外，
+            # 但用户看到的结论仍然是基于这些材料生成的，所以必须当轮说明一次，
+            # 而不是让报告"看起来有依据"。
+            notice = await self._demo_evidence_notice()
             if notice:
                 if messages:
                     messages[-1] = messages[-1].model_copy(
@@ -689,7 +728,7 @@ class DefaultOrchestrator(Orchestrator):
                 stage=stage.value,
             )
             for hit in hits
-            if hit.namespace.value == "theory"
+            if hit.namespace.value == "theory" and not _is_demo_evidence(hit)
         ]
 
     async def _record_turn(
@@ -868,7 +907,11 @@ class DefaultOrchestrator(Orchestrator):
     ) -> list[str]:
         candidates: list[str] = []
         allowed: set[str] = set()
+        # 演示语料**不能**给报告当出处（D12）：它既不能进 allowed（否则模型引一句
+        # 演示卡片就算"核对通过"），也不能作为候选来源（否则报告会直接"引用"它）。
         for hit in knowledge_hits:
+            if _is_demo_evidence(hit):
+                continue
             for source in (
                 hit.source_url,
                 hit.source_id,
@@ -908,6 +951,8 @@ class DefaultOrchestrator(Orchestrator):
         """
         versions: dict[str, int] = {}
         for hit in knowledge_hits:
+            if _is_demo_evidence(hit):
+                continue
             canonical = hit.source_url or hit.source_id or hit.evidence_id
             if not canonical:
                 continue

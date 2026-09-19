@@ -261,13 +261,64 @@ async def test_acceptance_7_stall_triggers_coach_message() -> None:
     assert messages[0]["action"]["type"] == "resume_review"
 
 
+def _real_knowledge_dir(tmp_path: Path) -> Path:
+    """写一份**不带 DEMO 声明**的知识语料，供"引用真的能进报告"这类用例使用。
+
+    为什么需要它：仓库自带的 `data/knowledge/*.json` 自述为演示数据，而 D12 之后
+    演示语料**不允许**给报告当出处（也不作为理论依据）。如果继续拿演示语料去验
+    "报告有引用"，就等于在验一个我们刚刚刻意禁掉的行为。所以这里造一份真实语料，
+    让用例验的仍是**真实来源可被引用**这条契约。
+    """
+    knowledge = tmp_path / "knowledge"
+    knowledge.mkdir()
+    items = [
+        {
+            "id": "real-parsons",
+            "namespace": "theory",
+            "title": "帕森斯特质因素论",
+            "summary": "先了解自我，再了解职业，最后做匹配。",
+            "source_url": "https://example.org/parsons",
+            "source": "公开教材（示例来源）",
+            "status": "enabled",
+            "version": 1,
+        },
+        {
+            "id": "real-holland",
+            "namespace": "theory",
+            "title": "霍兰德 RIASEC",
+            "summary": "六类职业兴趣与三字母组合。",
+            "source_url": "https://example.org/holland",
+            "source": "公开教材（示例来源）",
+            "status": "enabled",
+            "version": 2,
+        },
+    ]
+    (knowledge / "theory.json").write_text(
+        json.dumps({"_note": "真实来源语料（测试用）", "items": items}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return knowledge
+
+
 @pytest.mark.asyncio
-async def test_acceptance_8_orchestrator_persists_full_assets_and_knowledge() -> None:
-    """编排器必须保存正文，并只展示本地知识库真实命中的理论引用。"""
+async def test_acceptance_8_orchestrator_persists_full_assets_and_knowledge(
+    tmp_path: Path,
+) -> None:
+    """编排器必须保存正文，并只展示**真实**知识库命中的理论引用。
+
+    ⚠️ 用 `_real_knowledge_dir` 而不是仓库自带的演示语料：D12 之后演示语料不得成为
+    报告出处（那正是"报告看起来有依据、出处却是演示 JSON"的坑）。用演示语料跑这条
+    用例会自相矛盾——一边禁掉演示引用，一边要求出现引用。
+    """
+    from dataclasses import replace
+
     from zhiyin_api.dto.conversation import MessageRequest, TaskEnterRequest
     from zhiyin_kernel.enums import AssetType
 
-    container = _container()
+    knowledge_dir = _real_knowledge_dir(tmp_path)
+    container = build_container(
+        replace(_settings(), local_knowledge_dir=str(knowledge_dir))
+    )
     user_id = "e2e_orchestrator_assets"
 
     diagnose_session = await container.facade.enter_task(
@@ -289,7 +340,7 @@ async def test_acceptance_8_orchestrator_persists_full_assets_and_knowledge() ->
     assert report.sources
 
     known_theories = json.loads(
-        (DATA_DIR / "knowledge" / "theory.json").read_text(encoding="utf-8")
+        (knowledge_dir / "theory.json").read_text(encoding="utf-8")
     )
     known_ids = {item["id"] for item in known_theories["items"]}
     cited_ids = {

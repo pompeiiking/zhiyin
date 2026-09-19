@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from zhiyin_boot import (
@@ -12,6 +14,8 @@ from zhiyin_boot import (
     wire_application,
 )
 from zhiyin_api.runtime import WIRED
+from zhiyin_kernel.enums import RetrievalNamespace
+from zhiyin_kernel.retrieval import RetrievalQuery
 
 
 @pytest.fixture
@@ -72,6 +76,117 @@ def test_placeholder_llm_allowed_with_explicit_consent(settings: Settings) -> No
     assert_minimum_viable(container)  # 不抛异常即为通过
     # 但"允许启动"不等于"假装是真的"：占位标记照样如实上报
     assert describe_assembly(container).placeholders == ["llm"]
+
+
+def test_demo_knowledge_is_reported_without_blocking_startup(
+    settings: Settings, tmp_path
+) -> None:
+    """演示语料必须**如实上报**，但不得阻止启动（D12 选 A 的第一步）。
+
+    两件事要同时成立，所以放在一个用例里对照着锁：
+
+    1. **如实上报**：仓库里 `data/knowledge/*.json` 自述为 DEMO，装配报告必须把它
+       标进 `demo_content`，`/healthz` 随之降级——因为相位门禁只问"search 能力位
+       装没装上"，此前演示语料照样让 phase 3 判绿、healthz 判 `ok`。
+    2. **不阻断启动**：内容缺失不等于服务不可用，`assert_minimum_viable` 不得因此
+       抛错（这正是当初没有选"硬失败 + opt-in"那条改法的原因）。
+    """
+    from zhiyin_boot import describe_assembly
+
+    container = build_container(settings)
+    report = describe_assembly(container)
+
+    # 容器里装配的 search 是 RRF 包装类，信号必须由它透传出来（否则漏报）
+    assert report.gateways["search"] == WIRED
+    assert report.demo_content == ["search"], "演示语料必须被如实标出"
+    assert report.serves_fabricated_content is True, "/healthz 据此降级"
+    # 它不是"占位实现"：实现是真的，假的是内容
+    assert "search" not in report.placeholders
+    # 且不阻断启动
+    assert_minimum_viable(container)
+
+
+def test_real_corpus_is_not_flagged_as_demo(settings: Settings, tmp_path) -> None:
+    """反向用例：语料自述不是演示数据时**不得**误报（避免"到处都标红"而失效）。"""
+    from dataclasses import replace
+
+    from zhiyin_boot import describe_assembly
+
+    knowledge = tmp_path / "knowledge"
+    knowledge.mkdir()
+    (knowledge / "theory.json").write_text(
+        json.dumps(
+            {
+                "_note": "真实采集并评审通过的公共知识条目。",
+                "items": [
+                    {
+                        "id": "t-1",
+                        "namespace": "theory",
+                        "title": "某理论",
+                        "summary": "真实来源",
+                        "status": "enabled",
+                    }
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    real = replace(settings, local_knowledge_dir=str(knowledge))
+    report = describe_assembly(build_container(real))
+    # 只看"演示内容"这一维：本 fixture 的 llm 仍是占位实现，所以合并后的
+    # serves_fabricated_content 本来就会是 True，用它判断会掩盖这里的真实意图。
+    assert report.demo_content == []
+    assert report.placeholders == ["llm"], "占位维度不受影响"
+
+
+def test_demo_detection_follows_the_data_not_the_path(settings: Settings, tmp_path) -> None:
+    """判定依据是**语料自己的声明**，不是目录名/环境名。
+
+    为什么专门锁这条：按路径或 `env` 猜"这是不是演示内容"看起来更省事，但换目录、
+    改环境名时会静默失效——那时系统又会重新"不知道内容是假的"，而这正是 D12 要
+    根治的事。这里把同一份演示语料放到任意目录，标记必须照样生效。
+    """
+    from dataclasses import replace
+
+    from zhiyin_infrastructure.local.knowledge import LocalSearchGateway
+
+    elsewhere = tmp_path / "some" / "other" / "dir"
+    elsewhere.mkdir(parents=True)
+    (elsewhere / "whatever.json").write_text(
+        json.dumps(
+            {"_note": "DEMO 语料，仅用于本地链路验证", "items": []}, ensure_ascii=False
+        ),
+        encoding="utf-8",
+    )
+    gateway = LocalSearchGateway(str(elsewhere))
+    assert gateway.serves_demo_content is True
+
+    report = describe_assembly(
+        build_container(replace(settings, local_knowledge_dir=str(elsewhere)))
+    )
+    assert report.demo_content == ["search"]
+
+
+@pytest.mark.asyncio
+async def test_demo_corpus_evidence_is_flagged_for_citation_check(
+    settings: Settings,
+) -> None:
+    """演示语料的命中必须能被**逐条识别**出来（D12 第二步的前置）。
+
+    装配报告只能说明"这条通道的内容是演示的"；要让引用核对拒绝演示证据，命中本身
+    就得带标记。这里锁住标记的存在与取值，避免第二步做了个假动作。
+    """
+    container = build_container(settings)
+    hits = await container.search.search(
+        RetrievalQuery(
+            query="霍兰德", namespace=RetrievalNamespace.THEORY, top_k=3
+        )
+    )
+    assert hits, "演示语料里应有可召回条目"
+    assert all(hit.metadata.get("demo") is True for hit in hits), (
+        f"演示命中缺少 demo 标记：{[hit.metadata for hit in hits]}"
+    )
 
 
 def test_orchestration_primitives_are_wired(settings: Settings) -> None:

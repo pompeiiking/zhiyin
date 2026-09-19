@@ -552,6 +552,56 @@ async def test_placeholder_model_output_is_marked_in_the_reply() -> None:
 
 
 @pytest.mark.asyncio
+async def test_demo_knowledge_is_disclosed_and_never_cited() -> None:
+    """演示语料：**不得**进报告出处，但必须在应答里说明（D12 选 A）。
+
+    两件事必须同时成立，缺一个都会骗人：
+
+    1. **不得被引用**：`_report_sources()` 原来只校验"模型引用的来源在不在证据包里"，
+       不校验证据本身是不是演示数据——于是本地演示卡片能被写进报告的"出处"，报告
+       看起来有依据，出处却是演示 JSON。现在演示证据被挡在 `Report.sources` /
+       `source_versions` 与理论依据之外。
+    2. **必须被说明**：只拦不说是更糟的骗法——报告里突然一条出处都没有，而用户
+       不知道原因。所以编排器要把 `copies.json::notice.demo_evidence` 追加到应答。
+
+    本用例用的是仓库自带语料（`_note` 自述 DEMO），因此正好走演示分支。
+    """
+    from zhiyin_api.dto.conversation import TaskEnterRequest
+    from zhiyin_business.ports.orchestrator import TurnRequest
+    from zhiyin_kernel.enums import AssetType
+
+    container = _container()
+    user_id = "demo-evidence-user"
+    session = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code="verify_direction")
+    )
+    turn = await container.orchestrator.handle_message(
+        TurnRequest(
+            user_id=user_id,
+            task_id=session.task_id,
+            message="想验证某方向行不行",
+        )
+    )
+
+    # ① 演示证据不得成为报告出处 / 理论依据
+    report = await container.asset_service.get_report(user_id)
+    assert report is not None, "本轮应产出报告"
+    assert report.sources == [], f"演示语料不得进报告出处：{report.sources}"
+    assert report.source_versions == {}
+    assert turn.badge.theory_refs == [], "演示理论卡不得作为理论依据"
+
+    # ② 但必须当轮说明来源是演示语料
+    bundle = await container.registry_service.get_copy_bundle()
+    expected = bundle["notice.demo_evidence"]
+    assert expected, "演示语料提示文案必须存在于动态资源里"
+    texts = [m.text for m in turn.messages]
+    assert any(expected in text for text in texts), f"应答里没有演示提示：{texts}"
+
+    # 顺带确认报告本体仍然落库（不是"拦到什么都不剩"）
+    assert await container.asset_service.list_versions(user_id, AssetType.REPORT)
+
+
+@pytest.mark.asyncio
 async def test_handoff_is_the_only_stage_transition_path() -> None:
     """阶段变更只走 `Orchestrator.handoff`，且主理由规则层决定、落库生效（D3）。
 

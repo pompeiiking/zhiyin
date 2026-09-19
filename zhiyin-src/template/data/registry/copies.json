@@ -192,6 +192,14 @@
       "status": "enabled",
       "sort_order": 37,
       "note": "智能体不主理任何环节时的环节说明（能力池 D9）。信息侦查员的输出契约不绑定环节，`stages` 为空即按需调用；不写死在前端。"
+    },
+    {
+      "code": "notice.demo_evidence",
+      "text": "（本轮参考的知识条目来自本地演示语料，仅用于联调，不作为真实依据，也不会被报告引用为出处。）",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 38,
+      "note": "演示语料提示（待决问题 D12）。当本轮证据包里出现标记为 demo 的命中时，由编排器追加到应答末尾；同时 `_report_sources` / `_report_source_versions` 已把演示证据挡在报告引用之外。文案属动态资源，改本文件不需要发版。"
     }
   ]
 }

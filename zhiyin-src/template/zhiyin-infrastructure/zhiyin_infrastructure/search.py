@@ -68,6 +68,19 @@ class RrfHybridSearchGateway(SearchGateway):
         self._audit = audit
         self._org_id = org_id
 
+    @property
+    def serves_demo_content(self) -> bool:
+        """任一内部通道提供演示语料即算（D12）。
+
+        **包装类必须透传这个信号**：容器里装配的 `search` 是本类（不是
+        `LocalSearchGateway`），如果只让被包装的通道自己有这个属性，装配报告就会
+        漏报——那正是 D12 想解决的"系统不知道内容是演示的"。
+        """
+        return any(
+            getattr(channel, "serves_demo_content", False)
+            for channel in (self._keyword, self._embedding, self._vector_gateway)
+        )
+
     def configure_authority(self, authority: Any) -> None:
         """注入 Infrastructure 内部的权威数据回填器，不新增跨层 Port。"""
         self._authority = authority

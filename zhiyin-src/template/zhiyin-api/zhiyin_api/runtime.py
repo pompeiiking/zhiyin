@@ -47,10 +47,20 @@ class AssemblyReport:
     所以必须单独成一类，不能混进 `wired`。
     """
 
+    demo_content: list[str] = field(default_factory=list)
+    """装上了、实现是真的，但**内容来自演示语料**的能力位（当前只会是 `search`）。
+
+    与 `placeholders` 的区别在"假在哪"：占位实现假在**代码**（合成结果）；这一条假在
+    **数据**（演示知识卡片）。之所以也要如实上报：相位门禁只回答"能力位装没装上"，
+    于是演示语料照样让 phase 3 判绿、`/healthz` 判 `ok`，而报告可能把演示卡片当引用
+    （待决问题 D12）。它与占位一样属于"对外提供虚构内容"，所以并入下面那个属性；
+    但**不参与启动硬校验**——内容缺失不等于服务不可用。
+    """
+
     @property
     def serves_fabricated_content(self) -> bool:
-        """是否在对外提供**虚构内容**（占位实现）。供 `/healthz` 降级使用。"""
-        return bool(self.placeholders)
+        """是否在对外提供**虚构内容**（占位实现或演示语料）。供 `/healthz` 降级使用。"""
+        return bool(self.placeholders) or bool(self.demo_content)
 
     @property
     def healthy(self) -> bool:
@@ -83,6 +93,7 @@ class AssemblyReport:
             "missing": list(self.missing),
             "skeletons": list(self.skeletons),
             "placeholders": list(self.placeholders),
+            "demo_content": list(self.demo_content),
         }
 
 

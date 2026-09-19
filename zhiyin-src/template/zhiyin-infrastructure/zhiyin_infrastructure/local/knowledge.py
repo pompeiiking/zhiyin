@@ -27,6 +27,52 @@ class LocalSearchGateway(SearchGateway):
     def __init__(self, data_dir: str = "data/knowledge") -> None:
         self._data_dir = Path(data_dir)
         self._cache: dict[str, list[dict[str, Any]]] = {}
+        self._demo_namespaces: set[str] | None = None
+
+    @property
+    def demo_namespaces(self) -> set[str]:
+        """自述为演示数据的 namespace 集合（按文件判定，不是整个目录一刀切）。
+
+        **按 namespace 判定**是有意的：真实内容会一个域一个域地补进来（例如 theory
+        先换成真实卡片、jd 仍是空的），一刀切会在那时把真实内容也标成演示。
+        """
+        if self._demo_namespaces is None:
+            self._demo_namespaces = self._scan_demo_namespaces()
+        return self._demo_namespaces
+
+    @property
+    def serves_demo_content(self) -> bool:
+        """当前语料里是否**有**演示数据（D12）。
+
+        为什么要暴露这个属性：这些卡片会被当作证据进入报告，而此前系统对它是不是
+        演示内容一无所知——相位门禁只问"search 能力位装没装上"，于是演示语料照样
+        让 phase 3 判绿，`/healthz` 也显示 `ok`。装配报告据此如实上报，不再假装
+        "实现装上了"就等于"内容是真的"。
+
+        判定方式：语料文件自带的 `_note` 里出现 `DEMO` / `演示`。刻意**只看语料
+        自己的声明**，不靠环境名或文件路径猜——路径猜法会在换目录时静默失效。
+
+        结果缓存：`/healthz` 会被反复探活，不能每次都重扫语料。单个文件读取失败按
+        "不是演示内容"处理，避免把一次目录/格式问题升级成启动失败（真正搜索时该
+        错误照样会暴露）。
+        """
+        return bool(self.demo_namespaces)
+
+    def _scan_demo_namespaces(self) -> set[str]:
+        found: set[str] = set()
+        if not self._data_dir.is_dir():
+            return found
+        for path in sorted(self._data_dir.glob("*.json")):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            note = str(payload.get("_note") or "")
+            if "DEMO" in note.upper() or "演示" in note:
+                found.add(path.stem)
+        return found
 
     async def search(self, request: RetrievalQuery) -> list[RetrievalEvidence]:
         if request.mode == "vector":
@@ -48,7 +94,13 @@ class LocalSearchGateway(SearchGateway):
                 score = _score(raw, terms)
                 if score <= 0:
                     continue
-                metadata = {**raw, "namespace": space}
+                # 逐条标出"这条是演示内容"（D12）：装配报告只能说明整条通道可疑，
+                # 而引用核对要按**单条证据**决定收不收，所以标记必须落到命中上。
+                metadata = {
+                    **raw,
+                    "namespace": space,
+                    "demo": space in self.demo_namespaces,
+                }
                 scored.append(
                     (
                         score,

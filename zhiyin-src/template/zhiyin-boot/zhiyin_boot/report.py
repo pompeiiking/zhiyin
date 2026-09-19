@@ -88,6 +88,10 @@ def describe_assembly(container: "Container") -> "AssemblyReport":
         # **虚构内容**，必须与"真实现"区分开，否则漏配环境看起来一切正常。
         if getattr(type(value), "IS_PLACEHOLDER", False):
             report.placeholders.append(name)
+        # 另一类"看起来正常"：实现是真的，但**内容是演示语料**（D12）。门禁只问
+        # "能力位装没装上"，所以这里必须如实上报，否则演示卡片会被当真实证据引用。
+        if getattr(value, "serves_demo_content", False):
+            report.demo_content.append(name)
 
     for name in REPOSITORY_PORTS:
         report.repositories[name] = _status_of(
