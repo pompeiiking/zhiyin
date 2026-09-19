@@ -419,24 +419,10 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
             gap_confidence_floor=gap_floor,
         )
 
-    async def advance(
-        self,
-        context: LoopContext,
-        to_stage: LoopStage,
-        *,
-        lead_agent: Optional[str] = None,
-    ) -> LoopContext:
-        """推进到下一环节，保留已继承的资产（R-BIZ-005）。
-
-        `lead_agent` 由调用方（Orchestrator）按 `policies/teaming.py` 的规则决定；
-        不传时才回落到"任务入口默认主理"的本类兜底逻辑。这样"交接换主理"的
-        决策权在规则层，本类只负责落库与上下文推进。
-        """
-        lead = lead_agent or await self._resolve_lead(context, to_stage)
-        session = await self._sessions.update_stage(context.session.id, to_stage, lead)
-        return context.model_copy(
-            update={"session": session, "stage": to_stage, "lead_agent": lead}
-        )
+    # 原本这里还有 `advance()`：只做 `sessions.update_stage` + 返回新上下文。
+    # 2026-09-19 删除（待决问题 D3），理由见 `ports/loop.py` 内同一处的注释：
+    # 阶段变更的语义完整性（主理 / 落库 / 记忆 / 事件 / 告知）属于
+    # `DefaultOrchestrator.handoff`，状态机不该暴露一个"落库但不发事件"的半个入口。
 
     # ------------------------------------------------------------------
     # 内部
@@ -595,22 +581,6 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
             guide=BehaviorGuide(kind="question", text=self._degraded_guide_text),
             model_degraded=degraded,
         )
-
-    async def _resolve_lead(self, context: LoopContext, to_stage: LoopStage) -> str:
-        """交接后的主理。
-
-        正式的主理判定（轴 A × 轴 B × 意图）属于
-        `policies/teaming.py::LeadPolicy`，由 Orchestrator 在调用 `advance` 时传入；
-        本类只做「按任务入口配置取默认主理」的兜底，保证不传 lead_agent 时
-        `advance` 仍然可用（注意：该兜底与目标环节无关，不是正确的组队口径）。
-        """
-        try:
-            for entry in await self._registry.list_task_entries():
-                if entry.code == context.session.task_code and entry.lead_agent:
-                    return entry.lead_agent
-        except NotImplementedError:
-            pass
-        return context.lead_agent
 
 
 def _utcnow() -> datetime:

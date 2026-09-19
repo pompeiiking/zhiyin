@@ -177,7 +177,15 @@ async def test_resume_rejects_wrong_user(coordinator) -> None:
         await coordinator.resume("someone-else", context.session.id)
 
 
-async def test_advance_keeps_inherited_assets(coordinator, registry) -> None:
+async def test_inherited_assets_come_from_the_blackboard(coordinator, registry) -> None:
+    """"前序资产自动继承"发生在**读黑板**这一步，且续接时同样成立。
+
+    本用例原来叫 `test_advance_keeps_inherited_assets`，靠 `advance()` 来断言
+    "推进环节不得丢前序资产"。`advance` 已于 2026-09-19 删除（待决问题 D3），
+    所以断言移到仍然存在的两个入口：首次进入 `start()` 与会话续接 `resume()`——
+    它们才是真正负责"从黑板取继承资产"的地方。阶段变更本身现在只走
+    `Orchestrator.handoff`（守卫见 `tests/test_orchestrator_second_wave.py`）。
+    """
     from datetime import datetime, timezone
 
     from zhiyin_kernel.blackboard import AssetVersion
@@ -208,22 +216,9 @@ async def test_advance_keeps_inherited_assets(coordinator, registry) -> None:
     # 进入 ① 时已带上 ② 的资产 → 证明"前序资产自动继承"发生在读黑板这一步
     assert [asset.asset_type for asset in context.inherited_assets] == [AssetType.REPORT]
 
-    advanced = await coord.advance(context, LoopStage.DIAGNOSE)
-    assert advanced.stage is LoopStage.DIAGNOSE
-    assert advanced.inherited_assets == context.inherited_assets, "推进环节不得丢前序资产"
-
-
-async def test_advance_uses_explicit_lead_when_given(coordinator) -> None:
-    """交接主理由调用方（Orchestrator + policies）决定，本类不得倒过来猜。
-
-    兜底口径（任务入口默认主理）与目标环节无关，因此显式传入必须优先。
-    """
-    context = await coordinator.start(_entry(LoopStage.COLLECT, "profile_analyst"))
-    advanced = await coordinator.advance(
-        context, LoopStage.REVIEW, lead_agent="companion_coach"
-    )
-    assert advanced.stage is LoopStage.REVIEW
-    assert advanced.lead_agent == "companion_coach"
+    # 续接走的也必须是同一份黑板：从任意环节进入都不重建上下文
+    resumed = await coord.resume("u1", context.session.id)
+    assert [asset.asset_type for asset in resumed.inherited_assets] == [AssetType.REPORT]
 
 
 # --------------------------------------------------------------------------

@@ -131,16 +131,18 @@ class LoopCoordinator(ABC):
         落库由调用方（Orchestrator）统一完成。
         """
 
-    @abstractmethod
-    async def advance(
-        self,
-        context: LoopContext,
-        to_stage: LoopStage,
-        *,
-        lead_agent: Optional[str] = None,
-    ) -> LoopContext:
-        """推进到下一环节，保留已继承的资产。
+    # 这里原本还有一个 `advance(context, to_stage, lead_agent=None)`：只做
+    # `sessions.update_stage` 并返回新上下文。2026-09-19 删除（待决问题 D3），原因：
+    #
+    # 1. **语义不完整**：一次真正的阶段变更必须同时做四件事——按 `policies/teaming.py`
+    #    定主理、落库、写会话记忆、发 `loop_stage_changed`、并组好告知文案。
+    #    `advance` 只做其中一件，于是它天然是"落库成功而事件失败"的不自洽入口；
+    # 2. **与生产路径重复**：`DefaultOrchestrator._perform_handoff` 本来就直接调
+    #    `sessions.update_stage`，两处各写一遍；
+    # 3. **没有调用方**：全仓只有两处测试在调它，而冻结 Port 上半职责的方法正是
+    #    本项目反复被"看起来有、实际没有"咬到的形态。
+    #
+    # **阶段变更的唯一入口是 `Orchestrator.handoff(user_id, task_id, to_stage, reason)`**——
+    # 它已是冻结公开契约，且语义完整（主理、落库、记忆、事件、告知）。
+    # 独立 Worker 或调度器要推进环节时，也走它。
 
-        `lead_agent` 由调用方按 `policies/teaming.py` 的规则给出；为 None 时由
-        实现自行兜底（仅为保证 Port 可用，不代表正确的组队口径）。
-        """

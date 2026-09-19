@@ -550,3 +550,37 @@ async def test_placeholder_model_output_is_marked_in_the_reply() -> None:
     texts = [m.text for m in turn.messages]
     assert any(expected in text for text in texts), f"应答里没有占位提示：{texts}"
 
+
+@pytest.mark.asyncio
+async def test_handoff_is_the_only_stage_transition_path() -> None:
+    """阶段变更只走 `Orchestrator.handoff`，且主理由规则层决定、落库生效（D3）。
+
+    `LoopCoordinator.advance` 于 2026-09-19 删除：它只做落库，不发
+    `loop_stage_changed`、不写会话记忆、不组告知文案——是"落库成功而事件失败"的
+    不自洽入口，且与 `_perform_handoff` 重复。删掉之后 `handoff` 就是唯一入口，
+    本用例把这条口径钉住：换环节确实换了主理，并且落到会话上。
+    """
+    from zhiyin_api.dto.conversation import TaskEnterRequest
+    from zhiyin_kernel.enums import LoopStage
+
+    container = _container()
+    session = await container.facade.enter_task(
+        "handoff-transition-user", TaskEnterRequest(task_code="verify_direction")
+    )
+    before = await container.sessions.get(session.task_id)
+    assert before is not None
+
+    decision = await container.orchestrator.handoff(
+        "handoff-transition-user", session.task_id, LoopStage.REVIEW, "测试：进入复盘"
+    )
+
+    # 主理来自 policies/teaming.py（⑤ 复盘由陪伴教练主理），不是调用方随手写的
+    assert decision.to_agent == "companion_coach"
+    assert decision.to_agent != before.lead_agent
+
+    # 落库生效
+    after = await container.sessions.get(session.task_id)
+    assert after is not None
+    assert after.loop_stage is LoopStage.REVIEW
+    assert after.lead_agent == decision.to_agent
+
