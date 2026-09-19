@@ -12,7 +12,8 @@ const input = ref('')
 const sending = ref(false)
 const headTitle = computed(() => {
   const taskName = conversation.sessions.find((session) => session.task_id === conversation.currentTaskId)?.task_name
-  return String(taskName ?? String(conversation.badge.name ?? '职业顾问'))
+  // 徽章只由真实一轮对话写入；没有任务时显示中性文案，不假定某位主理在场。
+  return String(taskName ?? conversation.badge?.name ?? '核心对话')
 })
 
 const stageLabels = ['采集', '诊断', '决策', '行动', '复盘']
@@ -47,13 +48,19 @@ function send() {
   conversation.turns.push({ role: 'user', content: text })
   input.value = ''
   sending.value = true
-  window.setTimeout(() => {
-    conversation.turns.push({
-      role: 'agent',
-      content: '（演示数据）已收到，继续按当前环节追问；正式实现将接入 sendMessage 返回最短结论。',
+  // 真实一轮对话由 conversation.send 走 POST /app/conversation/message。
+  // 这里不再合成任何"已收到"之类的假回复：接口失败就如实报错。
+  conversation
+    .send(text)
+    .catch((err: unknown) => {
+      conversation.turns.push({
+        role: 'coach',
+        content: `这轮消息没有发送成功：${err instanceof Error ? err.message : '未知错误'}。请稍后重试。`,
+      })
     })
-    sending.value = false
-  }, 600)
+    .finally(() => {
+      sending.value = false
+    })
 }
 </script>
 

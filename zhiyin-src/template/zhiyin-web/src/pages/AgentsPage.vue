@@ -1,29 +1,28 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AgentTeamGrid from '@/components/agents/AgentTeamGrid.vue'
-import MockBadge from '@/components/common/MockBadge.vue'
-import { useProfileCoverage } from '@/composables'
-import { useAgentsStore } from '@/stores/agents'
+import type { ProfilePanelView } from '@/api/schema'
+import { useWorkspaceStore } from '@/stores/workspace'
 
 // 智能体小队主页 #screen-agents（功能块，不占主线导航）
 //
 // 承载的轴：《职引-前端页面设计》§2.1——轴 C「能力与编排」的可见投影。
-// 使命：让用户看清「当前是谁在帮我、各管哪一段」，并在需要时召唤某一位继续微循环。
+// 使命：让用户看清「当前是谁在帮我、各管哪一段」。
 // 明确不为它做：不做能力陈列墙、不堆模型与能力数字；**不做实时对话**——对话与结论产出只在
 // 核心对话页发生（§2.1），本页与单智能体页只做能力与边界的可见化。
+//
+// 画像数字直接读 `GET /app/workspace` 的真实面板；不再在这里合成"15 维解析"状态。
 const router = useRouter()
-const agents = useAgentsStore()
-const { coverageText, confidenceText } = useProfileCoverage()
-const analysisDone = computed(() => agents.analysisStatus === 'done')
-const groups = computed(() => agents.analysisGroups)
+const store = useWorkspaceStore()
 
-const summary = computed(() => [
-  { label: '强项', value: groups.value.strong.length },
-  { label: '机会', value: groups.value.option.length },
-  { label: '待补', value: groups.value.gap.length },
-  { label: '风险', value: groups.value.risk.length },
-])
+const profile = computed(() => store.profilePanel as unknown as ProfilePanelView | null)
+const coverageText = computed(() =>
+  profile.value ? `${Math.round((profile.value.coverage ?? 0) * 100)}%` : '—',
+)
+const confidenceText = computed(() =>
+  profile.value ? (profile.value.overall_confidence ?? 0).toFixed(2) : '—',
+)
 
 function toConversation() {
   void router.push({ name: 'conversation' })
@@ -32,6 +31,10 @@ function toConversation() {
 function toReport() {
   void router.push({ name: 'report' })
 }
+
+onMounted(() => {
+  void store.load()
+})
 </script>
 
 <template>
@@ -45,33 +48,24 @@ function toReport() {
         <aside>
           <div class="aside-row"><small>画像覆盖</small><b>{{ coverageText }}</b></div>
           <div class="aside-row"><small>整体置信度</small><b>{{ confidenceText }}</b></div>
-          <div class="aside-row"><small>15 维解析</small><b :class="{ ok: analysisDone }">{{ analysisDone ? '已完成' : '未生成' }}</b></div>
           <button class="aside-link" type="button" @click="toConversation">回到核心对话页 →</button>
         </aside>
       </section>
 
-      <section v-if="analysisDone" class="summary" aria-label="解析结论摘要">
-        <div class="summary-main">
-          <h2>解析已完成，可按环节找人接手</h2>
-          <ul class="chips">
-            <li v-for="item in summary" :key="item.label"><b>{{ item.value }}</b>{{ item.label }}</li>
-          </ul>
-        </div>
-        <button class="act ghost" type="button" @click="toReport">查看完整解析 →</button>
-      </section>
+      <p v-if="store.error" class="summary empty" role="alert">画像加载失败：{{ store.error }}</p>
 
-      <section v-else class="summary empty" aria-label="解析状态">
+      <section v-else class="summary" aria-label="环节产出">
         <div class="summary-main">
-          <h2>解析还没生成</h2>
-          <p>回对话页完成建档即可生成（当前覆盖 {{ coverageText }} · 置信度 {{ confidenceText }}）。</p>
+          <h2>各环节产出以真实资产为准</h2>
+          <p>诊断、决策、行动三段的产出都在核心对话页完成，并写回同一份资产；这里不预置任何结论。</p>
         </div>
-        <button class="act" type="button" @click="toConversation">回对话页生成解析 →</button>
+        <button class="act ghost" type="button" @click="toReport">查看完整报告 →</button>
       </section>
 
       <AgentTeamGrid />
 
       <footer class="hub-foot">
-        <p><MockBadge source="demo" /> 能力池与状态为演示数据 · 对话与结论产出只在核心对话页发生 · 五位共用同一份画像与资产，换主理不换结论。</p>
+        <p>能力池来自动态资源 · 对话与结论产出只在核心对话页发生 · 五位共用同一份画像与资产，换主理不换结论。</p>
       </footer>
     </div>
   </main>

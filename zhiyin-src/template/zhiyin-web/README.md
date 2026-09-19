@@ -25,14 +25,14 @@
 | 首页 | `#screen-home` | `pages/HomePage.vue` | `home/ShowcaseStage`、`home/AgentsShowcase`、`common/TopBar` | `bootstrap`（任务入口 / 信任块 / 文案包 / 横幅 / FAQ） |
 | 登录 / 注册 | `#screen-auth` | `pages/AuthPage.vue` | `common/LoginModal` | `bootstrap`（身份区）+ 登录接口（第一期默认演示用户） |
 | 核心对话页 | `#screen-conv` | `pages/ConversationPage.vue` | `conversation/{SessionList,ChatStream,PipelinePanel,AnalysisHandoff,ProfileFields}`、`MessageBubble`、`DisclosureRow`、`AgentBadge`、`TheoryTag`、`PipelineCard`、`BehaviorGuide`、`QuickActions` | `sessions` / `task/enter` / `conversation/message` |
-| 智能体小队 | `#screen-agents` | `pages/AgentsPage.vue` | `agents/AgentTeamGrid`、`common/MockBadge` | 会话产出（15 维解析摘要）+ 演示能力池（`stores/agents.ts`） |
-| 单智能体页 | `#screen-subagent` | `pages/AgentDetailPage.vue` | `agents/{AgentScopePanel,AgentContextRail}`、`common/MockBadge` | 演示能力池（`stores/agents.ts`）+ 画像 / 管线状态；**不做对话**（对话回 `/app/conversation/message`） |
+| 智能体小队 | `#screen-agents` | `pages/AgentsPage.vue` | `agents/AgentTeamGrid` | `workspace` 聚合（画像覆盖 / 置信度）+ 能力池（`stores/agents.ts`） |
+| 单智能体页 | `#screen-subagent` | `pages/AgentDetailPage.vue` | `agents/{AgentScopePanel,AgentContextRail}` | 能力池（`stores/agents.ts`）+ 真实资产状态；**不做对话**（对话回 `/app/conversation/message`） |
 | 智能工作台 | `#screen-wb` | `pages/WorkspacePage.vue` | `workspace/CoachMessageStream` | `workspace` 聚合接口 |
-| 完整报告页 | `#screen-report` | `pages/ReportPage.vue` | `report/{ReportToc,ReportSection,GrowthShareCard}` | `report/full-text` |
-| 全局 | — | `App.vue` / `components/common/AppShell.vue` | `TopBar`、`MockBadge`、`MessageCenter` | `bootstrap`（身份 / 菜单 / 路由 / 功能开关） |
+| 完整报告页 | `#screen-report` | `pages/ReportPage.vue` | `report/{ReportToc,ReportSection}` | `report/full-text`（导出走 `assets/export`） |
+| 全局 | — | `App.vue` / `components/common/AppShell.vue` | `TopBar` | `bootstrap`（身份 / 菜单 / 路由 / 功能开关） |
 
-> `MockBadge` 是产品硬约束的落点：第一期模型是 Mock，结论与主理标签必须显式标注来源，
-> 否则演示会被误读为真实能力（见《架构与代码结构评估》B5）。
+> `MockBadge`、`MessageCenter`、`GrowthShareCard` 已删除：前两者随"不允许保留 Mock"一并移除
+> （Mock 产出已归零，站内消息中心后端至今没有接口），后者依赖不存在的分享/邀请码后端能力。
 
 ## 三、四条全局约束（前端必须成立）
 

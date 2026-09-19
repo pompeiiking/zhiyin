@@ -13,7 +13,7 @@ const pipeline = computed(() => conversation.pipeline as unknown as PipelineCard
 const profile = computed(() => conversation.profile as unknown as ProfilePanelView | null)
 
 const title = computed(() => String(session.copyBundle['conv.pipeline_title'] ?? '微循环管线'))
-const leadName = computed(() => String(conversation.badge.name ?? '待分配'))
+const leadName = computed(() => String(conversation.badge?.name ?? '待分配'))
 </script>
 
 <template>

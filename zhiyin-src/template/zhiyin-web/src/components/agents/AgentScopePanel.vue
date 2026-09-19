@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
-import MockBadge from '@/components/common/MockBadge.vue'
 import { useAgentsStore } from '@/stores/agents'
 import { useConversationStore } from '@/stores/conversation'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -106,7 +105,8 @@ const producedAssets = computed(() => {
 })
 
 function summon() {
-  agents.summon(props.agentId)
+  // 只做跳转：真正的换主理由编排器在下一轮对话里判定并下发 Disclosure。
+  // 曾经这里会在前端直接改写徽章与告知行，等于伪造一次并未发生的交接。
   void router.push({ name: 'conversation' })
 }
 </script>
@@ -118,7 +118,7 @@ function summon() {
       <div class="hero-copy">
         <div class="hero-line">
           <h1>{{ agent.name }}</h1>
-          <span class="status" :class="`is-${agent.statusTone}`">{{ agent.status }}</span>
+          <span class="status" :class="`is-${agent.statusTone}`">{{ agent.stages }}</span>
         </div>
         <p class="hero-role">{{ agent.role }}</p>
         <div class="hero-foot">
@@ -171,13 +171,13 @@ function summon() {
     <section class="summon">
       <div>
         <h2>要它接手，回核心对话页</h2>
-        <p class="muted">召唤后对话页顶部出现换主理告知行，主理徽章切换为「{{ agent.name }}」；结论仍写回同一份画像。</p>
+        <p class="muted">是否交接由编排器按环节判定，并在一轮对话里显式告知；前端不自行改写主理徽章。</p>
       </div>
-      <button class="act" type="button" @click="summon">在核心对话页由它接手 →</button>
+      <button class="act" type="button" @click="summon">去核心对话页继续 →</button>
     </section>
 
     <footer class="scope-foot">
-      <p><MockBadge source="demo" /> 能力池、环节状态与产出均为演示数据 · 五位共用同一份画像。</p>
+      <p>能力池来自动态资源；环节状态与产出取当前账号的真实资产，未产出即显示为空。</p>
     </footer>
   </section>
   <p v-else class="fallback">没有找到这个智能体，正在返回智能体小队…</p>

@@ -80,8 +80,6 @@ router.beforeEach(async (to, from) => {
   if (!to.meta.requireLogin) return true
   if (!session.loaded) await session.loadBootstrap()
   if (session.isLoggedIn) return true
-  // 演示阶段（preview=true，后端未接入）先放开登录拦截，方便直接看报告 / 工作台整体。
-  if (session.preview) return true
   session.pendingRoute = to.fullPath
   session.pendingTaskCode = ''
   session.openLogin('登录后继续，当前页面与输入会保留。')

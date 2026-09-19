@@ -14,7 +14,7 @@ const def = () =>
       props.theory?.definition ??
       '把一个成熟的职业咨询框架，套到你的真实信息上，帮助你解释「为什么会给出这个结论」。',
   )
-const source = () => String(props.theory?.source ?? '职业咨询经典框架（演示数据）')
+const source = () => String(props.theory?.source ?? '')
 </script>
 
 <template>
@@ -30,7 +30,7 @@ const source = () => String(props.theory?.source ?? '职业咨询经典框架（
           <small v-if="abbr()">{{ abbr() }}</small>
         </header>
         <p class="tp-def">{{ def() }}</p>
-        <p class="tp-source">出处：{{ source() }}</p>
+        <p v-if="source()" class="tp-source">出处：{{ source() }}</p>
       </div>
     </Transition>
   </span>

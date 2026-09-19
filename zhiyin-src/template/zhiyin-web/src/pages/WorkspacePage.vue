@@ -4,20 +4,19 @@ import { useRouter } from 'vue-router'
 import type { ProfilePanelView, StagePanelView } from '@/api/schema'
 import { trackEvent } from '@/api/endpoints'
 import { useWorkspaceStore } from '@/stores/workspace'
-import { agentCatalog, useAgentsStore } from '@/stores/agents'
+import { agentCatalog } from '@/stores/agents'
 import { useSessionStore } from '@/stores/session'
 import TheoryTag from '@/components/conversation/TheoryTag.vue'
-import MockBadge from '@/components/common/MockBadge.vue'
 import CoachMessageStream from '@/components/workspace/CoachMessageStream.vue'
 
 // 智能工作台 #screen-wb（P0，登录用户）。
-// 「职业成长主页」形态：hero（含五环节闭环）→ 智能体矩阵 → 双列（左：诊断+时间线，右：画像·日历·成就）。
+// 本页所有内容来自 `GET /app/workspace` 与 `GET /app/bootstrap`。
+// 演示数据已全部清除：拿不到就不显示，并给出空态，不预置任何看起来像业务结果的内容。
 const store = useWorkspaceStore()
-const agents = useAgentsStore()
 const session = useSessionStore()
 const router = useRouter()
 
-const owner = computed(() => session.identity.nickname || '演示用户')
+const owner = computed(() => session.identity.nickname || '当前用户')
 
 const profile = computed(() => store.profilePanel as unknown as ProfilePanelView | null)
 const reportPanel = computed(() => store.reportPanel as unknown as StagePanelView | null)
@@ -30,24 +29,27 @@ const confidence = computed(() => Math.round((profile.value?.overall_confidence 
 const profileFields = computed(() => (profile.value?.fields ?? []) as Array<Record<string, unknown>>)
 const profileGaps = computed(() => (profile.value?.gaps ?? []) as Array<Record<string, unknown>>)
 
-// 15 维结论复用 agents store（与报告页 / 对话页同源），不另写一套维度与阈值。
-const matchScore = computed(() => agents.analysis?.matchScore ?? 0)
-const groups = computed(() => agents.analysisGroups)
-const swot = computed(() => [
-  { key: 'strong', label: '优势', tone: 'green', items: groups.value.strong },
-  { key: 'option', label: '机会', tone: 'blue', items: groups.value.option },
-  { key: 'gap', label: '待补', tone: 'amber', items: groups.value.gap },
-  { key: 'risk', label: '风险', tone: 'red', items: groups.value.risk },
-])
+// 轴 A 阶段定位只由接口下发；没给就如实显示「待系统确认」，不用硬编码阶段名顶替。
+const axisAStage = computed(() => store.axisAStage || '待系统确认')
 
-// 轴 B · 五环节闭环（含再入环）。
-const loopStages = [
-  { stage: 'collect', label: '采集建模', status: 'done' },
-  { stage: 'diagnose', label: '诊断匹配', status: 'done' },
-  { stage: 'decide', label: '决策', status: 'done' },
-  { stage: 'act', label: '行动', status: 'current' },
-  { stage: 'review', label: '复盘校准', status: 'next' },
-]
+// 轴 B · 五环节闭环：状态由真实产出推导（有对应资产版本才算完成）。
+const STAGE_ORDER = ['collect', 'diagnose', 'decide', 'act', 'review'] as const
+const STAGE_LABELS = ['采集建模', '诊断匹配', '决策', '行动', '复盘校准']
+const loopStages = computed(() => {
+  const done = [
+    Boolean(profile.value && profileFields.value.length),
+    Boolean(reportPanel.value?.version),
+    Boolean(planPanel.value?.version),
+    Boolean(actionPanel.value?.version),
+    Boolean(reviewPanel.value?.version),
+  ]
+  const firstPending = done.findIndex((value) => !value)
+  return STAGE_ORDER.map((stage, index) => ({
+    stage,
+    label: STAGE_LABELS[index],
+    status: done[index] ? 'done' : index === firstPending ? 'current' : 'next',
+  }))
+})
 
 // 轴 A 纠正入口（WB-009）
 const correcting = ref(false)
@@ -59,6 +61,7 @@ function submitCorrection() {
 }
 
 // 长期跟踪时间线：五环节资产链（画像 → 诊断 → 方案 → 计划 → 复盘）。
+// 时间只显示接口给的时间；没有就留空，不再回落到「今天 11:02」这类编造值。
 interface TimelineNode {
   no: number
   title: string
@@ -68,44 +71,60 @@ interface TimelineNode {
   theories: Array<Record<string, unknown>>
   diff: string | null
 }
-const timeline = computed<TimelineNode[]>(() => [
-  { no: 1, title: '完成对话建档', detail: `画像覆盖度 ${coverage.value}% · 置信度 ${confidence.value}%`, status: 'done', time: String(profile.value?.updated_at ?? '今天 10:24'), theories: [], diff: null },
-  { no: 2, title: '完成 15 维深度解析', detail: String(reportPanel.value?.evaluation ?? '生成诊断报告'), status: 'done', time: String(reportPanel.value?.updated_at ?? '今天 11:02'), theories: (reportPanel.value?.theory_models ?? []) as Array<Record<string, unknown>>, diff: reportPanel.value?.diff ?? null },
-  { no: 3, title: '选定主攻方向', detail: String(planPanel.value?.evaluation ?? '方向方案'), status: 'done', time: String(planPanel.value?.updated_at ?? '今天 11:20'), theories: (planPanel.value?.theory_models ?? []) as Array<Record<string, unknown>>, diff: planPanel.value?.diff ?? null },
-  { no: 4, title: '生成行动计划', detail: String(actionPanel.value?.evaluation ?? '行动计划'), status: 'current', time: String(actionPanel.value?.updated_at ?? '今天 11:40'), theories: (actionPanel.value?.theory_models ?? []) as Array<Record<string, unknown>>, diff: actionPanel.value?.diff ?? null },
-  { no: 5, title: '节点提醒 · 网申', detail: String(reviewPanel.value?.evaluation ?? '持续校准'), status: 'next', time: String(reviewPanel.value?.updated_at ?? '昨天 20:15'), theories: (reviewPanel.value?.theory_models ?? []) as Array<Record<string, unknown>>, diff: reviewPanel.value?.diff ?? null },
-])
+const timeline = computed<TimelineNode[]>(() => {
+  const rows = [
+    {
+      title: '完成对话建档',
+      detail: profile.value
+        ? `画像覆盖度 ${coverage.value}% · 置信度 ${confidence.value}%`
+        : '尚未建立画像',
+      panel: null as StagePanelView | null,
+      fallbackTime: profile.value?.updated_at,
+    },
+    { title: '完成 15 维深度解析', detail: '生成诊断报告', panel: reportPanel.value, fallbackTime: reportPanel.value?.updated_at },
+    { title: '选定主攻方向', detail: '方向方案', panel: planPanel.value, fallbackTime: planPanel.value?.updated_at },
+    { title: '生成行动计划', detail: '行动计划', panel: actionPanel.value, fallbackTime: actionPanel.value?.updated_at },
+    { title: '复盘校准', detail: '持续校准', panel: reviewPanel.value, fallbackTime: reviewPanel.value?.updated_at },
+  ]
+  return rows.map((row, index) => {
+    const done = index === 0 ? Boolean(profile.value && profileFields.value.length) : Boolean(row.panel?.version)
+    const firstPending = rows.findIndex((item, i) =>
+      i === 0 ? !(profile.value && profileFields.value.length) : !item.panel?.version,
+    )
+    return {
+      no: index + 1,
+      title: row.title,
+      detail: row.panel?.evaluation ? String(row.panel.evaluation) : row.detail,
+      status: done ? 'done' : index === firstPending ? 'current' : 'next',
+      time: row.fallbackTime ? String(row.fallbackTime) : '',
+      theories: (row.panel?.theory_models ?? []) as Array<Record<string, unknown>>,
+      diff: row.panel?.diff ?? null,
+    }
+  })
+})
 
 const openNode = ref<number | null>(2)
 function toggleNode(no: number) {
   openNode.value = openNode.value === no ? null : no
 }
 
-// 关键节点日历（演示）。
-const calendar = [
-  { date: '09.12', title: '简历重写 + 投递 5 家设计院', countdown: '6 天后', urgent: true },
-  { date: '09.30', title: 'PKPM / YJK 突击计划截止', countdown: '24 天后', urgent: false },
-  { date: '10.15', title: '校园宣讲会 + 内推盘点', countdown: '39 天后', urgent: false },
-  { date: '10.31', title: '笔试面试模拟 ×3', countdown: '55 天后', urgent: false },
-]
+// 关键节点日历：接口目前没有提供日历数据源，显示空态而不是预置若干节点。
+const calendar = computed<Array<Record<string, unknown>>>(() => [])
 
-// 成长与成就（演示）。
-const badges = [
-  { char: '像', label: '画像建立者', on: true },
-  { char: '报', label: '首份分析报告', on: true },
-  { char: '向', label: '已选定方向', on: true },
-  { char: '连', label: '连续在线 7 天', on: false },
-  { char: '行', label: '行动派 · 完成 10 项任务', on: false },
-  { char: '职', label: '首个 Offer', on: false },
-]
+// 成长与成就：只渲染后端按真实行为日志算出的成就键，不预置任何已解锁项。
+const achievementKeys = computed<string[]>(() => {
+  const raw = store.blocks?.achievement_badge_keys
+  return Array.isArray(raw) ? raw.map((item) => String(item)) : []
+})
+function achievementLabel(key: string): string {
+  return session.copyBundle[`wb.achievement.${key}`] ?? key
+}
 
-// 智能体最近动态（演示，对应 agentCatalog）。
-const agentActivity: Record<string, string> = {
-  profile_analyst: '最近更新 · 今天 10:24',
-  career_advisor: '最近分析 · 今天 11:02',
-  path_planner: '当前 · 行动进行中',
-  companion_coach: '刚刚 · 已发出 2 条提醒',
-  info_scout: '最近同步 · 今天 06:00',
+/** 画像字段值可能是字符串、字符串数组或对象，统一成可读文本。 */
+function formatValue(value: unknown): string {
+  if (Array.isArray(value)) return value.map((item) => String(item)).join(' / ')
+  if (value !== null && typeof value === 'object') return JSON.stringify(value)
+  return String(value)
 }
 
 function goAgent(id: string) {
@@ -120,7 +139,6 @@ function goReport() {
 
 onMounted(() => {
   void store.load()
-  agents.ensureDemoAnalysis()
   void trackEvent('wb_enter', {}).catch(() => {})
 })
 </script>
@@ -132,14 +150,13 @@ onMounted(() => {
       <header class="wb-hero">
         <span class="hero-glow hero-glow-a" aria-hidden="true"></span>
         <span class="hero-glow hero-glow-b" aria-hidden="true"></span>
-        <MockBadge class="hero-badge" source="demo" />
 
         <div class="hero-main">
           <span class="hero-tag">数据闭环 · 持续校准</span>
           <h1>{{ owner }} 的智能工作台</h1>
           <p class="hero-sub">五个智能体围绕同一份画像持续协作，报告、方案与计划随你成长不断更新。</p>
           <div class="hero-meta">
-            <span class="hero-stage">当前阶段 · {{ store.axisAStage }}</span>
+            <span class="hero-stage">当前阶段 · {{ axisAStage }}</span>
             <button type="button" class="hero-correct" :aria-expanded="correcting" @click="correcting = !correcting">
               {{ correcting ? '收起' : '不是这样，纠正' }}
             </button>
@@ -147,7 +164,7 @@ onMounted(() => {
           <div v-if="correcting" class="correct-panel">
             <textarea v-model="correction" rows="2" placeholder="说说你现在的真实状态…"></textarea>
             <button type="button" @click="submitCorrection">提交纠正</button>
-            <p v-if="correctionDone" class="correct-done">已记录（演示），正式实现会反馈到阶段推断。</p>
+            <p v-if="correctionDone" class="correct-done">已记录，会纳入阶段校准。</p>
           </div>
         </div>
 
@@ -155,7 +172,6 @@ onMounted(() => {
           <div class="hero-ring" :style="{ '--score': `${coverage * 3.6}deg` }">
             <div><strong>{{ coverage }}%</strong><span>画像覆盖</span></div>
           </div>
-          <p class="hero-since">陪伴第 <b>18</b> 天 · 累计 <b>7</b> 次对话</p>
         </div>
 
         <ol class="wb-loop" aria-label="五环节闭环">
@@ -164,6 +180,10 @@ onMounted(() => {
           </li>
         </ol>
       </header>
+
+      <!-- 加载失败必须可见：不显示任何内容，也不回落到演示数据 -->
+      <p v-if="store.error" class="wb-error" role="alert">工作台加载失败：{{ store.error }}</p>
+      <p v-else-if="store.loading" class="wb-empty">正在加载工作台…</p>
 
       <!-- 智能体协作矩阵 -->
       <section class="wb-agents" aria-label="智能体协作矩阵">
@@ -175,9 +195,8 @@ onMounted(() => {
           <button v-for="agent in agentCatalog" :key="agent.id" type="button" class="agent-card" :class="agent.theme" @click="goAgent(agent.id)">
             <span class="ac-ico">{{ agent.shortName }}</span>
             <span class="ac-body">
-              <span class="ac-top"><b>{{ agent.name }}</b><em :class="agent.statusTone">{{ agent.status }}</em></span>
+              <span class="ac-top"><b>{{ agent.name }}</b><em :class="agent.statusTone">负责 {{ agent.stages }}</em></span>
               <span class="ac-role">{{ agent.role }}</span>
-              <span class="ac-time">{{ agentActivity[agent.id] ?? '—' }}</span>
             </span>
           </button>
         </div>
@@ -192,18 +211,7 @@ onMounted(() => {
               <button type="button" class="link-btn" @click="goReport">查看完整报告 →</button>
             </header>
             <div class="diag-top">
-              <div class="diag-score">
-                <strong>{{ matchScore }}</strong>
-                <span>综合匹配度</span>
-              </div>
               <p class="diag-conclusion">{{ reportPanel?.evaluation ?? '尚未生成诊断结论，先完成对话建档。' }}</p>
-            </div>
-            <div class="diag-swot">
-              <div v-for="s in swot" :key="s.key" :class="`swot-cell t-${s.tone}`">
-                <b>{{ s.label }}</b>
-                <em>{{ s.items.length }}</em>
-                <p>{{ s.items.slice(0, 3).join(' · ') || '—' }}</p>
-              </div>
             </div>
           </section>
 
@@ -247,37 +255,42 @@ onMounted(() => {
               <div><b>{{ confidence }}%</b><span>置信度</span></div>
             </div>
             <ul class="prof-fields">
-              <li v-for="f in profileFields" :key="String(f.name)">
-                <span class="pf-name">{{ String(f.name) }}</span>
-                <span class="pf-value">{{ String(f.value ?? '—') }}</span>
-                <i :class="f.status === 'done' ? 'ok' : 'pending'"></i>
+              <li v-for="f in profileFields" :key="String(f.key)">
+                <span class="pf-name">{{ session.copyBundle[`profile.field.${String(f.key)}`] ?? String(f.key) }}</span>
+                <span class="pf-value">{{ f.value === null || f.value === undefined ? '待采集' : formatValue(f.value) }}</span>
+                <i :class="f.value === null || f.value === undefined ? 'pending' : 'ok'"></i>
               </li>
             </ul>
-            <p v-if="profileGaps.length" class="prof-gap">待补：{{ profileGaps.map((g) => String(g.name)).join('、') }}</p>
+            <p v-if="profileFields.length === 0" class="tl-empty">尚未采集到画像字段。</p>
+            <p v-if="profileGaps.length" class="prof-gap">
+              待补：{{ profileGaps.map((g) => session.copyBundle[`profile.field.${String(g.key)}`] ?? String(g.key)).join('、') }}
+            </p>
           </section>
 
           <section class="wb-calendar" aria-label="关键节点日历">
             <header class="sec-head">
               <div><h2>关键节点</h2></div>
             </header>
-            <ul class="cal-list">
-              <li v-for="item in calendar" :key="item.date" :class="{ urgent: item.urgent }">
+            <ul v-if="calendar.length" class="cal-list">
+              <li v-for="item in calendar" :key="String(item.date)" :class="{ urgent: item.urgent }">
                 <span class="cal-date">{{ item.date }}</span>
                 <span class="cal-title">{{ item.title }}</span>
                 <span class="cal-count">{{ item.countdown }}</span>
               </li>
             </ul>
+            <p v-else class="tl-empty">暂无关键节点。节点来自行动计划与导师登记，尚未产生。</p>
           </section>
 
           <section class="wb-badges" aria-label="成长与成就">
             <header class="sec-head">
               <div><h2>成长与成就</h2></div>
             </header>
-            <div class="badge-grid">
-              <div v-for="b in badges" :key="b.label" :class="{ on: b.on }">
-                <span class="badge-ico">{{ b.char }}</span>{{ b.label }}
+            <div v-if="achievementKeys.length" class="badge-grid">
+              <div v-for="key in achievementKeys" :key="key" class="on">
+                <span class="badge-ico">{{ achievementLabel(key).slice(0, 1) }}</span>{{ achievementLabel(key) }}
               </div>
             </div>
+            <p v-else class="tl-empty">尚未解锁成就。成就只由真实行为日志驱动，浏览不计入。</p>
           </section>
         </div>
       </div>

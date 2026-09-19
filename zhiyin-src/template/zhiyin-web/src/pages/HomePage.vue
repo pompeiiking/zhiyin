@@ -16,13 +16,15 @@ const { handleGuestError } = useGuestGuard()
 const selected = ref('')
 const busy = ref(false)
 const message = ref('')
-// 工作台矩阵（HOME-005）：4 张卡内容化——场景名 / 说明 / 时间窗口 / 产出样例 / 状态动作。
-// 未开放项不再死块，点击「预约提醒」有明确反馈。
+// 工作台矩阵（HOME-005）：场景名 / 说明 / 时间窗口 / 状态动作。
+// 未开放项点击「预约提醒」会记录一次真实埋点。
+// ⚠️ 这里曾为每张卡内联一份"产出样例"（含编造的匹配度数字与节点），已删除：
+//    产出只来自真实账号，不在首页预置样例。
 const workbenches = [
-  { key: 'campus', name: '校招求职', desc: '秋招 / 春招 / 网申窗口，岗位画像与面试节点全流程', window: '秋招 9–11 月 · 春招 3–4 月', audience: '面向大三、大四', open: true, color: 'b-blue', sampleTitle: '方案样例', sample: ['主攻 · 结构设计岗（匹配度 82%）', '关键节点：9 月网申 → 11 月面试'] },
-  { key: 'postgrad', name: '考研 / 保研 / 留学', desc: '择校定位、备考与申请季时间线', window: '考研 12 月 · 申请季 9–1 月', audience: '面向大三、大四', open: false, color: 'b-green', sampleTitle: '定位样例', sample: ['目标梯度：冲 / 稳 / 保三档院校', '时间线：择校 → 备考 → 申请 → 复试'] },
-  { key: 'civil', name: '考公 / 考编', desc: '选岗建议、公告节点、备考节奏', window: '国考 11–12 月 · 省考 3–4 月', audience: '面向大四及以上', open: false, color: 'b-amber', sampleTitle: '选岗样例', sample: ['岗位匹配：专业 / 地区 / 竞争比', '节奏：公告 → 报名 → 笔试 → 面试'] },
-  { key: 'early', name: '职场新人转型', desc: '0–3 年竞争力校准与进阶路径', window: '全年可进入 · 每季度校准', audience: '面向职场新人', open: false, color: 'b-purple', sampleTitle: '校准样例', sample: ['竞争力：技能 / 经历 / 目标三维度', '路径：现状 → 目标岗 → 进阶计划'] },
+  { key: 'campus', name: '校招求职', desc: '秋招 / 春招 / 网申窗口，岗位画像与面试节点全流程', window: '秋招 9–11 月 · 春招 3–4 月', audience: '面向大三、大四', open: true, color: 'b-blue' },
+  { key: 'postgrad', name: '考研 / 保研 / 留学', desc: '择校定位、备考与申请季时间线', window: '考研 12 月 · 申请季 9–1 月', audience: '面向大三、大四', open: false, color: 'b-green' },
+  { key: 'civil', name: '考公 / 考编', desc: '选岗建议、公告节点、备考节奏', window: '国考 11–12 月 · 省考 3–4 月', audience: '面向大四及以上', open: false, color: 'b-amber' },
+  { key: 'early', name: '职场新人转型', desc: '0–3 年竞争力校准与进阶路径', window: '全年可进入 · 每季度校准', audience: '面向职场新人', open: false, color: 'b-purple' },
 ]
 
 const reserved = ref<string[]>([])
@@ -79,10 +81,6 @@ async function selectTask(code: string) {
   if (!entry) return
   selected.value = code
   message.value = ''
-  if (session.preview) {
-    message.value = `已选择「${entry.label}」。当前为只读界面演示，连接服务后才能开始对话。`
-    return
-  }
   if (!session.isLoggedIn && entry.target_stage != null) {
     session.pendingTaskCode = code
     session.openLogin('已保留你选择的任务，登录后继续。')
@@ -172,12 +170,6 @@ async function selectTask(code: string) {
             <span class="cn">{{ w.name }}</span>
             <span class="ds">{{ w.desc }}</span>
             <span class="win">{{ w.window }}</span>
-            <div class="sample">
-              <span class="sample-title">{{ w.sampleTitle }} · 演示</span>
-              <ul>
-                <li v-for="line in w.sample" :key="line">{{ line }}</li>
-              </ul>
-            </div>
             <span class="meta">
               <span>{{ w.audience }}</span>
               <span v-if="w.open" class="tag-open">已开放 ↗</span>
@@ -198,9 +190,9 @@ async function selectTask(code: string) {
         <div class="footer-brand"><span class="dot"></span>职引 ZHIYIN</div>
         <p class="footer-tag">面向大学生与职场新人的 AI 职业规划工具</p>
         <div class="footer-meta">
-          <div class="footer-item"><b>数据来源</b><span>专业 / 职业知识库对接教育部「学职平台」；行业与岗位信息用于演示，不代表实时招录口径。</span></div>
+          <div class="footer-item"><b>数据来源</b><span>专业 / 职业知识库、政策与理论卡均登记来源、版本与更新时间；未登记的来源不进入结论。</span></div>
           <div class="footer-item"><b>方法论出处</b><span>舒伯 · 帕森斯 · 霍兰德 · 三叶草 · CD · CASVE · SMART 等职业咨询经典框架。</span></div>
-          <div class="footer-item"><b>示例数据声明</b><span>页面中的对话、画像、报告、方案与计划均为演示数据，仅供产品评审，不代表真实用户与真实结论。</span></div>
+          <div class="footer-item"><b>内容说明</b><span>页面不预置任何演示数据；对话、画像、报告、方案与计划都来自你的真实账号产出，未产出即显示为空。</span></div>
         </div>
       </div>
     </footer>

@@ -5,7 +5,6 @@ import { useRoute } from 'vue-router'
 
 import type { MenuView } from '@/api/schema'
 import { useSessionStore } from '@/stores/session'
-import MessageCenter from '@/components/common/MessageCenter.vue'
 
 // 顶栏（§3.2）：常驻 [登录/注册] 或 [头像·昵称·身份徽章]；
 // 主线导航固定四条（首页 / 核心对话页 / 智能工作台 / 完整报告页），菜单由 bootstrap 下发。
@@ -56,7 +55,8 @@ const avatar = computed(() => identity.value.avatar ?? '')
     </nav>
 
     <div class="identity">
-      <MessageCenter />
+      <!-- 站内消息中心已移除：后端尚未定义消息中心接口，此前那套消息与通知偏好
+           全部是本地演示数据。等接口落地后再接回来，不用假数据占位。 -->
       <template v-if="isLoggedIn">
         <span v-if="avatar" class="avatar">{{ avatar }}</span>
         <span class="nickname">{{ nickname }}</span>
