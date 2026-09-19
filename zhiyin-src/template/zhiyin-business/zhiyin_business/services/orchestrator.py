@@ -444,7 +444,15 @@ class DefaultOrchestrator(Orchestrator):
 
     async def handle_message(self, request: TurnRequest) -> TurnResult:
         existing = await self._sessions.get(request.task_id)
-        if existing is not None and existing.user_id != request.user_id:
+        if existing is None:
+            # **未知 task_id 必须显式失败**，不能顺手新建一个会话：
+            # 同一个 `task_id` 在旧口径下会被"采纳"成新会话，于是前端把过期/写错的 id
+            # 发过来时，用户看到的是"新开了一段对话"而不是报错——问题被静默吞掉，
+            # 历史上下文也无从解释。`handoff` 对不存在的会话本来就是 `LookupError`，
+            # 这里与它统一。前端始终使用 `task/enter` 或 `sessions` 返回的 id，
+            # 因此不受影响。
+            raise LookupError(f"任务会话不存在：{request.task_id}")
+        if existing.user_id != request.user_id:
             raise PermissionError(f"会话 {request.task_id} 不属于用户 {request.user_id}")
         intent = await self.detect_intent(request.user_id, request.message)
         decision = await self._detect_stage_for_message(
@@ -454,10 +462,6 @@ class DefaultOrchestrator(Orchestrator):
             message=request.message,
         )
         if decision.need_clarify or decision.stage is None:
-            if existing is None:
-                existing = await self._create_session(
-                    request.user_id, request.task_id, LoopStage.COLLECT, intent
-                )
             descriptor = await self._registry.get_agent(existing.lead_agent)
             question = decision.clarify_question
             if not question:
@@ -490,12 +494,7 @@ class DefaultOrchestrator(Orchestrator):
             stage,
             intent,
         )
-        if existing is None:
-            session = await self._create_session(
-                request.user_id, request.task_id, stage, intent, lead.lead_agent
-            )
-            handoff = None
-        elif existing.loop_stage is not stage or existing.lead_agent != lead.lead_agent:
+        if existing.loop_stage is not stage or existing.lead_agent != lead.lead_agent:
             handoff = await self._perform_handoff(
                 user_id=request.user_id,
                 session=existing,

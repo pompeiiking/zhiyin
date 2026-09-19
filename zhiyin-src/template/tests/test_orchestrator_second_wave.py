@@ -521,6 +521,32 @@ async def test_undecided_message_does_not_auto_advance_to_decide() -> None:
 
 
 @pytest.mark.asyncio
+async def test_unknown_task_id_is_rejected_instead_of_silently_created() -> None:
+    """未知 `task_id` 必须**显式失败**，不能顺手新建一个会话。
+
+    旧口径会"采纳"客户端给的 id 并新建会话（`handle_message` 里的 `existing is None`
+    分支）。后果是：前端把过期或写错的 id 发过来时，用户看到的是"新开了一段对话"
+    而不是报错——问题被静默吞掉，历史上下文为什么没了也无从解释。
+
+    改成 `LookupError` 也与 `handoff`（对不存在的会话本就抛 `LookupError`）统一。
+    前端始终使用 `task/enter` 或 `sessions` 返回的 id，所以不受影响。
+    """
+    from zhiyin_business.ports.orchestrator import TurnRequest
+
+    container = _container()
+    with pytest.raises(LookupError, match="任务会话不存在"):
+        await container.orchestrator.handle_message(
+            TurnRequest(
+                user_id="unknown-task-user",
+                task_id="tsk_does_not_exist",
+                message="你好",
+            )
+        )
+    # 且**不能**留下一个被采纳出来的会话
+    assert await container.sessions.get("tsk_does_not_exist") is None
+
+
+@pytest.mark.asyncio
 async def test_placeholder_model_output_is_marked_in_the_reply() -> None:
     """占位模型的产出必须在应答里显式说明（D1）。
 
