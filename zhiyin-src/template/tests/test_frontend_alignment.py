@@ -528,6 +528,37 @@ def orphan_css_rules() -> list[tuple[str, str, int, int]]:
     return orphans
 
 
+def test_agent_capability_pool_is_not_hardcoded_in_the_frontend() -> None:
+    """能力池不得在前端硬编码——它必须来自 `/app/bootstrap` 的 `agents`（D9）。
+
+    `stores/agents.ts` 曾经内联五位智能体的名称 / 职责 / 理论包 / 工具 / 边界，
+    与 `data/registry/agents.json` 靠人工保持一致。这违反《AGENTS.md》§8
+    （智能体属动态资源），且两边漂移时**没有任何守卫会红**。
+    现在整份定义来自 bootstrap，展示字段（序号 / 头像字 / 主题色 / 环节中文名）派生。
+
+    本守卫检查该文件里不再出现任何智能体 id 或展示名：一旦有人把清单抄回来，
+    这里立刻红——包括"先加硬编码兜底、以后再接线"这种半接头写法。
+    """
+    source = (SRC / "stores" / "agents.ts").read_text(encoding="utf-8")
+    forbidden = [
+        "profile_analyst",
+        "career_advisor",
+        "path_planner",
+        "companion_coach",
+        "info_scout",
+        "建档分析师",
+        "职业顾问",
+        "路径规划师",
+        "陪伴教练",
+        "信息侦查员",
+    ]
+    hits = [item for item in forbidden if item in source]
+    assert not hits, (
+        f"stores/agents.ts 里又出现了硬编码的能力池内容：{hits}。"
+        "智能体定义必须由 bootstrap 下发（见 stores/agents.ts 文件头与待决问题 D9）"
+    )
+
+
 def test_no_orphan_css_classes_in_components() -> None:
     """组件 `<style scoped>` 里不得留下**本组件没有任何元素能命中**的规则。
 

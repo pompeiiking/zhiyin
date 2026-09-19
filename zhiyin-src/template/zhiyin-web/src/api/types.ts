@@ -84,6 +84,65 @@ export type webhooks = Record<string, never>;
 
 export interface components {
   schemas: {
+    /**
+     * AgentTheoryView
+     * @description 智能体持有的理论卡（id + 中文名）。
+     *
+     * 只下发 id 与展示名：前端要显示的是"帕森斯 · 了解自我"这类中文名，而注册表里
+     * `theory_packages` 存的是理论卡 id。**翻译放后端**，否则前端只能硬编码映射，
+     * 或把 `parsons_self` 直接显示给用户。
+     */
+    AgentTheoryView: {
+      /** Id */
+      id: string;
+      /**
+       * Name
+       * @description 理论中文名，如 帕森斯 · 了解自我
+       */
+      name: string;
+    };
+    /**
+     * AgentView
+     * @description 能力池条目（智能体小队页 / 工作台使用）。
+     *
+     * 口径（待决问题 D9）：
+     * - `stages` 由后端用 `(agent_id, stage)` 逐环节探测产出契约得出，
+     *   **不在注册表里新增字段**，也不由前端猜；
+     * - `theories` 由后端把理论卡 id 翻成中文名；
+     * - `no` / `shortName` / `theme` 属纯展示，由前端按顺序与名称派生，不进契约。
+     */
+    AgentView: {
+      /**
+       * Id
+       * @description 稳定标识，取值见 AgentRole
+       */
+      id: string;
+      /**
+       * Name
+       * @description 展示名，如 建档分析师
+       */
+      name: string;
+      /**
+       * Not To Do
+       * @description 边界：不做什么
+       */
+      not_to_do?: string[];
+      /**
+       * Role Summary
+       * @description 一句话职责
+       * @default
+       */
+      role_summary?: string;
+      /**
+       * Stages
+       * @description 负责的环节；空表示按需调用、不主理某一段
+       */
+      stages?: components["schemas"]["LoopStage"][];
+      /** Theories */
+      theories?: components["schemas"]["AgentTheoryView"][];
+      /** Tools */
+      tools?: string[];
+    };
     /** ApiResponse[BootstrapView] */
     ApiResponse_BootstrapView_: {
       /** @default 0 */
@@ -285,6 +344,11 @@ export interface components {
      * @description 启动装配视图。
      */
     BootstrapView: {
+      /**
+       * Agents
+       * @description 能力池：五位主理的展示名 / 职责 / 负责环节 / 理论 / 工具 / 边界
+       */
+      agents?: components["schemas"]["AgentView"][];
       /**
        * App Name
        * @description 应用名，取自动态文案 app.name；为空表示文案包缺失

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 
 import type {
+  AgentView,
   BannerView,
   FaqView,
   MenuView,
@@ -29,6 +30,11 @@ export const useSessionStore = defineStore('session', {
     menus: [] as MenuView[],
     routes: [] as RouteView[],
     taskEntries: [] as TaskEntryView[],
+    /**
+     * 能力池（五位主理的定义）：来自 bootstrap（D9），前端不再硬编码。
+     * 展示字段（序号 / 头像字 / 主题色 / 环节中文名）由 `stores/agents.ts` 派生。
+     */
+    agents: [] as AgentView[],
     featureFlags: {} as Record<string, boolean>,
     /** 文案包（key → text）：组件不硬编码展示文案，一律按 key 取 */
     copyBundle: {} as Record<string, string>,
@@ -70,6 +76,7 @@ export const useSessionStore = defineStore('session', {
         this.menus = data.menus ?? []
         this.routes = data.routes ?? []
         this.taskEntries = data.task_entries ?? []
+        this.agents = data.agents ?? []
         this.featureFlags = data.feature_flags ?? {}
         this.copyBundle = data.copy_bundle ?? {}
         this.trustBlocks = data.trust_blocks ?? []

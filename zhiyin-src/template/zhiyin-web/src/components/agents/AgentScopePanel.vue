@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { useAgentsStore } from '@/stores/agents'
+import { useAgentById } from '@/stores/agents'
 import { useConversationStore } from '@/stores/conversation'
 import { useWorkspaceStore } from '@/stores/workspace'
 
@@ -11,11 +11,11 @@ import { useWorkspaceStore } from '@/stores/workspace'
 const props = defineProps<{ agentId: string }>()
 
 const router = useRouter()
-const agents = useAgentsStore()
+const agentById = useAgentById()
 const conversation = useConversationStore()
 const workspace = useWorkspaceStore()
 
-const agent = computed(() => agents.agentById(props.agentId))
+const agent = computed(() => agentById(props.agentId))
 
 /** 全环节按需调用（如信息侦查员）：不在某一段主理。 */
 const onDemand = computed(() => (agent.value?.stageCodes ?? []).length === 0)

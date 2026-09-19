@@ -184,6 +184,14 @@
       "status": "enabled",
       "sort_order": 36,
       "note": "占位模型提示（待决问题 D1）。仅当模型自述降级（`LoopResult.model_degraded`）时由编排器追加到应答末尾；部署环境走真实 PAMI 模型，不会出现。文案属动态资源，改本文件不需要发版。"
+    },
+    {
+      "code": "agent.stage.none",
+      "text": "全环节按需调用",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 37,
+      "note": "智能体不主理任何环节时的环节说明（能力池 D9）。信息侦查员的输出契约不绑定环节，`stages` 为空即按需调用；不写死在前端。"
     }
   ]
 }

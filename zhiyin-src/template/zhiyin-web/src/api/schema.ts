@@ -30,6 +30,9 @@ export type TaskEntryView = Schemas['TaskEntryView']
 export type TrustBlockView = Schemas['TrustBlockView']
 export type BannerView = Schemas['BannerView']
 export type FaqView = Schemas['FaqView']
+/** 能力池条目（D9）：含负责环节与理论中文名，供 agents store 派生展示字段 */
+export type AgentView = Schemas['AgentView']
+export type AgentTheoryView = Schemas['AgentTheoryView']
 
 // ---------- 会话与对话（conversation_controller） ----------
 

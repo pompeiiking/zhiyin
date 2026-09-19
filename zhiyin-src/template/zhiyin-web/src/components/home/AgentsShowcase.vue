@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 
-import { agentCatalog } from '@/stores/agents'
+import { useAgentCatalog } from '@/stores/agents'
 
 // 首页「五个智能体，各管一段」。
 //
 // ⚠️ 这里曾经内嵌一个"演示对话框"：开场白、回复、快捷提问全是本地写死的假内容，
 //    点卡片就在首页演一段并不存在的对话。真实交互只在核心对话页发生，已全部删除；
 //    现在点卡片直接进入该智能体的能力边界页。
+//
+// 能力池定义来自 `GET /app/bootstrap` 的 agents（D9），前端不再硬编码五位智能体。
 const router = useRouter()
+const catalog = useAgentCatalog()
 
 function openAgent(id: string) {
   void router.push({ name: 'agentDetail', params: { agentId: id } })
@@ -31,7 +34,7 @@ function openTeam() {
       </div>
 
       <ul class="agent-grid">
-        <li v-for="agent in agentCatalog" :key="agent.id" :class="agent.theme">
+        <li v-for="agent in catalog" :key="agent.id" :class="agent.theme">
           <button class="agent-card" type="button" @click="openAgent(agent.id)">
             <span class="swatch" aria-hidden="true"></span>
             <span class="card-top">

@@ -31,6 +31,24 @@ class TheoryCard(BaseModel):
     product_usage: str = Field(default="", description="在本产品里怎么被用")
 
 
+class AgentCapability(BaseModel):
+    """能力池条目：智能体定义 + 它负责的环节 + 解析好的理论卡。
+
+    为什么要有这一层：界面要展示"有哪几位主理、各自负责哪几段、依据哪些理论"，
+    而这三样在注册表里的形态各不相同——智能体是定义、环节没有字段（要由
+    `(agent_id, stage)` 的产出契约反推）、理论包存的是 id（要翻成中文名）。
+    把这些"读侧翻译"收敛在业务层一次做完，BFF 与前端就都不需要各自猜一遍。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    agent: AgentDescriptor
+    stages: list[LoopStage] = Field(
+        default_factory=list, description="负责的环节；空表示按需调用、不主理某一段"
+    )
+    theories: list[TheoryCard] = Field(default_factory=list)
+
+
 class OutputContractSpec(BaseModel):
     """智能体产出契约。
 

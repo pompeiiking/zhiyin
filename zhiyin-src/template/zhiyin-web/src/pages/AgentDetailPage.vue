@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import AgentContextRail from '@/components/agents/AgentContextRail.vue'
 import AgentScopePanel from '@/components/agents/AgentScopePanel.vue'
-import { useAgentsStore } from '@/stores/agents'
+import { useAgentById } from '@/stores/agents'
 
 // 单智能体页 #screen-subagent（功能块，挂在智能体小队主页下）
 //
@@ -13,12 +13,12 @@ import { useAgentsStore } from '@/stores/agents'
 // 明确不为它做：**不做实时对话**（实时交互只在核心对话页）、不产生平行资产、不另起一套结论。
 const route = useRoute()
 const router = useRouter()
-const agents = useAgentsStore()
+const agentById = useAgentById()
 
 const agentId = computed(() => String(route.params.agentId ?? ''))
 
 function ensureKnownAgent() {
-  if (!agents.agentById(agentId.value)) void router.replace({ name: 'agents' })
+  if (!agentById(agentId.value)) void router.replace({ name: 'agents' })
 }
 
 onMounted(ensureKnownAgent)

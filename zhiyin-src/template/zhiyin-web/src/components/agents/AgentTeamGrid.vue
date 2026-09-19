@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { agentCatalog } from '@/stores/agents'
+import { useAgentCatalog } from '@/stores/agents'
 
 // 智能体小队卡片组：轴 C 能力池的列表视图。
-// 每张卡只回答「谁 / 管哪一段 / 什么状态」，点击进入该智能体的单智能体页看职责与边界；
-// 本页与下级页都不做实时对话（§2.1、§4.8）。数据来源见 stores/agents.ts 的文件头说明。
+// 每张卡只回答「谁 / 管哪一段」，点击进入该智能体的单智能体页看职责与边界；
+// 本页与下级页都不做实时对话（§2.1、§4.8）。定义来自 bootstrap，见 stores/agents.ts。
 const router = useRouter()
+const catalog = useAgentCatalog()
 
 function openDetail(id: string) {
   void router.push({ name: 'agentDetail', params: { agentId: id } })
@@ -14,7 +15,7 @@ function openDetail(id: string) {
 
 <template>
   <ul class="agent-grid">
-    <li v-for="agent in agentCatalog" :key="agent.id" :class="agent.theme">
+    <li v-for="agent in catalog" :key="agent.id" :class="agent.theme">
       <button class="agent-card" type="button" @click="openDetail(agent.id)">
         <span class="swatch" aria-hidden="true"></span>
         <span class="card-top">

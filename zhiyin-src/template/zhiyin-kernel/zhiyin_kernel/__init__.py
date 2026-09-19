@@ -89,7 +89,8 @@ from zhiyin_kernel.dynamic_content import (
     TrustBlockSpec,
 )
 from zhiyin_kernel.registry import (
-    AgentDescriptor,
+    AgentCapability,
+AgentDescriptor,
     OutputContractSpec,
     PolicyParamSet,
     TaskEntrySpec,
@@ -153,6 +154,7 @@ __all__ = [
     "MenuSpec",
     "RouteSpec",
     "TrustBlockSpec",
+    "AgentCapability",
     "AgentDescriptor",
     "OutputContractSpec",
     "PolicyParamSet",

@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { agentCatalog, useAgentsStore } from '@/stores/agents'
+import { useAgentById, useAgentCatalog } from '@/stores/agents'
 
 // 单智能体页右栏：把这一位的「依据什么、不做什么、队友是谁」摆在主栏旁边。
-// 口径来自 data/registry/agents.json（理论包 / 工具 / 不做什么），本组件不新增能力描述。
+// 口径来自 bootstrap 下发的 agents（能力池，源头是 data/registry/agents.json），
+// 本组件不新增能力描述、也不硬编码任何智能体定义。
 const props = defineProps<{ agentId: string }>()
 
-const agents = useAgentsStore()
+const catalog = useAgentCatalog()
+const agentById = useAgentById()
 const router = useRouter()
 
-const agent = computed(() => agents.agentById(props.agentId))
-const peers = computed(() => agentCatalog.filter((item) => item.id !== props.agentId))
+const agent = computed(() => agentById(props.agentId))
+const peers = computed(() => catalog.value.filter((item) => item.id !== props.agentId))
 
 function switchTo(id: string) {
   void router.push({ name: 'agentDetail', params: { agentId: id } })

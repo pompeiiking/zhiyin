@@ -39,7 +39,7 @@ from zhiyin_kernel.dynamic_content import (
     RouteSpec,
     TrustBlockSpec,
 )
-from zhiyin_kernel.registry import AgentDescriptor, TaskEntrySpec
+from zhiyin_kernel.registry import AgentCapability, AgentDescriptor, TaskEntrySpec
 from zhiyin_kernel.registry import TrackEventSpec
 
 
@@ -61,6 +61,22 @@ class RegistryService(ABC):
 
         用途举例：任务入口的"开场主理"、左栏会话的主理名、顶栏徽章。
         取不到时调用方按"展示名回落为 agent_id"处理，**不要**静默编名字。
+        """
+
+    @abstractmethod
+    async def list_agent_capabilities(self) -> list[AgentCapability]:
+        """能力池（PRD §3.3 / FR-HOME）——读侧一次解析好，BFF 直接下发。
+
+        存在理由：智能体小队页与工作台要展示"有哪几位主理、各自负责哪几段、依据
+        哪些理论"，而这三样在注册表里的形态不同——智能体是定义；**负责的环节没有
+        字段**，要由 `(agent_id, stage)` 的产出契约反推；理论包存的是 id，要翻成
+        中文名。此前前端把整套定义**硬编码**在 `stores/agents.ts`，与注册表人工同步
+        （违反《AGENTS.md》§8，且漂移无守卫可拦，待决问题 D9）。
+
+        为什么是"一个聚合方法"而不是"`list_agents` + `list_theory_cards` + 让调用方
+        自己拼"：反推环节、翻译理论名都是读侧翻译工作，散到 BFF 就会有两份口径；
+        而且 `RegistryRepository` **没有** `list_output_contracts`，逐环节探测
+        （`get_output_contract`）这件事只该发生在一处。
         """
 
     # ---------- 前端页面内容 ----------

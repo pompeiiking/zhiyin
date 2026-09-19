@@ -32,6 +32,43 @@ class TaskEntryView(BaseModel):
     sort_order: int = 0
 
 
+class AgentTheoryView(BaseModel):
+    """智能体持有的理论卡（id + 中文名）。
+
+    只下发 id 与展示名：前端要显示的是"帕森斯 · 了解自我"这类中文名，而注册表里
+    `theory_packages` 存的是理论卡 id。**翻译放后端**，否则前端只能硬编码映射，
+    或把 `parsons_self` 直接显示给用户。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    name: str = Field(description="理论中文名，如 帕森斯 · 了解自我")
+
+
+class AgentView(BaseModel):
+    """能力池条目（智能体小队页 / 工作台使用）。
+
+    口径（待决问题 D9）：
+    - `stages` 由后端用 `(agent_id, stage)` 逐环节探测产出契约得出，
+      **不在注册表里新增字段**，也不由前端猜；
+    - `theories` 由后端把理论卡 id 翻成中文名；
+    - `no` / `shortName` / `theme` 属纯展示，由前端按顺序与名称派生，不进契约。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(description="稳定标识，取值见 AgentRole")
+    name: str = Field(description="展示名，如 建档分析师")
+    role_summary: str = Field(default="", description="一句话职责")
+    stages: list[LoopStage] = Field(
+        default_factory=list, description="负责的环节；空表示按需调用、不主理某一段"
+    )
+    theories: list[AgentTheoryView] = Field(default_factory=list)
+    tools: list[str] = Field(default_factory=list)
+    not_to_do: list[str] = Field(default_factory=list, description="边界：不做什么")
+
+
 class MenuView(BaseModel):
     """顶层导航项。仅"首页 / 核心对话页 / 智能工作台"三条主线。"""
 
@@ -110,6 +147,10 @@ class BootstrapView(BaseModel):
     faqs: list[FaqView] = Field(default_factory=list, description="常见问题")
     feature_flags: dict[str, bool] = Field(
         default_factory=dict, description="功能开关：导出/导师/演示等"
+    )
+    agents: list[AgentView] = Field(
+        default_factory=list,
+        description="能力池：五位主理的展示名 / 职责 / 负责环节 / 理论 / 工具 / 边界",
     )
     identity: dict[str, str] = Field(
         default_factory=dict, description="当前身份：role / nickname / avatar"

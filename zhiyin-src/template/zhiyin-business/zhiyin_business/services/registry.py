@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Optional
 
 from zhiyin_business.ports.registry import RegistryService
@@ -33,7 +34,8 @@ from zhiyin_kernel.dynamic_content import (
     RouteSpec,
     TrustBlockSpec,
 )
-from zhiyin_kernel.registry import AgentDescriptor, TaskEntrySpec
+from zhiyin_kernel.enums import LoopStage
+from zhiyin_kernel.registry import AgentCapability, AgentDescriptor, TaskEntrySpec
 from zhiyin_kernel.registry import TrackEventSpec
 
 class DefaultRegistryService(RegistryService):
@@ -54,6 +56,46 @@ class DefaultRegistryService(RegistryService):
 
     async def get_agent(self, agent_id: str) -> Optional[AgentDescriptor]:
         return await self._registry.get_agent(agent_id)
+
+    async def list_agent_capabilities(self) -> list[AgentCapability]:
+        """能力池：智能体定义 + 负责环节（由产出契约反推）+ 理论卡中文名。
+
+        反推环节用**已有的** `get_output_contract(agent_id, stage)` 逐环节问一遍
+        （5×5 = 25 次，并发）。这样就不必给 `RegistryRepository` 再开一个
+        `list_output_contracts`，更不必在 `agents.json` 里加"我负责哪几段"——
+        那会与产出契约形成第二个事实来源。查不到任何环节的（信息侦查员）
+        如实返回空列表，界面按"按需调用、不主理某一段"呈现。
+        """
+        agents = await self._registry.list_agents()
+        probes = [(agent.id, stage) for agent in agents for stage in LoopStage]
+        specs = await asyncio.gather(
+            *(
+                self._registry.get_output_contract(agent_id, stage)
+                for agent_id, stage in probes
+            )
+        )
+        owner: dict[str, list[LoopStage]] = {agent.id: [] for agent in agents}
+        for (agent_id, stage), spec in zip(probes, specs, strict=True):
+            if spec is not None:
+                owner[agent_id].append(stage)
+
+        theory_ids = sorted(
+            {theory_id for agent in agents for theory_id in agent.theory_packages}
+        )
+        cards = await self._registry.list_theory_cards(theory_ids)
+        by_id = {card.id: card for card in cards}
+        return [
+            AgentCapability(
+                agent=agent,
+                stages=owner[agent.id],
+                theories=[
+                    by_id[theory_id]
+                    for theory_id in agent.theory_packages
+                    if theory_id in by_id
+                ],
+            )
+            for agent in agents
+        ]
 
     async def list_menus(self) -> list[MenuSpec]:
         return await self._registry.list_menus()

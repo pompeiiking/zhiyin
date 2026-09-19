@@ -1,10 +1,10 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { ProfilePanelView, StagePanelView } from '@/api/schema'
 import { trackEvent } from '@/api/endpoints'
 import { useWorkspaceStore } from '@/stores/workspace'
-import { agentCatalog } from '@/stores/agents'
+import { useAgentCatalog } from '@/stores/agents'
 import { useSessionStore } from '@/stores/session'
 import TheoryTag from '@/components/conversation/TheoryTag.vue'
 import CoachMessageStream from '@/components/workspace/CoachMessageStream.vue'
@@ -15,6 +15,8 @@ import CoachMessageStream from '@/components/workspace/CoachMessageStream.vue'
 const store = useWorkspaceStore()
 const session = useSessionStore()
 const router = useRouter()
+/** 能力池（五位主理）：来自 bootstrap，见 stores/agents.ts（D9）。 */
+const catalog = useAgentCatalog()
 
 const owner = computed(() => session.identity.nickname || '当前用户')
 
@@ -192,7 +194,7 @@ onMounted(() => {
           <p>围绕同一份画像持续协作，谁负责哪一环节一目了然。</p>
         </header>
         <div class="agent-grid">
-          <button v-for="agent in agentCatalog" :key="agent.id" type="button" class="agent-card" :class="agent.theme" @click="goAgent(agent.id)">
+          <button v-for="agent in catalog" :key="agent.id" type="button" class="agent-card" :class="agent.theme" @click="goAgent(agent.id)">
             <span class="ac-ico">{{ agent.shortName }}</span>
             <span class="ac-body">
               <span class="ac-top"><b>{{ agent.name }}</b><em>负责 {{ agent.stages }}</em></span>
@@ -315,7 +317,7 @@ onMounted(() => {
   gap: var(--space-7);
 }
 
-/* 智能体主题色（与 agentCatalog.theme 对应） */
+/* 智能体主题色（与 stores/agents.ts 的 THEMES 对应） */
 .a-blue { --c: var(--blue); --cSoft: var(--blueSoft); }
 .a-green { --c: var(--greenD); --cSoft: var(--greenSoft); }
 .a-amber { --c: var(--amber); --cSoft: var(--amberSoft); }

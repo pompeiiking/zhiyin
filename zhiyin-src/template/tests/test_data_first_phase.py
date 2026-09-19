@@ -381,6 +381,44 @@ class _Behaviors:
         return items[:limit]
 
 
+async def test_agent_capability_pool_is_resolved_server_side() -> None:
+    """能力池必须由业务读侧解析好：负责环节反推自产出契约，理论包翻成中文名（D9）。
+
+    此前前端把五位智能体的完整定义硬编码在 `stores/agents.ts`，与
+    `data/registry/agents.json` 靠人工同步——违反《AGENTS.md》§8，漂移了也没有守卫。
+    现在由 `RegistryService.list_agent_capabilities()` 一次解析：
+    - `stages` 用**已有的** `get_output_contract(agent_id, stage)` 逐环节探测得出，
+      不给 Repository 加 `list_output_contracts`、也不在 agents.json 里加冗余字段；
+    - `theories` 把理论卡 id 翻成中文名（否则前端要么硬编码映射，要么显示 `parsons_self`）。
+    """
+    from zhiyin_business.services.registry import DefaultRegistryService
+
+    registry = LocalJsonRegistryRepository(str(DATA_DIR / "registry"))
+    service = DefaultRegistryService(registry, LocalFeatureFlagStore(str(DATA_DIR / "registry")))
+    capabilities = await service.list_agent_capabilities()
+
+    assert [item.agent.id for item in capabilities] == [
+        "profile_analyst",
+        "career_advisor",
+        "path_planner",
+        "companion_coach",
+        "info_scout",
+    ]
+    stages = {item.agent.id: [stage.value for stage in item.stages] for item in capabilities}
+    # 负责环节由产出契约反推：职业顾问同时管②诊断与③决策
+    assert stages["career_advisor"] == ["diagnose", "decide"]
+    assert stages["profile_analyst"] == ["collect"]
+    assert stages["path_planner"] == ["act"]
+    assert stages["companion_coach"] == ["review"]
+    # 信息侦查员不绑定环节：如实为空，界面按"全环节按需调用"呈现
+    assert stages["info_scout"] == []
+
+    # 理论中文名已解析（不是 id）
+    analyst = next(item for item in capabilities if item.agent.id == "profile_analyst")
+    assert analyst.theories, "建档分析师必须带上理论卡"
+    assert all(card.name and card.name != card.id for card in analyst.theories)
+
+
 async def test_workspace_available_blocks_is_derived_from_feature_flags() -> None:
     """可用功能块必须由功能开关派生，不得在 Python 里再抄一份清单（D8）。
 

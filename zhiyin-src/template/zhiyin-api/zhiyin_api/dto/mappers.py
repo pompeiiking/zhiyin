@@ -45,6 +45,8 @@ from zhiyin_api.dto.asset import (
     ReportFullTextView,
 )
 from zhiyin_api.dto.bootstrap import (
+    AgentTheoryView,
+    AgentView,
     BannerView,
     BootstrapView,
     FaqView,
@@ -81,7 +83,7 @@ from zhiyin_kernel.dynamic_content import (
     TrustBlockSpec,
 )
 from zhiyin_kernel.identity import UserAccount
-from zhiyin_kernel.registry import AgentDescriptor, TaskEntrySpec
+from zhiyin_kernel.registry import AgentCapability, AgentDescriptor, TaskEntrySpec
 from zhiyin_kernel.enums import LoopStage, TaskStatus
 
 
@@ -97,10 +99,11 @@ def bootstrap_view(
     routes: Sequence[RouteSpec],
     task_entries: Sequence[TaskEntrySpec],
     agents: dict[str, AgentDescriptor],
-    trust_blocks: Sequence[TrustBlockSpec],
-    banners: Sequence[BannerSpec],
-    faqs: Sequence[FaqSpec],
-    feature_flags: dict[str, bool],
+    capabilities: Sequence[AgentCapability] = (),
+    trust_blocks: Sequence[TrustBlockSpec] = (),
+    banners: Sequence[BannerSpec] = (),
+    faqs: Sequence[FaqSpec] = (),
+    feature_flags: Optional[dict[str, bool]] = None,
     identity: Optional[UserAccount] = None,
 ) -> BootstrapView:
     """拼首页启动视图。
@@ -110,8 +113,22 @@ def bootstrap_view(
       空值会让"文案包缺了"在联调时立刻可见；
     - 任务入口的 `lead_agent_name` 由 `agents[lead_agent].name` 解析，取不到时为 None
       （前端回落显示 agent_id，不静默编名字）；
-    - 身份区为 `None`（游客）时 identity 留空 dict。
+    - 身份区为 `None`（游客）时 identity 留空 dict；
+    - `capabilities`（能力池）由业务层解析好、按注册表顺序给出，mapper 只做形状翻译，
+      **不猜任何字段**（环节与理论名都不在这里反推）。
     """
+    catalog = [
+        AgentView(
+            id=item.agent.id,
+            name=item.agent.name,
+            role_summary=item.agent.role_summary,
+            stages=list(item.stages),
+            theories=[AgentTheoryView(id=card.id, name=card.name) for card in item.theories],
+            tools=list(item.agent.tools),
+            not_to_do=list(item.agent.not_to_do),
+        )
+        for item in capabilities
+    ]
     return BootstrapView(
         app_name=copy_bundle.get("app.name", ""),
         menus=[
@@ -171,7 +188,8 @@ def bootstrap_view(
             FaqView(code=item.code, question=item.question, answer=item.answer)
             for item in faqs
         ],
-        feature_flags=dict(feature_flags),
+        feature_flags=dict(feature_flags or {}),
+        agents=catalog,
         identity=(
             {
                 "user_id": identity.id,

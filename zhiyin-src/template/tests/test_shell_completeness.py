@@ -338,6 +338,8 @@ BOOTSTRAP_FIELD_SOURCES: dict[str, tuple[str, str]] = {
     "banners": ("zhiyin_business.ports.registry", "list_banners"),
     "faqs": ("zhiyin_business.ports.registry", "list_faqs"),
     "feature_flags": ("zhiyin_business.ports.registry", "feature_flags"),
+    # 能力池（D9）：环节由产出契约反推、理论包翻中文名，都由业务读侧一次解析好。
+    "agents": ("zhiyin_business.ports.registry", "list_agent_capabilities"),
     # 身份区不走 Registry：它由 IdentityService 解析当前用户后填入。
     "identity": ("zhiyin_business.ports.identity", "current_user"),
 }

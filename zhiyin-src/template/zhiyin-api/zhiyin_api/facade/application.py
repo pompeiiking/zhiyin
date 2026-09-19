@@ -124,6 +124,7 @@ class DefaultApplicationFacade(ApplicationFacade):
             banners,
             faqs,
             flags,
+            capabilities,
         ) = await asyncio.gather(
             self._identity.current_user(),
             self._registry.get_copy_bundle(),
@@ -134,6 +135,8 @@ class DefaultApplicationFacade(ApplicationFacade):
             self._registry.list_banners(),
             self._registry.list_faqs(),
             self._registry.feature_flags(),
+            # 能力池（D9）：业务层已把"负责环节（由产出契约反推）"与"理论中文名"解析好
+            self._registry.list_agent_capabilities(),
         )
         agent_ids = {entry.lead_agent for entry in entries if entry.lead_agent}
         descriptors = await asyncio.gather(
@@ -148,6 +151,7 @@ class DefaultApplicationFacade(ApplicationFacade):
             routes=routes,
             task_entries=entries,
             agents=agents,
+            capabilities=capabilities,
             trust_blocks=trust,
             banners=banners,
             faqs=faqs,
