@@ -99,6 +99,26 @@ class ConversationTurnView(BaseModel):
     )
 
 
+class ConversationHistoryView(BaseModel):
+    """某任务会话的既成事实：按时间正序的全部消息 + 所处环节 + 管线卡。
+
+    与 `ConversationTurnView` 的分工：一轮回复回答"刚刚发生了什么"，
+    历史回答"这个会话到现在为止是什么样"。前端刷新或切换会话时据此恢复
+    对话流与环节进度，而不是把气泡清空后显示空态。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_id: str
+    stage: LoopStage
+    stage_label: str = Field(description="环节中文名，左栏与右栏高亮共用同一口径")
+    badge: dict[str, Any] = Field(
+        default_factory=dict, description="当前主理徽章：agent_id/name/role_summary"
+    )
+    messages: list[ConversationMessageView] = Field(default_factory=list)
+    pipeline_cards: list[PipelineCardView] = Field(default_factory=list)
+
+
 class TaskSessionView(BaseModel):
     """左栏会话项。按"任务/环节"命名，不按 agent 名排布（FR-CONV-003）。"""
 

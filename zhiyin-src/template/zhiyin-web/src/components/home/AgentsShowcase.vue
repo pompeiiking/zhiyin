@@ -50,8 +50,8 @@ function openTeam() {
       </ul>
 
       <p class="agents-note">
-        能力池当前由前端静态配置，与 <code>data/registry/agents.json</code> 同值；
-        bootstrap 尚未下发该能力池，改由后端下发前两处需手工保持同步。
+        能力池由后端 <code>GET /app/bootstrap</code> 的 <code>agents</code> 下发（定义在
+        <code>data/registry/agents.json</code>），前端只派生展示字段，不在前端静态维护。
         对话与结论产出只在核心对话页发生。
       </p>
     </div>
@@ -161,20 +161,6 @@ function openTeam() {
 .go { margin-top: auto; padding-top: 10px; color: var(--c); font-size: 13px; font-weight: 700; }
 
 .agents-note { margin: 20px 0 0; text-align: center; color: var(--color-text-muted); font-size: 12.5px; }
-
-.chat-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--cSoft);
-}
-.chat-row.user { justify-content: flex-end; }
-
-.chat-msg.agent p { background: var(--cSoft); border: 1px solid var(--color-border); border-top-left-radius: 4px; }
-.chat-msg.user p { background: var(--c); color: #fff; border-top-right-radius: 4px; }
 
 /* 每个智能体一个主题色（与智能体小队、对话页主理徽章同一套令牌） */
 .a-blue { --c: var(--blue); --cSoft: var(--blueSoft); }

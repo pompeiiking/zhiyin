@@ -3,6 +3,7 @@ import type {
   AssetTypeValue,
   AssetVersionView,
   BootstrapView,
+  ConversationHistoryView,
   ConversationTurnView,
   ExportRequest,
   ExportResultView,
@@ -52,6 +53,14 @@ export const sendMessage = (taskId: string, message: string, clientMsgId?: strin
     url: '/app/conversation/message',
     method: 'POST',
     data: { task_id: taskId, message, client_msg_id: clientMsgId } satisfies MessageRequest,
+  })
+
+/** GET /app/conversation/history —— 某任务会话的既成事实（刷新/切会话恢复对话流与环节进度） */
+export const getConversationHistory = (taskId: string) =>
+  request<ConversationHistoryView>({
+    url: '/app/conversation/history',
+    method: 'GET',
+    params: { task_id: taskId },
   })
 
 // ---------- 工作台（workspace_controller） ----------

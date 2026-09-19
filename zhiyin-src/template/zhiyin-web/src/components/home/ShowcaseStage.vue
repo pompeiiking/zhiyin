@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
-
 import { useSessionStore } from '@/stores/session'
 
 // 五环节说明区（HOME-004）。
@@ -11,8 +9,12 @@ import { useSessionStore } from '@/stores/session'
 //
 // 现在这一区只做一件事：如实说明每个环节产出什么、边界在哪。
 // 真实产出在核心对话页完成后写回工作台与完整报告页。
-const router = useRouter()
 const session = useSessionStore()
+
+// CTA 只把"开始"抛给页面：进任务的链路（建兜底任务 / 登录拦截 / 错误处理 / 跳转）只有一个持有者。
+// 这里曾经自己 `router.push({ name: 'conversation' })`，与首页其它入口一样是"裸跳对话页"，
+// 到了对话页没有当前任务，第一条消息必然失败。
+const emit = defineEmits<{ start: [] }>()
 
 interface StageCard {
   key: string
@@ -61,7 +63,7 @@ const STAGES: StageCard[] = [
 ]
 
 function toStart() {
-  void router.push({ name: 'conversation' })
+  emit('start')
 }
 
 const hasEntries = () => session.taskEntries.length > 0

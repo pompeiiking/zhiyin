@@ -1,7 +1,26 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
+
 import ChatStream from '@/components/conversation/ChatStream.vue'
 import PipelinePanel from '@/components/conversation/PipelinePanel.vue'
 import SessionList from '@/components/conversation/SessionList.vue'
+import { useConversationStore } from '@/stores/conversation'
+
+const conversation = useConversationStore()
+
+// 左栏会话来自 GET /app/sessions。此前没有任何调用点：直接打开 /conv（或刷新页面）时
+// 左栏永远是空的，而后端其实存着真实会话——"刷新一下任务就没了"就是这么来的。
+// 失败时保持空列表并显示空态（loadSessions 不塞演示数据）；这里 catch 只为不产生未处理拒绝，
+// 页面仍以空态如实呈现，不假装有会话。
+//
+// 列表到手后必须再读一次当前会话的历史：中栏气泡与右栏管线卡同样只在内存里，
+// 刷新后会连同左栏一起消失（"刷新后对话被清空"）。`loadHistory` 自己处理失败并
+// 如实提示，不会把失败静默成空态。
+onMounted(async () => {
+  await conversation.loadSessions().catch(() => {})
+  const taskId = conversation.currentTaskId
+  if (taskId) await conversation.loadHistory(taskId)
+})
 </script>
 
 <template>

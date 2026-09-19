@@ -3,6 +3,12 @@ import { useConversationStore } from '@/stores/conversation'
 
 const conversation = useConversationStore()
 const pct = (item: Record<string, unknown>) => `${Math.round((Number(item.progress) || 0) * 100)}%`
+
+// 切换会话要读回该会话的历史，失败由 store 自己如实提示；这里只吞掉返回的 Promise，
+// 避免在模板里产生未处理拒绝（真正的错误信息已经写进中栏）。
+function onSelect(taskId: string) {
+  void conversation.selectSession(taskId)
+}
 </script>
 
 <template>
@@ -18,6 +24,7 @@ const pct = (item: Record<string, unknown>) => `${Math.round((Number(item.progre
         type="button"
         class="session-item"
         :class="{ active: item.task_id === conversation.currentTaskId }"
+        @click="onSelect(String(item.task_id))"
       >
         <strong>{{ String(item.task_name ?? '未命名任务') }}</strong>
         <small>{{ String(item.stage_label ?? '进行中') }}</small>

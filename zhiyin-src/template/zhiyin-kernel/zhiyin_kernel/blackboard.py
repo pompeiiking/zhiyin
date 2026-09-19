@@ -1,14 +1,20 @@
 """黑板四件套契约。
 
-黑板书 = 画像（活状态）+ 行为日志 + 会话记忆 + 资产版本影响面。
+黑板书 = 画像（活状态）+ 行为日志 + 会话记忆 + 对话消息 + 资产版本影响面。
 对应数据库表：profile_field / profile_gap / behavior_log / conversation_memory
-/ asset_version / task_session。
+/ conversation_message / asset_version / task_session。
+
+`TheoryRef` / `ConversationMessage` 放在内核而不是业务契约，是因为它们同时是
+**持久化事实**：`ConversationMessageRepository` 的入参与返回值必须是内核形状
+（R-SDK-001），业务层的对话流与读历史接口消费的也必须是同一形状。若在业务侧
+另建一份，就会出现"同一概念两处定义"，由
+`tests/test_architecture.py::test_no_duplicate_contract_definitions` 守卫。
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -83,6 +89,32 @@ class ConversationMemory(BaseModel):
     lead_agent: str = Field(description="该会话当前主理智能体的 agent_id")
     summary: str = Field(default="", description="会话摘要")
     last_active_at: datetime
+
+
+class TheoryRef(BaseModel):
+    """理论引用。用于"理论可点开"。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    theory_id: str = Field(description="理论卡 id，指向 theory_card")
+    name: str = Field(description="展示名，如 霍兰德 RIASEC")
+    stage: str = Field(default="", description="所属环节标识")
+
+
+class ConversationMessage(BaseModel):
+    """对话消息。长内容不进对话流，这里只放最短结论。
+
+    既是对话流契约，也是持久化事实（`conversation_message` 表）：
+    `created_at` 允许为空，由 Repository 在落库时补齐真实时间戳。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["agent", "user", "system"]
+    text: str
+    agent_id: Optional[str] = None
+    theory_refs: list[TheoryRef] = Field(default_factory=list)
+    created_at: Optional[datetime] = None
 
 
 class AssetVersion(BaseModel):

@@ -13,17 +13,9 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from zhiyin_kernel.blackboard import ConversationMessage as ConversationMessage  # 显式再导出
+from zhiyin_kernel.blackboard import TheoryRef
 from zhiyin_kernel.enums import AssetType, BehaviorEventType
-
-
-class TheoryRef(BaseModel):
-    """理论引用。用于"理论可点开"。"""
-
-    model_config = ConfigDict(extra="forbid")
-
-    theory_id: str = Field(description="理论卡 id，指向 theory_card")
-    name: str = Field(description="展示名，如 霍兰德 RIASEC")
-    stage: str = Field(default="", description="所属环节标识")
 
 
 class Evidence(BaseModel):
@@ -104,18 +96,6 @@ class AgentBadge(BaseModel):
     name: str
     role_summary: str = ""
     theory_refs: list[TheoryRef] = Field(default_factory=list)
-
-
-class ConversationMessage(BaseModel):
-    """对话消息。长内容不进对话流，这里只放最短结论。"""
-
-    model_config = ConfigDict(extra="forbid")
-
-    role: Literal["agent", "user", "system"]
-    text: str
-    agent_id: Optional[str] = None
-    theory_refs: list[TheoryRef] = Field(default_factory=list)
-    created_at: Optional[datetime] = None
 
 
 class BehaviorEventDraft(BaseModel):

@@ -54,6 +54,13 @@ export const useSessionStore = defineStore('session', {
 
   getters: {
     isLoggedIn: (state) => state.identity.role != null && state.identity.role !== 'guest',
+    /**
+     * 兜底「直接开聊」入口（前端设计 §4.1：兜底入口常驻，由编排器判定入口）。
+     *
+     * 判定口径用 `target_stage == null` 而不是写死 `free_chat` 这个 code：
+     * 任务入口属动态资源（《AGENTS.md》§8），哪一条是兜底由后端下发决定。
+     */
+    fallbackTaskEntry: (state) => state.taskEntries.find((entry) => entry.target_stage == null) ?? null,
   },
 
   actions: {

@@ -13,7 +13,7 @@ from zhiyin_boot.settings import Settings
 
 
 def build_repositories(settings: Settings) -> dict[str, Any]:
-    """按配置装配 Repository；启用 MySQL 时七类能力必须整体切换。"""
+    """按配置装配 Repository；启用 MySQL 时八类能力必须整体切换。"""
     if settings.use_mysql:
         if not settings.database_url:
             raise ValueError("启用 MySQL Repository 时必须配置 ZHIYIN_DATABASE_URL")
@@ -31,6 +31,7 @@ def build_repositories(settings: Settings) -> dict[str, Any]:
         InMemoryAssetRepository,
         InMemoryBehaviorRepository,
         InMemoryConversationMemoryRepository,
+        InMemoryConversationMessageRepository,
         InMemoryProfileRepository,
         InMemoryTaskSessionRepository,
         InMemoryUserRepository,
@@ -41,6 +42,7 @@ def build_repositories(settings: Settings) -> dict[str, Any]:
         "profiles": InMemoryProfileRepository(),
         "behaviors": InMemoryBehaviorRepository(),
         "memories": InMemoryConversationMemoryRepository(),
+        "messages": InMemoryConversationMessageRepository(),
         "assets": InMemoryAssetRepository(),
         "sessions": InMemoryTaskSessionRepository(),
         "registry": LocalJsonRegistryRepository(settings.local_registry_dir),

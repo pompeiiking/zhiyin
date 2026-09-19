@@ -22,7 +22,7 @@
 
 | 页面 | 锚点 | 页面文件 | 主要组件 | 数据来源 |
 | --- | --- | --- | --- | --- |
-| 首页 | `#screen-home` | `pages/HomePage.vue` | `home/ShowcaseStage`、`home/AgentsShowcase`、`common/TopBar` | `bootstrap`（任务入口 / 信任块 / 文案包 / 横幅 / FAQ） |
+| 首页 | `#screen-home` | `pages/HomePage.vue` | `home/TaskCardGroup`、`home/ShowcaseStage`、`home/AgentsShowcase`、`common/TopBar` | `bootstrap`（任务入口 / 信任块 / 文案包 / 横幅 / FAQ） |
 | 登录 / 注册 | `#screen-auth` | `pages/AuthPage.vue` | `common/LoginModal` | `bootstrap`（身份区）+ 登录接口（第一期默认演示用户） |
 | 核心对话页 | `#screen-conv` | `pages/ConversationPage.vue` | `conversation/{SessionList,ChatStream,PipelinePanel,AnalysisHandoff,ProfileFields}`、`MessageBubble`、`DisclosureRow`、`AgentBadge`、`TheoryTag`、`PipelineCard`、`BehaviorGuide`、`QuickActions` | `sessions` / `task/enter` / `conversation/message` |
 | 智能体小队 | `#screen-agents` | `pages/AgentsPage.vue` | `agents/AgentTeamGrid` | `workspace` 聚合（画像覆盖 / 置信度）+ 能力池（`stores/agents.ts`） |
@@ -88,5 +88,5 @@ tests/test_frontend_alignment.py 守「错误码 / 路由锚点 / url 清单 / �
 | 路由 | 7 条路由 + 页面锚点（含智能体小队 / 单智能体页两个功能块） | 登录守卫（未登录拉起 Modal，不跳走） |
 | 状态 | session / conversation / workspace / agents 四个 store 及字段 | 各自的 `load*` / `send` / 交互 action（`agents` 的演示能力池与解析分数待换成 bootstrap 下发能力池 + `/app/conversation/message`） |
 | 接口 | `client.ts` 信封处理 + `endpoints.ts` 全部接口函数 + **生成类型已就位**（`types.ts` / `schema.ts`） | 无（后端 DTO 变更时跑 `npm run gen:api`） |
-| 组件 | 31 个组件（见 §二 表；本次新增 `agents/{AgentTeamGrid,AgentScopePanel,AgentContextRail}` 与 `conversation/AnalysisHandoff`） | 接入真实接口后把能力池改为 bootstrap 下发 |
+| 组件 | 32 个组件（见 §二 表；本次新增 `home/TaskCardGroup`，此前新增 `agents/{AgentTeamGrid,AgentScopePanel,AgentContextRail}` 与 `conversation/AnalysisHandoff`） | 接入真实接口后把能力池改为 bootstrap 下发 |
 | 样式 | `tokens.css` / `main.css` 空位 | 令牌取值（出处：`prototype/原型设计说明.md` §2） |

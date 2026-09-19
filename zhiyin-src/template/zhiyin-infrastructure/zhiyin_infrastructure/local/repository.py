@@ -30,6 +30,7 @@ from zhiyin_kernel.blackboard import (
     AssetVersion,
     BehaviorLog,
     ConversationMemory,
+    ConversationMessage,
     Profile,
     ProfileField,
     ProfileGap,
@@ -62,6 +63,7 @@ from zhiyin_data_sdk.repositories import (
     AssetRepository,
     BehaviorRepository,
     ConversationMemoryRepository,
+    ConversationMessageRepository,
     ProfileRepository,
     RegistryRepository,
     TaskSessionRepository,
@@ -249,6 +251,27 @@ class InMemoryConversationMemoryRepository(ConversationMemoryRepository):
 
     async def delete(self, user_id: str, task_id: str) -> None:
         self._memories.pop((user_id, task_id), None)
+
+
+class InMemoryConversationMessageRepository(ConversationMessageRepository):
+    """对话消息。按任务会话只追加，读历史按时间正序。"""
+
+    def __init__(self) -> None:
+        self._messages: dict[str, list[ConversationMessage]] = {}
+
+    async def append(self, task_id: str, message: ConversationMessage) -> ConversationMessage:
+        stored = _snapshot(message)
+        bucket = self._messages.setdefault(task_id, [])
+        created_at = _now()
+        previous = bucket[-1].created_at if bucket else None
+        if previous is not None and created_at <= previous:
+            created_at = previous + timedelta(microseconds=1)
+        stored.created_at = created_at
+        bucket.append(stored)
+        return _snapshot(stored)
+
+    async def list_by_task(self, task_id: str) -> list[ConversationMessage]:
+        return [_snapshot(item) for item in self._messages.get(task_id, [])]
 
 
 class InMemoryAssetRepository(AssetRepository):
@@ -711,6 +734,7 @@ __all__ = [
     "InMemoryAssetRepository",
     "InMemoryBehaviorRepository",
     "InMemoryConversationMemoryRepository",
+    "InMemoryConversationMessageRepository",
     "InMemoryProfileRepository",
     "InMemoryTaskSessionRepository",
     "InMemoryUserRepository",

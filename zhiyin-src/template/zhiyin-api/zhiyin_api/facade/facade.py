@@ -36,6 +36,7 @@ from zhiyin_api.dto.asset import (
 )
 from zhiyin_api.dto.bootstrap import BootstrapView
 from zhiyin_api.dto.conversation import (
+    ConversationHistoryView,
     ConversationTurnView,
     MessageRequest,
     SessionListView,
@@ -81,6 +82,17 @@ class ApplicationFacade(ABC):
         self, user_id: str, body: MessageRequest
     ) -> ConversationTurnView:
         """处理一轮消息，返回最短结论 + 告知 + 引导 + 管线卡。"""
+
+    @abstractmethod
+    async def read_conversation_history(
+        self, user_id: str, task_id: str
+    ) -> ConversationHistoryView:
+        """读取某任务会话的既成事实：全部消息 + 所处环节 + 管线卡。
+
+        前端刷新页面或切换会话时用它恢复对话流与环节进度。未知会话或不属于
+        该用户的会话必须显式失败（由 Orchestrator 抛 LookupError/PermissionError
+        统一映射），**不得返回空历史冒充成功**。
+        """
 
     # ---------- 工作台 ----------
 

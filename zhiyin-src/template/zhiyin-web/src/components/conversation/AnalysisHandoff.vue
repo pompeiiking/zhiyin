@@ -3,8 +3,9 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { useProfileCoverage } from '@/composables'
+import { useConversationStore } from '@/stores/conversation'
 
-// 核心对话页中栏顶部的「建档完成 → ② 诊断」状态条（#screen-conv）。
+// 核心对话页中栏顶部的「画像进展 → 下一步」状态条（#screen-conv）。
 //
 // 口径（《职引-前端页面设计》§2.3「长内容不进对话流」与 §4.7）：这一条只说最短状态与
 // 下一步，15 维全文去完整报告页。
@@ -13,10 +14,23 @@ import { useProfileCoverage } from '@/composables'
 //    后端没有提供"触发诊断"的接口；"画像是否达标"是决策 5 的口径，由后端按关键
 //    字段覆盖率与整体置信度判定，达标时**自动交接给②并在对话里显式告知**。
 //    前端只如实显示后端下发的两个指标，不自己算、不自己下结论。
+//
+// ⚠️ 环节标签只能来自后端下发的 pipeline_cards（谁是 active 就是谁），
+//    曾经这里硬编码「① 采集建模」，导致在④复盘会话里也显示"①采集建模"，
+//    与左栏/右栏自相矛盾。拿不到管线数据时不猜环节。
 const { gaps, coverageText, confidenceText } = useProfileCoverage()
+const conversation = useConversationStore()
 const router = useRouter()
 
 const gapText = computed(() => (gaps.value.length ? gaps.value.join(' / ') : ''))
+
+const stageNumbers = ['①', '②', '③', '④', '⑤']
+const currentStage = computed(() => {
+  const index = conversation.pipeline.findIndex((card) => Boolean(card.active))
+  if (index < 0) return null
+  const card = conversation.pipeline[index] as Record<string, unknown>
+  return `${stageNumbers[index] ?? ''} ${String(card.title ?? '')}`.trim()
+})
 
 function toReport() {
   void router.push({ name: 'report' })
@@ -24,8 +38,8 @@ function toReport() {
 </script>
 
 <template>
-  <section class="handoff" aria-label="诊断解析交接">
-    <span class="kicker">① 采集建模</span>
+  <section class="handoff" aria-label="画像进展与下一步">
+    <span class="kicker">{{ currentStage ?? '画像进展' }}</span>
     <p class="line" :title="gapText ? `待补：${gapText}` : ''">
       画像覆盖 {{ coverageText }} · 整体置信度 {{ confidenceText }}
       <template v-if="gapText">　待补：{{ gapText }}</template>

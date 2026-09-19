@@ -52,6 +52,7 @@ from zhiyin_business.ports.blackboard import (
 )
 from zhiyin_business.ports.loop import LoopCoordinator
 from zhiyin_business.ports.orchestrator import (
+    ConversationHistory,
     HandoffDecision,
     IntentType,
     LeadDecision,
@@ -62,7 +63,11 @@ from zhiyin_business.ports.orchestrator import (
 )
 from zhiyin_business.services.loop import STAGE_OUTPUT_CONTRACTS
 from zhiyin_data_sdk.gateways.ai import SearchGateway
-from zhiyin_data_sdk.repositories import RegistryRepository, TaskSessionRepository
+from zhiyin_data_sdk.repositories import (
+    ConversationMessageRepository,
+    RegistryRepository,
+    TaskSessionRepository,
+)
 from zhiyin_kernel.assets import ActionPlan, DirectionPlan, PlanGap, Report
 from zhiyin_kernel.blackboard import AssetVersion, TaskSession
 from zhiyin_kernel.enums import (
@@ -149,6 +154,7 @@ class DefaultOrchestrator(Orchestrator):
         state_store: StateStore,
         sessions: TaskSessionRepository,
         registry: RegistryRepository,
+        messages: ConversationMessageRepository,
         event_bus: EventBus,
     ) -> None:
         self._profiles = profiles
@@ -169,6 +175,7 @@ class DefaultOrchestrator(Orchestrator):
         self._state_store = state_store
         self._sessions = sessions
         self._registry = registry
+        self._messages = messages
         self._event_bus = event_bus
 
     async def read_blackboard(self, user_id: str, task_id: str) -> BlackboardView:
@@ -466,10 +473,14 @@ class DefaultOrchestrator(Orchestrator):
             question = decision.clarify_question
             if not question:
                 raise RuntimeError("路由策略要求澄清，但未提供澄清文案")
+            reply = ConversationMessage(
+                role="agent", text=question, agent_id=existing.lead_agent
+            )
             await self._record_turn(
                 user_id=request.user_id,
                 session=existing,
                 message=request.message,
+                agent_messages=[reply],
             )
             return TurnResult(
                 task_id=existing.id,
@@ -480,9 +491,7 @@ class DefaultOrchestrator(Orchestrator):
                     name=descriptor.name if descriptor else existing.lead_agent,
                     role_summary=descriptor.role_summary if descriptor else "",
                 ),
-                messages=[
-                    ConversationMessage(role="agent", text=question, agent_id=existing.lead_agent)
-                ],
+                messages=[reply],
                 guide=BehaviorGuide(kind="question", text=question, question=question),
             )
 
@@ -619,6 +628,7 @@ class DefaultOrchestrator(Orchestrator):
             user_id=request.user_id,
             session=session,
             message=request.message,
+            agent_messages=messages,
         )
         descriptor = await self._registry.get_agent(session.lead_agent)
         return TurnResult(
@@ -636,6 +646,17 @@ class DefaultOrchestrator(Orchestrator):
             guide=guide,
             asset_versions=created_versions,
         )
+
+    async def read_history(self, user_id: str, task_id: str) -> ConversationHistory:
+        # 与 `handle_message` 同一口径：未知会话或不属于该用户时显式失败，
+        # 不返回空历史冒充成功——否则前端刷新后会看到"对话被清空"的假象。
+        session = await self._sessions.get(task_id)
+        if session is None:
+            raise LookupError(f"任务会话不存在：{task_id}")
+        if session.user_id != user_id:
+            raise PermissionError(f"会话 {task_id} 不属于用户 {user_id}")
+        messages = await self._messages.list_by_task(task_id)
+        return ConversationHistory(task_id=task_id, session=session, messages=messages)
 
     async def _load_retrieval_context(
         self,
@@ -736,6 +757,7 @@ class DefaultOrchestrator(Orchestrator):
         user_id: str,
         session: TaskSession,
         message: str,
+        agent_messages: list[ConversationMessage] | None = None,
     ) -> None:
         await self._behaviors.log(
             user_id,
@@ -751,6 +773,17 @@ class DefaultOrchestrator(Orchestrator):
             lead_agent=session.lead_agent,
             summary_delta=message[:200],
         )
+        # 对话流是既成事实：用户消息与主理回复都按时间正序落库，
+        # 刷新 / 切会话时 `read_history` 才能用同一份事实恢复。谁说的话就记谁，
+        # 缺 `agent_id` 时按当前主理补，避免历史里出现无法归因的气泡。
+        await self._messages.append(session.id, ConversationMessage(role="user", text=message))
+        for reply in agent_messages or []:
+            await self._messages.append(
+                session.id,
+                reply.model_copy(
+                    update={"agent_id": reply.agent_id or session.lead_agent}
+                ),
+            )
 
     async def _create_session(
         self,

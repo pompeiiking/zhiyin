@@ -82,6 +82,26 @@ class ConversationMemoryRow(Base):
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
 
 
+class ConversationMessageRow(Base):
+    """对话消息（只追加）。按任务会话读历史时用 (task_id, created_at) 正序。
+
+    `created_at` 存 ISO 字符串（与 `conversation_memory.last_active_at` 同一理由）：
+    字符串在 UTC 统一格式下可直接按字典序排序，避免不同驱动返回裸 datetime 时
+    出现带时区与不带时区混比的错误。
+    """
+
+    __tablename__ = "conversation_message"
+
+    sequence: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    id: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    task_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_at: Mapped[str] = mapped_column(String(40), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+
+    __table_args__ = (Index("ix_conversation_message_task_time", "task_id", "created_at"),)
+
+
 class AssetVersionRow(Base):
     __tablename__ = "asset_version"
 
@@ -260,6 +280,7 @@ CORE_TABLES: dict[str, str] = {
     "profile_field": "画像字段活状态 ← contracts/blackboard.ProfileField",
     "profile_gap": "画像缺口 ← contracts/blackboard.ProfileGap",
     "conversation_memory": "会话记忆 ← contracts/blackboard.ConversationMemory",
+    "conversation_message": "对话消息（只追加）← contracts/blackboard.ConversationMessage",
     # 行为与跟踪
     "behavior_log": "行为日志（只追加）← contracts/blackboard.BehaviorLog",
     "track_event": "跟踪时间线 ← contracts/assets.TrackEvent",
@@ -366,6 +387,7 @@ __all__ = [
     "BehaviorLogRow",
     "CONTRACT_TO_TABLE",
     "ConversationMemoryRow",
+    "ConversationMessageRow",
     "CORE_TABLES",
     "EmbedTaskRow",
     "FRONTEND_DYNAMIC_TABLES",

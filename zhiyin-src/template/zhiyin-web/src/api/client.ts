@@ -77,6 +77,16 @@ const http: AxiosInstance = axios.create({
 http.interceptors.response.use(
   (response) => response,
   (error) => {
+    // 后端**所有**错误响应也是统一信封（`zhiyin_api/app.py` 把 404/400/401/503 全套成
+    // {code, message, data, trace_id}），只是非 2xx 时 axios 把它放在 `error.response.data`。
+    // 这里曾经无条件替换成 `INTERNAL` + axios 英文串，结果是：
+    //   401/503 的 handleGuestError 与降级提示全部失效；
+    //   404 的真实业务文案（如"尚未生成诊断报告"）被丢成 "Request failed with status code 404"。
+    // 因此先认信封，认不出来（网络错误 / 非本项目响应）才退化成 INTERNAL。
+    const envelope = error?.response?.data as Envelope<unknown> | undefined
+    if (typeof envelope?.code === 'number' && envelope.code !== ErrorCode.OK) {
+      throw new ApiError(envelope.code as ErrorCodeValue, envelope.message, envelope.trace_id)
+    }
     throw new ApiError(ErrorCode.INTERNAL, error?.message ?? '网络异常')
   },
 )

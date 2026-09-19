@@ -43,6 +43,7 @@ from zhiyin_api.dto.asset import (
 )
 from zhiyin_api.dto.bootstrap import BootstrapView
 from zhiyin_api.dto.conversation import (
+    ConversationHistoryView,
     ConversationTurnView,
     MessageRequest,
     SessionListView,
@@ -231,6 +232,29 @@ class DefaultApplicationFacade(ApplicationFacade):
             )
         )
         return mappers.conversation_turn_view(turn)
+
+    async def read_conversation_history(
+        self, user_id: str, task_id: str
+    ) -> ConversationHistoryView:
+        history = await self._orchestrator.read_history(user_id, task_id)
+        # 管线卡要的是"各环节当前产出"，按资产类型各取最新一版：
+        # 三类资产独立取，缺哪类就少哪张卡的产出，不因缺一项而整体失败。
+        version_lists = await asyncio.gather(
+            *(self._assets.list_versions(user_id, asset_type) for asset_type in AssetType)
+        )
+        latest = [items[-1] for items in version_lists if items]
+        # 历史里可能跨过多次交接，气泡要各自显示当时的主理名；
+        # 名字只从注册表取，取不到就留空由前端回落 agent_id，不在这里编造。
+        agent_ids = {item.agent_id for item in history.messages if item.agent_id}
+        if history.session is not None and history.session.lead_agent:
+            agent_ids.add(history.session.lead_agent)
+        descriptors = await asyncio.gather(
+            *(self._registry.get_agent(agent_id) for agent_id in agent_ids)
+        )
+        agents = {item.id: item for item in descriptors if item is not None}
+        return mappers.conversation_history_view(
+            history, asset_versions=latest, agents=agents
+        )
 
     # ---------- 工作台 ----------
 

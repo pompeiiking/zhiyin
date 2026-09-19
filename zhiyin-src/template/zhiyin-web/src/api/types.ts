@@ -66,6 +66,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/conversation/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Conversation History
+         * @description 读取某任务会话的既成事实：全部消息 + 所处环节 + 管线卡。
+         *
+         *     刷新页面或切换会话时前端据此恢复对话流与环节进度；未知会话（404）与
+         *     不属于当前用户的会话（403）都显式失败，不用空历史冒充成功。
+         */
+        get: operations["read_conversation_history_api_v1_app_conversation_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/conversation/message": {
         parameters: {
             query?: never;
@@ -275,6 +298,22 @@ export interface components {
             /** @default 0 */
             code: components["schemas"]["ErrorCode"];
             data?: components["schemas"]["BootstrapView"] | null;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            /**
+             * Trace Id
+             * @description 链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用
+             */
+            trace_id?: string;
+        };
+        /** ApiResponse[ConversationHistoryView] */
+        ApiResponse_ConversationHistoryView_: {
+            /** @default 0 */
+            code: components["schemas"]["ErrorCode"];
+            data?: components["schemas"]["ConversationHistoryView"] | null;
             /**
              * Message
              * @default ok
@@ -524,6 +563,35 @@ export interface components {
              * @description 信任区：第一条为主线，其余为可展开示例
              */
             trust_blocks?: components["schemas"]["TrustBlockView"][];
+        };
+        /**
+         * ConversationHistoryView
+         * @description 某任务会话的既成事实：按时间正序的全部消息 + 所处环节 + 管线卡。
+         *
+         *     与 `ConversationTurnView` 的分工：一轮回复回答"刚刚发生了什么"，
+         *     历史回答"这个会话到现在为止是什么样"。前端刷新或切换会话时据此恢复
+         *     对话流与环节进度，而不是把气泡清空后显示空态。
+         */
+        ConversationHistoryView: {
+            /**
+             * Badge
+             * @description 当前主理徽章：agent_id/name/role_summary
+             */
+            badge?: {
+                [key: string]: unknown;
+            };
+            /** Messages */
+            messages?: components["schemas"]["ConversationMessageView"][];
+            /** Pipeline Cards */
+            pipeline_cards?: components["schemas"]["PipelineCardView"][];
+            stage: components["schemas"]["LoopStage"];
+            /**
+             * Stage Label
+             * @description 环节中文名，左栏与右栏高亮共用同一口径
+             */
+            stage_label: string;
+            /** Task Id */
+            task_id: string;
         };
         /**
          * ConversationMessageView
@@ -1125,6 +1193,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiResponse_BootstrapView_"];
+                };
+            };
+        };
+    };
+    read_conversation_history_api_v1_app_conversation_history_get: {
+        parameters: {
+            query: {
+                task_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_ConversationHistoryView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

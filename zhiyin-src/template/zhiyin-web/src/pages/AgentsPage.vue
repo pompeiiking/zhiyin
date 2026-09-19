@@ -65,7 +65,7 @@ onMounted(() => {
       <AgentTeamGrid />
 
       <footer class="hub-foot">
-        <p>能力池由前端静态配置（与 <code>data/registry/agents.json</code> 同值，尚未由 bootstrap 下发）· 对话与结论产出只在核心对话页发生 · 五位共用同一份画像与资产，换主理不换结论。</p>
+        <p>能力池由后端 <code>GET /app/bootstrap</code> 的 <code>agents</code> 下发（定义在 <code>data/registry/agents.json</code>）· 对话与结论产出只在核心对话页发生 · 五位共用同一份画像与资产，换主理不换结论。</p>
       </footer>
     </div>
   </main>

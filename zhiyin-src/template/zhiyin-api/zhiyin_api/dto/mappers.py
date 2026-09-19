@@ -56,6 +56,7 @@ from zhiyin_api.dto.bootstrap import (
     TrustBlockView,
 )
 from zhiyin_api.dto.conversation import (
+    ConversationHistoryView,
     ConversationMessageView,
     ConversationTurnView,
     PipelineCardView,
@@ -70,7 +71,7 @@ from zhiyin_api.dto.workspace import (
 )
 from zhiyin_business.ports.function import ExportResult
 from zhiyin_business.ports.loop import LoopResult
-from zhiyin_business.ports.orchestrator import TurnResult
+from zhiyin_business.ports.orchestrator import ConversationHistory, TurnResult
 from zhiyin_business.ports.workspace import StagePanel, WorkspaceView
 from zhiyin_business.services.loop import STAGE_LABELS
 from zhiyin_kernel.assets import ActionPlan, DirectionPlan, Report
@@ -268,6 +269,46 @@ def conversation_turn_view(turn: TurnResult) -> ConversationTurnView:
         guide=turn.guide.model_dump(mode="json"),
         pipeline_cards=pipeline_cards(turn.session, turn.asset_versions),
         changed_assets=[item.model_dump(mode="json") for item in turn.asset_versions],
+    )
+
+
+def conversation_history_view(
+    history: ConversationHistory,
+    *,
+    asset_versions: Sequence[AssetVersion],
+    agents: Optional[dict[str, AgentDescriptor]] = None,
+) -> ConversationHistoryView:
+    """会话既成事实 → 前端可恢复的对话流与环节进度。
+
+    `agents` 是"agent_id → 注册表描述"的解析结果，由 Facade 取（mapper 不取数）；
+    取不到就留空名字，**不编造中文名**，前端回落显示 agent_id。
+    """
+    session = history.session
+    if session is None:  # pragma: no cover - read_history 保证会话存在
+        raise ValueError(f"会话历史缺少会话当前态：{history.task_id}")
+    catalog = agents or {}
+    lead = catalog.get(session.lead_agent or "")
+    return ConversationHistoryView(
+        task_id=history.task_id,
+        stage=session.loop_stage,
+        stage_label=STAGE_LABELS[session.loop_stage],
+        badge={
+            "agent_id": session.lead_agent,
+            "name": lead.name if lead else "",
+            "role_summary": lead.role_summary if lead else "",
+        },
+        messages=[
+            ConversationMessageView(
+                **message.model_dump(mode="python"),
+                agent_name=(
+                    catalog[message.agent_id].name
+                    if message.agent_id in catalog
+                    else None
+                ),
+            )
+            for message in history.messages
+        ],
+        pipeline_cards=pipeline_cards(session, asset_versions),
     )
 
 

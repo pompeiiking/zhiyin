@@ -34,6 +34,7 @@ REPOSITORY_PORTS: tuple[str, ...] = (
     "profiles",
     "behaviors",
     "memories",
+    "messages",
     "assets",
     "sessions",
     "registry",

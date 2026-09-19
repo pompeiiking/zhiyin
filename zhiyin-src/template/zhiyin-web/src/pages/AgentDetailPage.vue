@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AgentContextRail from '@/components/agents/AgentContextRail.vue'
 import AgentScopePanel from '@/components/agents/AgentScopePanel.vue'
 import { useAgentById } from '@/stores/agents'
+import { useSessionStore } from '@/stores/session'
 
 // 单智能体页 #screen-subagent（功能块，挂在智能体小队主页下）
 //
@@ -13,16 +14,22 @@ import { useAgentById } from '@/stores/agents'
 // 明确不为它做：**不做实时对话**（实时交互只在核心对话页）、不产生平行资产、不另起一套结论。
 const route = useRoute()
 const router = useRouter()
+const session = useSessionStore()
 const agentById = useAgentById()
 
 const agentId = computed(() => String(route.params.agentId ?? ''))
 
-function ensureKnownAgent() {
+// 能力池来自 bootstrap 的 agents。本路由 `requireLogin: false`，路由守卫**不会**为它加载 bootstrap，
+// 而挂载瞬间 bootstrap 通常还没回来——只有 `agentById()` 会返回 undefined。
+// 曾经这里直接依据它 replace 回小队页，于是"直接打开 /agents/<id> 或刷新"必然被踢回；
+// 现在先确保 bootstrap 到位，再判断"这个智能体是否存在"。
+async function ensureKnownAgent() {
+  await session.loadBootstrap()
   if (!agentById(agentId.value)) void router.replace({ name: 'agents' })
 }
 
-onMounted(ensureKnownAgent)
-watch(agentId, ensureKnownAgent)
+onMounted(() => void ensureKnownAgent())
+watch(agentId, () => void ensureKnownAgent())
 
 function backToHub() {
   void router.push({ name: 'agents' })

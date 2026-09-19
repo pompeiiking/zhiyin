@@ -157,6 +157,8 @@ def build_services(container: "Container") -> None:
         state_store=container.state_store,
         sessions=container.sessions,
         registry=container.registry,
+        # 每轮对话的既成事实落在这里，刷新 / 切会话时按同一份事实恢复
+        messages=container.messages,
         event_bus=container.event_bus_primitive,
     )
 

@@ -176,7 +176,7 @@ function summon() {
     </section>
 
     <footer class="scope-foot">
-      <p>能力池由前端静态配置（与 <code>data/registry/agents.json</code> 同值，尚未由 bootstrap 下发）；环节状态与产出取当前账号的真实资产，未产出即显示为空。</p>
+      <p>能力池由后端 <code>GET /app/bootstrap</code> 的 <code>agents</code> 下发（定义在 <code>data/registry/agents.json</code>）；环节状态与产出取当前账号的真实资产，未产出即显示为空。</p>
     </footer>
   </section>
   <p v-else class="fallback">没有找到这个智能体，正在返回智能体小队…</p>

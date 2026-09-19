@@ -68,6 +68,7 @@ class Container:
     profiles: Optional[Any] = None
     behaviors: Optional[Any] = None
     memories: Optional[Any] = None
+    messages: Optional[Any] = None
     assets: Optional[Any] = None
     sessions: Optional[Any] = None
     registry: Optional[Any] = None

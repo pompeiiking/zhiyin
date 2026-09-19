@@ -41,6 +41,7 @@ export type TaskSessionView = Schemas['TaskSessionView']
 export type TaskEnterRequest = Schemas['TaskEnterRequest']
 export type MessageRequest = Schemas['MessageRequest']
 export type ConversationTurnView = Schemas['ConversationTurnView']
+export type ConversationHistoryView = Schemas['ConversationHistoryView']
 export type ConversationMessageView = Schemas['ConversationMessageView']
 export type PipelineCardView = Schemas['PipelineCardView']
 

@@ -18,6 +18,7 @@
     { "port": "profiles", "owner": "数据访问负责人", "scope": "画像活状态" },
     { "port": "behaviors", "owner": "数据访问负责人", "scope": "行为日志（只追加）" },
     { "port": "memories", "owner": "数据访问负责人", "scope": "会话记忆" },
+    { "port": "messages", "owner": "数据访问负责人", "scope": "对话消息（只追加，按任务会话读历史）" },
     { "port": "assets", "owner": "数据访问负责人", "scope": "资产版本与影响面" },
     { "port": "sessions", "owner": "数据访问负责人", "scope": "任务会话（可拆可续载体）" },
     { "port": "registry", "owner": "数据访问负责人", "scope": "动态资源读取" },

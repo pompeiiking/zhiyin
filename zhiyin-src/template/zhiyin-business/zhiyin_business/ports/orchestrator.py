@@ -118,6 +118,22 @@ class TurnResult(BaseModel):
     )
 
 
+class ConversationHistory(BaseModel):
+    """某任务会话的既成事实：会话本身 + 按时间正序的全部对话消息。
+
+    刷新、切会话、跨会话续接都必须从这里恢复，而不是前端凭空重建：
+    `handle_message` 每轮写下的用户与主理消息是同一份事实来源。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    task_id: str
+    session: Optional[TaskSession] = Field(
+        default=None, description="会话当前态：环节、主理、任务名"
+    )
+    messages: list[ConversationMessage] = Field(default_factory=list)
+
+
 class Orchestrator(ABC):
     """编排器 Port。"""
 
@@ -164,3 +180,11 @@ class Orchestrator(ABC):
     @abstractmethod
     async def handle_message(self, request: TurnRequest) -> TurnResult:
         """处理一次用户输入，跑完"单轮回复骨架"。"""
+
+    @abstractmethod
+    async def read_history(self, user_id: str, task_id: str) -> ConversationHistory:
+        """读取某任务会话的历史消息与当前态。
+
+        与 `handle_message` 同一口径：未知 `task_id` 或会话不属于该用户时显式失败，
+        不返回空历史冒充成功。前端刷新或切换会话后据此恢复对话流与环节进度。
+        """

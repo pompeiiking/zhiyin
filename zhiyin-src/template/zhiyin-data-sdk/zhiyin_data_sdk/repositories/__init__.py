@@ -13,6 +13,7 @@ MySQL / 网络存储时阻塞事件循环；第一期内存实现同样是 async
 from zhiyin_data_sdk.repositories.profile import ProfileRepository
 from zhiyin_data_sdk.repositories.behavior import BehaviorRepository
 from zhiyin_data_sdk.repositories.memory import ConversationMemoryRepository
+from zhiyin_data_sdk.repositories.message import ConversationMessageRepository
 from zhiyin_data_sdk.repositories.asset import AssetRepository
 from zhiyin_data_sdk.repositories.session import TaskSessionRepository
 from zhiyin_data_sdk.repositories.registry import RegistryRepository
@@ -22,6 +23,7 @@ __all__ = [
     "ProfileRepository",
     "BehaviorRepository",
     "ConversationMemoryRepository",
+    "ConversationMessageRepository",
     "AssetRepository",
     "TaskSessionRepository",
     "RegistryRepository",

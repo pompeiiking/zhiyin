@@ -10,6 +10,7 @@ from fastapi import APIRouter, Request
 
 from zhiyin_api.dto.common import ApiResponse
 from zhiyin_api.dto.conversation import (
+    ConversationHistoryView,
     ConversationTurnView,
     MessageRequest,
     SessionListView,
@@ -40,6 +41,23 @@ async def enter_task(
     facade = get_facade()
     user_id = await facade.resolve_user_id(request)
     return ApiResponse(data=await facade.enter_task(user_id, body))
+
+
+@router.get(
+    "/app/conversation/history",
+    response_model=ApiResponse[ConversationHistoryView],
+)
+async def read_conversation_history(
+    request: Request, task_id: str
+) -> ApiResponse[ConversationHistoryView]:
+    """读取某任务会话的既成事实：全部消息 + 所处环节 + 管线卡。
+
+    刷新页面或切换会话时前端据此恢复对话流与环节进度；未知会话（404）与
+    不属于当前用户的会话（403）都显式失败，不用空历史冒充成功。
+    """
+    facade = get_facade()
+    user_id = await facade.resolve_user_id(request)
+    return ApiResponse(data=await facade.read_conversation_history(user_id, task_id))
 
 
 @router.post("/app/conversation/message", response_model=ApiResponse[ConversationTurnView])

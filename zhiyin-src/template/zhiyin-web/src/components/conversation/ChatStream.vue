@@ -9,6 +9,7 @@ import MessageBubble from './MessageBubble.vue'
 
 const conversation = useConversationStore()
 const input = ref('')
+const inputEl = ref<HTMLInputElement | null>(null)
 const sending = ref(false)
 const headTitle = computed(() => {
   const taskName = conversation.sessions.find((session) => session.task_id === conversation.currentTaskId)?.task_name
@@ -17,13 +18,15 @@ const headTitle = computed(() => {
 })
 
 const stageLabels = ['采集', '诊断', '决策', '行动', '复盘']
+// 高亮只认后端 pipeline_cards 里的 active；没有管线数据时五段全部中性，
+// 不把"第一段"伪造成"当前正在采集"。
 const stageProgress = computed(() =>
   stageLabels.map((label, index) => {
     const card = conversation.pipeline[index] as Record<string, unknown> | undefined
     return {
       label,
       done: card?.status === 'done',
-      active: Boolean(card?.active) || (!conversation.pipeline.length && index === 0),
+      active: Boolean(card?.active),
     }
   }),
 )
@@ -34,6 +37,8 @@ const messages = computed(() => conversation.turns
     return {
       role,
       content: String(item.content ?? item.text ?? ''),
+      // 主理名来自后端（实时轮次与历史查询同一口径）；缺失时留空，由气泡回落中性称呼。
+      author: item.author as string | undefined,
       theory: item.theory as Record<string, unknown> | undefined,
       action: item.action as string | undefined,
       long: Boolean(item.long),
@@ -42,14 +47,32 @@ const messages = computed(() => conversation.turns
   .filter((item) => item.content))
 const guide = computed(() => conversation.guide)
 const disclosure = computed(() => conversation.disclosure)
+
+/**
+ * 行为引导选项点击：只接受字符串。
+ *
+ * 曾经这里直接把 BehaviorGuide 抛上来的对象塞进 input，input 变成对象后
+ * `input.trim()` 抛 TypeError，整个中栏渲染崩溃。选项必须传 label 字符串。
+ */
+function onChoose(value: string) {
+  if (typeof value !== 'string' || !value.trim() || sending.value) return
+  input.value = value
+  void send()
+}
+
+function focusInput() {
+  inputEl.value?.focus()
+}
+
 function send() {
   const text = input.value.trim()
   if (!text || sending.value) return
-  conversation.turns.push({ role: 'user', content: text })
   input.value = ''
   sending.value = true
+  // 用户气泡由 conversation.send 统一写入（它在 await 之前同步 push），这里不再二次 push：
+  // 曾经两处都 push，真实任务下每条消息都会出现两个用户气泡。
   // 真实一轮对话由 conversation.send 走 POST /app/conversation/message。
-  // 这里不再合成任何"已收到"之类的假回复：接口失败就如实报错。
+  // 这里不合成任何"已收到"之类的假回复：接口失败就如实报错。
   conversation
     .send(text)
     .catch((err: unknown) => {
@@ -91,17 +114,16 @@ function send() {
     <AnalysisHandoff />
 
     <div class="chat-scroll">
-      <div v-if="messages.length" class="message-list"><MessageBubble v-for="(item, index) in messages" :key="index" :role="item.role" :content="item.content" :theory="item.theory" :action="item.action" :long="item.long" /></div>
+      <div v-if="messages.length" class="message-list"><MessageBubble v-for="(item, index) in messages" :key="index" :role="item.role" :content="item.content" :author="item.author" :theory="item.theory" :action="item.action" :long="item.long" /></div>
       <div v-else class="empty-chat">
         <p>在下方写下你现在最想解决的困惑，开始和 AI 聊职业。</p>
       </div>
     </div>
 
-    <BehaviorGuide :guide="guide" @choose="value => { input = value; send() }" />
+    <BehaviorGuide :guide="guide" @choose="onChoose" @focus-input="focusInput" />
 
     <form class="chat-input-bar" @submit.prevent="send">
-      <button class="ci-attach" type="button" aria-label="添加附件" title="添加附件">＋</button>
-      <div class="chat-input-fake"><span class="ci-dot" aria-hidden="true"></span><input v-model="input" aria-label="输入消息" placeholder="写下你现在最想解决的困惑…" /></div>
+      <div class="chat-input-fake"><span class="ci-dot" aria-hidden="true"></span><input ref="inputEl" v-model="input" aria-label="输入消息" placeholder="写下你现在最想解决的困惑…" /></div>
       <button class="ci-send" type="submit" :disabled="!input.trim() || sending"><span v-if="sending" class="ci-spinner" aria-hidden="true"></span>{{ sending ? '发送中' : '发送' }}</button>
     </form>
   </section>
@@ -272,21 +294,6 @@ function send() {
 }
 
 .ci-send:disabled { background: var(--line); opacity: 0.7; cursor: not-allowed; }
-
-.ci-attach {
-  flex: none;
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--card);
-  color: var(--muted);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.ci-attach:hover { border-color: var(--blue); color: var(--blueD); }
 
 .ci-spinner {
   display: inline-block;

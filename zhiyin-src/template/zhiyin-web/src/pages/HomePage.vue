@@ -8,6 +8,7 @@ import { ApiError, ErrorCode } from '@/api/client'
 import { useGuestGuard } from '@/composables'
 import ShowcaseStage from '@/components/home/ShowcaseStage.vue'
 import AgentsShowcase from '@/components/home/AgentsShowcase.vue'
+import TaskCardGroup from '@/components/home/TaskCardGroup.vue'
 
 const session = useSessionStore()
 const conversation = useConversationStore()
@@ -64,9 +65,16 @@ onMounted(() => {
 })
 onUnmounted(() => revealObserver?.disconnect())
 
-// 首页主 CTA 与工作台「进入」都直接落到核心对话页（§4.1 兜底「直接开聊」常驻）：
-// 建档与任务进入交给对话页完成，不在首页因为拿不到任务入口而变成无效点击。
+// 首页里所有「开始聊 / 进入工作台」都走同一条兜底入口链路（§4.1 兜底「直接开聊」常驻）：
+// 先按 bootstrap 下发的兜底任务入口建出真实任务，再进对话页。
+// 曾经这里直接 `router.push` 裸跳对话页——对话页没有当前任务，用户一开口只会失败。
+// 拿不到任务入口（bootstrap 未送达）时才退回只切页，由对话页显示空态。
 function startChat() {
+  const fallback = session.fallbackTaskEntry
+  if (fallback) {
+    void selectTask(fallback.code)
+    return
+  }
   void router.push({ name: 'conversation' })
 }
 
@@ -150,7 +158,10 @@ async function selectTask(code: string) {
       </div>
     </div>
 
-    <ShowcaseStage />
+    <!-- 任务卡组（§4.1 页面结构：主区 → 任务卡组 → 信任区 → 页脚）：7 条入口全部来自 bootstrap -->
+    <TaskCardGroup :selected="selected" :busy="busy" :message="message" @select="selectTask" />
+
+    <ShowcaseStage @start="startChat" />
 
     <!-- AGENTS -->
     <AgentsShowcase />

@@ -41,7 +41,17 @@ onMounted(() => {
         :lead-name="card.active ? leadName : undefined"
       />
     </div>
-    <p v-if="!pipeline.length" class="empty-state">当前暂无管线数据，进入任务后会显示你的五环节进度。</p>
+    <!--
+      空态如实区分两种情形：还没选中会话（可进入任务），与已选中会话但后端确实没给出环节进度。
+      合成一句"进入任务后就会显示"会让已选中的空会话看起来像没进过任务，掩盖真实缺数。
+    -->
+    <p v-if="!pipeline.length" class="empty-state">
+      {{
+        conversation.currentTaskId
+          ? '该会话暂无环节进度数据。'
+          : '当前未选择任务会话，进入任务后会显示你的五环节进度。'
+      }}
+    </p>
     <p class="loop-hint"><span class="loop-arrow" aria-hidden="true">↺</span>完成复盘后，可带着新信息再次进入下一轮。</p>
   </aside>
 </template>

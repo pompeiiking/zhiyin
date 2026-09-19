@@ -1,4 +1,4 @@
-"""七类 Data SDK Repository 的 SQLAlchemy 异步实现。"""
+"""八类 Data SDK Repository 的 SQLAlchemy 异步实现。"""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from zhiyin_data_sdk.repositories import (
     AssetRepository,
     BehaviorRepository,
     ConversationMemoryRepository,
+    ConversationMessageRepository,
     ProfileRepository,
     RegistryRepository,
     TaskSessionRepository,
@@ -31,6 +32,7 @@ from zhiyin_infrastructure.persistence.models import (
     Base,
     BehaviorLogRow,
     ConversationMemoryRow,
+    ConversationMessageRow,
     ProfileRow,
     RegistryResourceRow,
     ReportHistoryRow,
@@ -42,6 +44,7 @@ from zhiyin_kernel.blackboard import (
     AssetVersion,
     BehaviorLog,
     ConversationMemory,
+    ConversationMessage,
     Profile,
     ProfileField,
     ProfileGap,
@@ -376,6 +379,47 @@ class SqlAlchemyConversationMemoryRepository(_Repository, ConversationMemoryRepo
                     ConversationMemoryRow.task_key == self._key(task_id),
                 )
             )
+
+
+class SqlAlchemyConversationMessageRepository(_Repository, ConversationMessageRepository):
+    async def append(self, task_id: str, message: ConversationMessage) -> ConversationMessage:
+        await self._ready()
+        async with self._db.sessions.begin() as session:
+            latest = await session.scalar(
+                select(func.max(ConversationMessageRow.created_at)).where(
+                    ConversationMessageRow.task_id == task_id
+                )
+            )
+            created_at = message.created_at or _now()
+            if latest is not None:
+                previous = datetime.fromisoformat(latest)
+                if created_at <= previous:
+                    created_at = previous + timedelta(microseconds=1)
+            stored = message.model_copy(deep=True, update={"created_at": created_at})
+            session.add(
+                ConversationMessageRow(
+                    id=_new_id("msg"),
+                    task_id=task_id,
+                    role=stored.role,
+                    created_at=created_at.isoformat(),
+                    payload=_payload(stored),
+                )
+            )
+        return stored
+
+    async def list_by_task(self, task_id: str) -> list[ConversationMessage]:
+        await self._ready()
+        query = (
+            select(ConversationMessageRow)
+            .where(ConversationMessageRow.task_id == task_id)
+            .order_by(
+                ConversationMessageRow.created_at.asc(),
+                ConversationMessageRow.sequence.asc(),
+            )
+        )
+        async with self._db.sessions() as session:
+            rows = (await session.scalars(query)).all()
+        return [ConversationMessage.model_validate(row.payload) for row in rows]
 
 
 class SqlAlchemyAssetRepository(_Repository, AssetRepository):
@@ -965,6 +1009,7 @@ def build_repository_set(
         "profiles": SqlAlchemyProfileRepository(context),
         "behaviors": SqlAlchemyBehaviorRepository(context),
         "memories": SqlAlchemyConversationMemoryRepository(context),
+        "messages": SqlAlchemyConversationMessageRepository(context),
         "assets": SqlAlchemyAssetRepository(context),
         "sessions": SqlAlchemyTaskSessionRepository(context),
         "registry": SqlAlchemyRegistryRepository(context, registry_seed_dir),
@@ -977,6 +1022,7 @@ __all__ = [
     "SqlAlchemyAssetRepository",
     "SqlAlchemyBehaviorRepository",
     "SqlAlchemyConversationMemoryRepository",
+    "SqlAlchemyConversationMessageRepository",
     "SqlAlchemyProfileRepository",
     "SqlAlchemyRegistryRepository",
     "SqlAlchemyTaskSessionRepository",
