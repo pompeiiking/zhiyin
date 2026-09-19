@@ -249,7 +249,13 @@ class DefaultApplicationFacade(ApplicationFacade):
         report = await self._assets.get_report(user_id, version)
         if report is None:
             raise LookupError("尚未生成诊断报告")
-        return mappers.report_full_text_view(report)
+        # ③方向方案与④行动计划是同一批"活资产"，报告页要一并展示；
+        # 它们各自独立降级：取不到就少一个章节，不因为计划缺失而让整个报告 500。
+        plans = await self._assets.list_direction_plans(user_id)
+        action_plan = await self._assets.get_action_plan(user_id)
+        return mappers.report_full_text_view(
+            report, direction_plans=plans, action_plan=action_plan
+        )
 
     async def export_asset(self, user_id: str, body: ExportRequest) -> ExportResultView:
         result = await self._functions.export_asset(

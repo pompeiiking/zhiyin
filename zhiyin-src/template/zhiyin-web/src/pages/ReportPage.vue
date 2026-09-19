@@ -89,8 +89,92 @@ const dimensionGroups = computed<DimensionGroup[]>(() =>
     .filter((group) => group.items.length > 0),
 )
 
+interface PlanGap {
+  requirement: string
+  current_state: string
+  suggestion: string
+}
+interface DirectionPlan {
+  id: string
+  role: string
+  name: string
+  target_desc: string
+  match_score: number
+  gaps: PlanGap[]
+  fit_reason: string
+  main_risk: string
+  selected: boolean
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  main: '主攻',
+  parallel: '平行',
+  fallback: '保底',
+}
+
+/** ③ 方向方案：与画像/报告同属活资产，由 `report/full-text` 一并下发。 */
+const directions = computed<DirectionPlan[]>(() => {
+  const content = (sectionById('directions')?.content ?? {}) as Record<string, unknown>
+  const raw = Array.isArray(content.plans) ? (content.plans as Array<Record<string, unknown>>) : []
+  return raw.map((plan) => ({
+    id: String(plan.id ?? ''),
+    role: String(plan.role ?? ''),
+    name: String(plan.name ?? ''),
+    target_desc: String(plan.target_desc ?? ''),
+    match_score: Number(plan.match_score ?? 0),
+    gaps: (Array.isArray(plan.gaps) ? (plan.gaps as Array<Record<string, unknown>>) : []).map(
+      (gap) => ({
+        requirement: String(gap.requirement ?? ''),
+        current_state: String(gap.current_state ?? ''),
+        suggestion: String(gap.suggestion ?? ''),
+      }),
+    ),
+    fit_reason: String(plan.fit_reason ?? ''),
+    main_risk: String(plan.main_risk ?? ''),
+    selected: Boolean(plan.selected),
+  }))
+})
+
+interface ActionTask {
+  text: string
+  due_date: string | null
+  done: boolean
+}
+interface ActionPhase {
+  name: string
+  date_range: string
+  tag: string
+  tasks: ActionTask[]
+}
+
+/** ④ 行动计划：同样属于活资产。 */
+const actionPhases = computed<ActionPhase[]>(() => {
+  const content = (sectionById('action')?.content ?? {}) as Record<string, unknown>
+  const raw = Array.isArray(content.phases) ? (content.phases as Array<Record<string, unknown>>) : []
+  return raw.map((phase) => ({
+    name: String(phase.name ?? ''),
+    date_range: String(phase.date_range ?? ''),
+    tag: String(phase.tag ?? ''),
+    tasks: (Array.isArray(phase.tasks) ? (phase.tasks as Array<Record<string, unknown>>) : []).map(
+      (task) => ({
+        text: String(task.text ?? ''),
+        due_date: task.due_date ? String(task.due_date) : null,
+        done: Boolean(task.done),
+      }),
+    ),
+  }))
+})
+
+function roleLabel(role: string): string {
+  return ROLE_LABELS[role] ?? role
+}
+
+function matchPercent(score: number): string {
+  return `${Math.round(score * 100)}%`
+}
+
 /** 已单独渲染的章节，其余章节走通用列表渲染。 */
-const RENDERED_IDS = new Set(['verdict', 'swot'])
+const RENDERED_IDS = new Set(['verdict', 'swot', 'directions', 'action'])
 const otherSections = computed(() =>
   sections.value.filter(
     (item) => !RENDERED_IDS.has(String(item.id)) && !String(item.id).startsWith('dimension-'),
@@ -230,16 +314,56 @@ onMounted(() => {
             </ul>
           </section>
 
+          <section v-if="directions.length" id="directions" class="rp-block">
+            <h2 class="rp-block-title">方向方案</h2>
+            <ul class="rp-items">
+              <li v-for="plan in directions" :key="plan.id" class="rp-item">
+                <div class="rp-item-head">
+                  <span class="rp-item-tag">{{ roleLabel(plan.role) }}</span>
+                  <b class="rp-item-name">{{ plan.name }}</b>
+                  <span class="rp-item-score">{{ matchPercent(plan.match_score) }} 匹配</span>
+                  <span v-if="plan.selected" class="rp-item-chosen">已选定</span>
+                </div>
+                <p class="rp-item-text">{{ plan.target_desc }}</p>
+                <p class="rp-item-evidence">契合依据：{{ plan.fit_reason }}</p>
+                <p class="rp-item-risk">主要风险：{{ plan.main_risk }}</p>
+                <ul v-if="plan.gaps.length" class="rp-gaps">
+                  <li v-for="(gap, index) in plan.gaps" :key="index">
+                    {{ gap.requirement }} → 现状：{{ gap.current_state }} → 建议：{{ gap.suggestion }}
+                  </li>
+                </ul>
+              </li>
+            </ul>
+          </section>
+
+          <section v-if="actionPhases.length" id="action" class="rp-block">
+            <h2 class="rp-block-title">行动计划</h2>
+            <ol class="rp-phases">
+              <li v-for="(phase, index) in actionPhases" :key="index" class="rp-phase">
+                <div class="rp-item-head">
+                  <b class="rp-item-name">{{ phase.name }}</b>
+                  <span class="rp-phase-range">{{ phase.date_range }}</span>
+                  <span v-if="phase.tag" class="rp-item-tag">{{ phase.tag }}</span>
+                </div>
+                <ul class="rp-tasks">
+                  <li v-for="(task, taskIndex) in phase.tasks" :key="taskIndex" :class="{ done: task.done }">
+                    <span class="rp-task-mark">{{ task.done ? '✓' : '○' }}</span>
+                    <span>{{ task.text }}</span>
+                    <span v-if="task.due_date" class="rp-task-due">{{ task.due_date.slice(0, 10) }}</span>
+                  </li>
+                </ul>
+              </li>
+            </ol>
+          </section>
+
+          <section v-else-if="report" class="rp-block">
+            <h2 class="rp-block-title">行动计划</h2>
+            <p class="rp-empty">尚未生成行动计划。在③选定方向后，④行动会产出带时间点的任务。</p>
+          </section>
+
           <section v-for="section in otherSections" :id="String(section.id)" :key="String(section.id)" class="rp-block">
             <h2 class="rp-block-title">{{ String(section.title ?? section.id) }}</h2>
             <pre class="rp-raw">{{ JSON.stringify(section.content ?? {}, null, 2) }}</pre>
-          </section>
-
-          <section class="rp-block">
-            <h2 class="rp-block-title">方向方案</h2>
-            <p class="rp-empty">
-              后端目前没有提供方向方案正文接口（只有版本列表），这里不预置任何方案。
-            </p>
           </section>
         </div>
       </div>
@@ -913,4 +1037,16 @@ onMounted(() => {
 .rp-item-evidence { margin: 6px 0 0; color: var(--muted); font-size: var(--font-size-xs); line-height: 1.6; }
 .rp-raw { margin: 0; padding: var(--space-4); border-radius: var(--radius-md); background: var(--card); font-size: var(--font-size-xs); white-space: pre-wrap; overflow-wrap: anywhere; }
 .rp-back { justify-self: start; margin-top: var(--space-6); padding: 6px 14px; border: 1px solid var(--color-border); border-radius: var(--radius-pill); background: var(--card); color: var(--color-text-secondary); font-size: var(--font-size-xs); cursor: pointer; }
+.rp-item-score { color: var(--greenD); font-size: var(--font-size-xs); font-weight: 800; }
+.rp-item-chosen { padding: 1px 8px; border-radius: var(--radius-pill); background: var(--greenSoft); color: var(--greenD); font-size: var(--font-size-xs); font-weight: 700; }
+.rp-item-risk { margin: 6px 0 0; color: var(--red); font-size: var(--font-size-xs); line-height: 1.6; }
+.rp-gaps { margin: 8px 0 0; padding-left: 18px; color: var(--color-text-secondary); font-size: var(--font-size-xs); line-height: 1.7; }
+.rp-phases { display: grid; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.rp-phase { padding: var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--card); }
+.rp-phase-range { color: var(--muted); font-size: var(--font-size-xs); }
+.rp-tasks { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.rp-tasks li { display: flex; align-items: baseline; gap: 8px; font-size: var(--font-size-xs); line-height: 1.6; }
+.rp-tasks li.done { color: var(--muted); text-decoration: line-through; }
+.rp-task-mark { flex: none; color: var(--greenD); font-weight: 800; }
+.rp-task-due { margin-left: auto; color: var(--muted); white-space: nowrap; }
 </style>

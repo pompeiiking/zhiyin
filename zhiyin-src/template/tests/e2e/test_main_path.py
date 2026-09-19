@@ -336,3 +336,22 @@ async def test_acceptance_8_orchestrator_persists_full_assets_and_knowledge() ->
     assert workspace.report is not None
     assert workspace.direction_plans
     assert workspace.action_plan is not None
+
+    # 报告全文必须带上③方向方案与④行动计划：它们与报告同属"活资产"。
+    # 此前 API 层从未引用这两块数据，mapper 把它们丢掉了，前端只能显示空态
+    # 或用编造内容顶替——DTO 里 sections 的说明却早已承诺包含它们。
+    full_text = await container.facade.get_report_full_text(user_id)
+    section_ids = [str(section["id"]) for section in full_text.sections]
+    toc_ids = [str(item["id"]) for item in full_text.toc]
+    assert toc_ids == section_ids, "目录与正文必须一致，不能出现空章节"
+    assert "directions" in section_ids and "action" in section_ids
+
+    directions_section = next(s for s in full_text.sections if s["id"] == "directions")
+    plans = directions_section["content"]["plans"]
+    assert [plan["id"] for plan in plans] == [plan.id for plan in directions]
+    assert plans[0]["name"] == directions[0].name
+    assert plans[0]["match_score"] == directions[0].match_score
+
+    action_section = next(s for s in full_text.sections if s["id"] == "action")
+    assert action_section["content"]["plan_id"] == selected.id
+    assert action_section["content"]["phases"], "行动计划正文不能为空"

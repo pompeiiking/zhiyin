@@ -70,7 +70,7 @@ from zhiyin_business.ports.function import ExportResult
 from zhiyin_business.ports.loop import LoopResult
 from zhiyin_business.ports.orchestrator import TurnResult
 from zhiyin_business.ports.workspace import StagePanel, WorkspaceView
-from zhiyin_kernel.assets import Report
+from zhiyin_kernel.assets import ActionPlan, DirectionPlan, Report
 from zhiyin_kernel.blackboard import AssetVersion, TaskSession
 from zhiyin_kernel.dynamic_content import (
     BannerSpec,
@@ -362,8 +362,21 @@ def asset_version_view(
     )
 
 
-def report_full_text_view(report: Report) -> ReportFullTextView:
-    """完整报告页正文（只读资产版本，不重新生成）。"""
+def report_full_text_view(
+    report: Report,
+    *,
+    direction_plans: Sequence[DirectionPlan] = (),
+    action_plan: Optional[ActionPlan] = None,
+) -> ReportFullTextView:
+    """完整报告页正文（只读资产版本，不重新生成）。
+
+    报告页要展示的**不只是②诊断**：③方向方案与④行动计划同样是"活资产"，必须一并
+    下发，否则页面只能显示空态。此前这两个能力已经在业务层聚合
+    （`WorkspaceView.direction_plans` / `action_plan`），但 API 层从未引用过它们，
+    mapper 把它们丢掉了——所以前端拿不到真实方案，只能用编造内容顶替。
+
+    没有数据的区块**不生成**：目录与正文保持一致，不在报告里放空章节。
+    """
     toc = [
         {"id": "verdict", "title": "综合结论"},
         {"id": "swot", "title": "SWOT"},
@@ -384,6 +397,28 @@ def report_full_text_view(report: Report) -> ReportFullTextView:
             for index, group in enumerate(report.dimensions, start=1)
         ],
     ]
+
+    if direction_plans:
+        toc.append({"id": "directions", "title": "方向方案"})
+        sections.append(
+            {
+                "id": "directions",
+                "title": "方向方案",
+                "content": {
+                    "plans": [plan.model_dump(mode="json") for plan in direction_plans],
+                },
+            }
+        )
+    if action_plan is not None:
+        toc.append({"id": "action", "title": "行动计划"})
+        sections.append(
+            {
+                "id": "action",
+                "title": "行动计划",
+                "content": action_plan.model_dump(mode="json"),
+            }
+        )
+
     return ReportFullTextView(
         report_id=report.id,
         version=report.version,
