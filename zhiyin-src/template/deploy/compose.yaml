@@ -138,6 +138,28 @@ services:
       zhiyin-mysql-init:
         condition: service_completed_successfully
 
+  # 平台 rerank 协议转换桥（D7 ③）。
+  #
+  # 为什么存在：平台模型供应商只会 `POST <endpointUrl>/rerank`，而平台可用的两家
+  # 上游（DashScope 兼容模式、Ark）都**没有**这个路径（实测 404），而平台的 RAG
+  # 问答又强制要求 rerank 模型非空。于是本服务把该协议翻译成上游原生 rerank。
+  #
+  # 复用同一个后端镜像、不加公开端口、只在 wanwu-net 内可达；真实上游 Key 只从
+  # gitignored 的 .env 注入（平台侧注册模型时只填占位 Key）。
+  zhiyin-rerank-bridge:
+    build:
+      context: ../../zhiyin-src/template
+      dockerfile: Dockerfile
+    image: zhiyin/backend:dev
+    restart: unless-stopped
+    env_file:
+      - ../../zhiyin-src/template/deploy/.env
+    command: ["python", "-m", "zhiyin_boot", "rerank-bridge"]
+    expose:
+      - "8100"
+    networks:
+      - wanwu-net
+
   zhiyin-runtime-verify:
     profiles: ["verify"]
     build:

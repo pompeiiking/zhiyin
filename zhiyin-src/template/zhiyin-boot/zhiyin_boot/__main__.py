@@ -13,6 +13,8 @@
     python -m zhiyin_boot worker impact --once   # 手动跑一轮某个 Worker
     python -m zhiyin_boot worker active_event    # 独立部署某个 Worker（常驻）
 
+    python -m zhiyin_boot rerank-bridge          # 平台 rerank 协议转换桥（见模块说明）
+
 第一期定位是"本地可启动、可演示、可调试"（§1.1）：读配置 → build_container →
 交给 uvicorn。任何装配缺失都在启动时暴露，不做静默降级。
 """
@@ -106,6 +108,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if argv and argv[0] == "worker":
         return _run_worker(argv[1:])
+
+    if argv and argv[0] == "rerank-bridge":
+        from zhiyin_boot.rerank_bridge import main as run_bridge
+
+        return run_bridge()
 
     parser = argparse.ArgumentParser(prog="zhiyin", description="职引 · 第一期服务")
     parser.add_argument("--host", default="127.0.0.1", help="监听地址（默认仅本机）")
