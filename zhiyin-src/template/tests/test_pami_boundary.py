@@ -124,6 +124,35 @@ async def test_pami_search_rejects_raw_vector_explicitly() -> None:
 
 
 @pytest.mark.asyncio
+async def test_pami_refuses_private_namespaces_instead_of_leaking_public_content() -> None:
+    """私有域必须**拒绝**走 PAMI，而不是"忽略过滤后拿公共内容凑答案"。
+
+    《第三期设计》§6.3：公共知识与用户私有知识不能绑定到同一个无隔离应用；平台
+    OpenAPI 表达不了用户级权限/版本/时效过滤，所以私有域不能走这条路径。
+    拒绝后 RRF 会把关键词通道记为降级、改用**会按 org/user 过滤**的向量通道——
+    这是"明确降级"，比"静默返回公共内容"正确得多。
+    """
+
+    def handler(_: httpx.Request) -> httpx.Response:  # pragma: no cover - 不应被调用
+        raise AssertionError("私有域不应发出 PAMI 请求")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        search = PamiSearchGateway("http://nginx:8081", "api-key", client=client)
+        for namespace, filters in (
+            (RetrievalNamespace.RESUME, {"status": "enabled", "user_id": "u1"}),
+            (RetrievalNamespace.REPORT, {"status": "enabled", "user_id": "u1"}),
+            (RetrievalNamespace.MEMORY, {}),
+        ):
+            with pytest.raises(UnavailableError, match="私有域"):
+                await search.search(
+                    RetrievalQuery(
+                        query="我的简历", namespace=namespace, mode="keyword",
+                        filters=filters,
+                    )
+                )
+
+
+@pytest.mark.asyncio
 async def test_pami_search_ignores_filters_but_says_so() -> None:
     """带 filters 时**不整条失败**，但必须让"过滤没被服务端执行"可见。
 

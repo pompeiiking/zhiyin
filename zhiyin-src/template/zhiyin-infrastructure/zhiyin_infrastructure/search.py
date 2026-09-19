@@ -176,6 +176,13 @@ class RrfHybridSearchGateway(SearchGateway):
                     for hit in result
                 ]
         if self._audit is not None:
+            # 审计里要能看出**是哪种降级**（D13 残留）：通道故障去查通道/平台，
+            # 命中被权威门丢则去查权威表有没有内容——处置动作不同。
+            reasons_log = []
+            if degraded:
+                reasons_log.append("channels")
+            if dropped_any:
+                reasons_log.append("authority_drop")
             await self._audit.record(
                 org_id=request.org_id or self._org_id,
                 namespace=request.namespace.value,
@@ -183,12 +190,8 @@ class RrfHybridSearchGateway(SearchGateway):
                 top_k=request.top_k,
                 source_ids=[hit.source_id or hit.evidence_id for hit in result],
                 latency_ms=int((time.perf_counter() - started) * 1000),
-                # 审计里的 `degraded` 覆盖两种情况，二者都意味着"这次结果不可全信"：
-                # (1) 通道故障（`degraded` 非空）；(2) 命中被权威门挡掉（D13）。
-                # ⚠️ 现在这两种在日志里只能靠"有没有通道故障"反推，
-                # 要在审计里**分别**记成两个字段需要给 `retrieval_log` 加列——那是
-                # 数据库语义变更，需先确认，故此处只做零 schema 变更的最小改动。
-                degraded=bool(degraded) or dropped_any,
+                degraded=bool(reasons_log),
+                degraded_reason="+".join(reasons_log),
                 query=request.query,
             )
         return result

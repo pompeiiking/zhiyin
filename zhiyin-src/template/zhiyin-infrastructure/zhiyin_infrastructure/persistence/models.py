@@ -204,6 +204,15 @@ class RetrievalLogRow(Base):
     source_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False)
     latency_ms: Mapped[int] = mapped_column(Integer, nullable=False)
     degraded: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    degraded_reason: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    """降级**原因**，让审计能区分"通道故障"与"命中被权威门挡掉"（D13 残留）。
+
+    为什么单独一列而不是塞进 `degraded` 布尔：这两件事的处置动作不同——
+    前者去查通道/平台，后者去查权威表有没有内容。只有布尔值时运维只能靠"有没有
+    通道故障"反推，实测中确实卡过一次（真实对话里检索恒 0，查不出原因）。
+    取值：`""`（未降级）/ `channels`（通道故障）/ `authority_drop`（命中被权威门丢）/
+    `channels+authority_drop`（两者同时）。
+    """
     query_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

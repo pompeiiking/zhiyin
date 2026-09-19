@@ -30,6 +30,7 @@ class RetrievalLogStore:
         latency_ms: int,
         degraded: bool,
         query: str,
+        degraded_reason: str = "",
     ) -> None:
         await self._db.ensure_ready()
         async with self._db.sessions.begin() as session:
@@ -43,6 +44,7 @@ class RetrievalLogStore:
                     source_ids=source_ids,
                     latency_ms=latency_ms,
                     degraded=degraded,
+                    degraded_reason=degraded_reason[:32],
                     query_hash=hashlib.sha256(query.encode("utf-8")).hexdigest(),
                     created_at=datetime.now(timezone.utc),
                 )

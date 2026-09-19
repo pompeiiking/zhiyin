@@ -304,6 +304,11 @@ class AuditSpy:
     def last_degraded(self) -> bool | None:
         return self.records[-1]["degraded"] if self.records else None
 
+    @property
+    def last_reason(self) -> str | None:
+        """最近一次审计的降级原因（`""` / `channels` / `authority_drop` / 两者）。"""
+        return self.records[-1].get("degraded_reason") if self.records else None
+
 
 class FailingVector(VectorGateway):
     """pgvector 不可用（库连不上 / 表被锁 / 向量维度不匹配）。"""
@@ -443,6 +448,27 @@ async def test_embedding_fault_degrades_to_keyword_only() -> None:
 
 
 @pytest.mark.asyncio
+async def test_degraded_reason_in_audit_tells_channel_fault_from_authority_drop() -> None:
+    """审计原因要能区分"通道故障"与"命中被权威门丢"（D13 残留）。
+
+    实测中卡过一次：真实对话里检索恒为 0，而审计只有 `degraded=1` 一个布尔，
+    无法判断该去查通道/平台，还是去查权威表有没有内容。
+    """
+    vector = LocalVectorStore()
+
+    # 混合模式下只挂向量通道（单通道全挂会按设计显式抛出，到不了审计）
+    spy = AuditSpy()
+    search = RrfHybridSearchGateway(
+        FakeKeywordSearch(), FailingEmbedding(), vector, rrf_k=60, audit=spy
+    )
+    hits = await search.search(
+        RetrievalQuery(query="目标", namespace=RetrievalNamespace.THEORY, top_k=2)
+    )
+    assert hits, "关键词通道仍有命中"
+    assert spy.last_reason == "channels"
+
+
+@pytest.mark.asyncio
 async def test_pgvector_fault_degrades_to_keyword_only() -> None:
     """故障注入：pgvector 不可用（嵌入正常）→ 关键词通道照常出结果。"""
     embedding = LocalHashEmbedder(dim=4, model_id="test-model")
@@ -554,6 +580,9 @@ async def test_authority_drop_is_reported_instead_of_silently_empty() -> None:
     )
     assert hits == [], "权威门挡掉后结果为空（策略不变）"
     assert spy.last_degraded is True, "空了但**不能**静默：审计必须标记降级"
+    assert spy.last_reason == "authority_drop", (
+        "审计必须说清**是哪种降级**（通道故障 vs 被权威门丢），否则运维只能反推"
+    )
 
 
 @pytest.mark.asyncio
@@ -618,6 +647,7 @@ async def test_no_drop_keeps_audit_not_degraded() -> None:
     )
     assert hits, "关键词通道有命中"
     assert spy.last_degraded is False
+    assert spy.last_reason == "", "没降级就不该写原因"
     assert "dropped_non_authoritative" not in hits[0].metadata["retrieval"]
 
 

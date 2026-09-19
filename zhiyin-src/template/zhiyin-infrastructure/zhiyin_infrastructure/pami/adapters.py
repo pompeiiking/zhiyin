@@ -22,10 +22,20 @@ from zhiyin_data_sdk.gateways.ai import (
     SearchGateway,
 )
 from zhiyin_data_sdk.gateways.security import AuthGateway, AuthPrincipal
-from zhiyin_kernel.enums import UserRole
+from zhiyin_kernel.enums import RetrievalNamespace, UserRole
 from zhiyin_kernel.retrieval import RetrievalEvidence, RetrievalQuery
 
 from .doc_naming import parse_doc_name
+
+#: **私有域**：内容只属于某个用户/组织，平台 OpenAPI 表达不了这种隔离，因此不得走 PAMI。
+#: 依据《第三期 RAG 检索内容与检索流程设计》§4.2 的域归属表与 §6.3 的隔离要求。
+PRIVATE_NAMESPACES = frozenset(
+    {
+        RetrievalNamespace.REPORT,
+        RetrievalNamespace.RESUME,
+        RetrievalNamespace.MEMORY,
+    }
+)
 
 
 def _clean_base_url(base_url: str) -> str:
@@ -344,16 +354,24 @@ class PamiSearchGateway(SearchGateway):
     async def search(self, request: RetrievalQuery) -> list[RetrievalEvidence]:
         if request.mode == "vector":
             raise UnavailableError("PAMI RAG OpenAPI 不接受调用方提供的裸向量")
-        # PAMI 的 OpenAPI **不接受**调用方 metadata filters（请求体只有 query/stream），
-        # 所以这里**不是**把 filters 当作"已生效"：命中会带
-        # `metadata["filters_ignored"]`，让调用方看得见"这次过滤没被服务端执行"。
+        # ⚠️ **私有域不得走 PAMI**：《第三期设计》§6.3 明确"公共知识与用户私有知识不能
+        # 绑定到同一个无隔离应用；如果 PAMI 不能表达用户级权限、版本和时效过滤，则私有域
+        # 不能直接走此路径"。平台 OpenAPI 的请求体只有 `query/stream`，确实无法表达
+        # 用户级隔离——所以这里**必须拒绝**，让 RRF 降级到向量通道（那条会按 org/user 过滤）。
         #
-        # 为什么不再直接抛错：编排器的检索计划**每一条 query 都带**
-        # `filters={"status": "enabled"}`（私有域还带 user_id）。原先的"带 filters 就
-        # 抛错"会把关键词通道**整条打挂**，于是启用 PAMI 后真实对话里检索恒为 0
-        # ——错误信息还落在通道降级里，看起来像"平台坏了"。而 `status=enabled` 在
-        # PAMI 侧本来就成立（只有启用文档会被索引），所以忽略它比整条失败更合理；
-        # 关键是**忽略也要可见**（与 D12/D13 同一条原则）。
+        # 这一条是我上一轮引入的问题的补丁：把"带 filters 就抛错"放宽成"忽略 filters"之后，
+        # 私有域查询会**拿到公共知识当结果**（过滤被忽略），既不符合口径也会污染私有域证据。
+        if request.namespace in PRIVATE_NAMESPACES or "user_id" in (request.filters or {}):
+            raise UnavailableError(
+                "私有域检索不能走 PAMI RAG（平台无法表达用户级隔离）",
+                detail={"namespace": request.namespace.value},
+            )
+        # 公共域：PAMI 的请求体只有 query/stream，**不接受** metadata filters。这里不是把
+        # filters 当作"已生效"：命中会带 `metadata["filters_ignored"]`，让调用方看得见
+        # "这次过滤没被服务端执行"。原先"带 filters 就抛错"会把关键词通道整条打挂
+        # （编排器每条 query 都带 `status=enabled`），启用 PAMI 后真实对话检索恒为 0。
+        # `status=enabled` 在 PAMI 侧本就成立（只有启用文档会被索引），因此忽略比整条失败
+        # 更合理；关键是**忽略也要可见**（与 D12/D13 同一条原则）。
         ignored_filters = dict(request.filters or {})
         body = await self._http.request(
             "POST",
