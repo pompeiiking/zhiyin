@@ -40,6 +40,7 @@ from zhiyin_infrastructure.local.object_store import LocalFileStore
 from zhiyin_infrastructure.local.repository import (
     InMemoryAssetRepository,
     InMemoryConversationMemoryRepository,
+    InMemoryTaskSessionRepository,
     LocalJsonRegistryRepository,
 )
 from zhiyin_kernel.assets import CalendarNode, Report, Swot, Verdict
@@ -444,6 +445,7 @@ async def test_workspace_available_blocks_is_derived_from_feature_flags() -> Non
         behaviors=_Behaviors(),
         registry=LocalJsonRegistryRepository(str(DATA_DIR / "registry")),
         features=LocalFeatureFlagStore(str(DATA_DIR / "registry")),
+        sessions=InMemoryTaskSessionRepository(),
     )
 
     view = await workspace.build_view("u1")
@@ -464,6 +466,7 @@ async def test_workspace_partial_failure_still_returns_five_panels() -> None:
         behaviors=_Behaviors(),
         registry=LocalJsonRegistryRepository(str(DATA_DIR / "registry")),
         features=LocalFeatureFlagStore(str(DATA_DIR / "registry")),
+        sessions=InMemoryTaskSessionRepository(),
     )
 
     view = await workspace.build_view("u1")

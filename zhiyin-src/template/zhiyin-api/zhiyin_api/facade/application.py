@@ -197,6 +197,9 @@ class DefaultApplicationFacade(ApplicationFacade):
             LoopEntry(
                 user_id=user_id,
                 task_code=entry.code,
+                # 会话显示名 = 入口文案：让 `task/enter` 的返回值与左栏会话列表
+                # （含刷新后的列表）说的是同一件事。
+                task_name=entry.label,
                 stage=stage,
                 lead_agent=lead_agent,
                 source=EntrySource.FREE_CHAT if entry.target_stage is None else EntrySource.HOME_TASK,

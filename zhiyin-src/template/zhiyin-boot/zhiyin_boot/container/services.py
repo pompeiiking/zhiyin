@@ -119,6 +119,8 @@ def build_services(container: "Container") -> None:
         behaviors=container.behavior_service,
         registry=container.registry,
         features=container.feature_flags,
+        # 左栏会话列表要取会话的 `task_name`（任务名），不能拿环节名顶替
+        sessions=container.sessions,
     )
     container.function_service = DefaultFunctionService(
         assets=container.asset_service,

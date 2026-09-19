@@ -521,6 +521,47 @@ async def test_undecided_message_does_not_auto_advance_to_decide() -> None:
 
 
 @pytest.mark.asyncio
+async def test_session_display_name_is_the_task_entry_label_everywhere() -> None:
+    """同一个"会话显示名"在**所有出口**必须是同一个值：动态任务入口文案。
+
+    此前它有三套口径，实测出来的现象很具体：
+    - 会话创建时写 `task_code`（库里存的是 `verify_direction`）；
+    - `POST /app/task/enter` 返回入口文案（"想验证某方向行不行"）；
+    - `GET /app/sessions` 用**环节名**（"② 诊断匹配"）。
+    而前端把 `task/enter` 的返回值直接 push 进左栏列表，于是**刷新一次侧栏名字就变了**。
+
+    本用例把这条口径钉住：task_name 必须等于 `task_entries.json` 里的入口标签。
+    """
+    from zhiyin_api.dto.conversation import TaskEnterRequest
+
+    container = _container()
+    user_id = "session-name-user"
+    entries = await container.registry_service.list_task_entries()
+    entry = next(item for item in entries if item.target_stage is not None)
+
+    entered = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code=entry.code)
+    )
+    assert entered.task_name == entry.label, "task/enter 必须返回入口文案"
+
+    stored = await container.sessions.get(entered.task_id)
+    assert stored is not None
+    assert stored.task_name == entry.label, "会话记录里存的也必须是入口文案（不是 code）"
+
+    listed = await container.facade.list_sessions(user_id)
+    item = next(
+        (session for session in listed.sessions if session.task_id == entered.task_id),
+        None,
+    )
+    assert item is not None, "刚进入的会话必须出现在左栏列表里"
+    assert item.task_name == entry.label, (
+        "左栏列表必须与 task/enter 同名（此前用的是环节名，刷新后名字会变）"
+    )
+    # 环节名仍在正确的字段上，没有被顶掉
+    assert item.stage_label != item.task_name or entry.label == item.stage_label
+
+
+@pytest.mark.asyncio
 async def test_unknown_task_id_is_rejected_instead_of_silently_created() -> None:
     """未知 `task_id` 必须**显式失败**，不能顺手新建一个会话。
 

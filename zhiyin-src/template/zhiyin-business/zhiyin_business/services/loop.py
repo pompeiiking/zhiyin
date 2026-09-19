@@ -317,7 +317,9 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
                     id=f"tsk_{uuid4().hex[:12]}",
                     user_id=entry.user_id,
                     task_code=entry.task_code,
-                    task_name=entry.task_code,
+                    # 用户可见的任务名取动态入口文案；拿不到时回落到 code。
+                    # 旧实现直接写 `entry.task_code`，于是左栏会显示 `verify_direction`。
+                    task_name=entry.task_name or entry.task_code,
                     loop_stage=entry.stage,
                     lead_agent=entry.lead_agent,
                     status=TaskStatus.ACTIVE,

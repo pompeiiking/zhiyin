@@ -46,6 +46,14 @@ class LoopEntry(BaseModel):
 
     user_id: str
     task_code: str
+    task_name: str = Field(
+        default="",
+        description=(
+            "用户可见的任务名（取自动态任务入口文案）。为空时由会话回落到 task_code。"
+            "为什么要有它：会话的 `task_name` 曾直接写 `task_code`（用户看到 "
+            "`verify_direction`），而左栏会话列表又拿环节名顶替——同一个显示名三套口径。"
+        ),
+    )
     stage: LoopStage = Field(description="本次进入的环节")
     lead_agent: str
     source: EntrySource = EntrySource.HOME_TASK

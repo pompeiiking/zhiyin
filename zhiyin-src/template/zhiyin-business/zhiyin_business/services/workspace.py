@@ -31,7 +31,7 @@ from zhiyin_business.ports.workspace import (
 )
 from zhiyin_business.services.loop import STAGE_LABELS
 from zhiyin_data_sdk.gateways.feature_flag import FeatureFlagGateway
-from zhiyin_data_sdk.repositories import RegistryRepository
+from zhiyin_data_sdk.repositories import RegistryRepository, TaskSessionRepository
 from zhiyin_kernel.assets import TrackEvent
 from zhiyin_kernel.enums import AssetType, BehaviorEventType, LoopStage
 
@@ -52,11 +52,14 @@ class DefaultWorkspaceService(WorkspaceService):
         behaviors: BehaviorService,
         registry: RegistryRepository,
         features: FeatureFlagGateway,
+        sessions: TaskSessionRepository,
     ) -> None:
         self._profiles = profiles
         self._assets = assets
         self._memories = memories
         self._behaviors = behaviors
+        # 会话记录用于左栏会话列表取"任务名"（`task_name`），见 `list_sessions_summary`。
+        self._sessions = sessions
         # 覆盖率与整体置信度的口径来自动态资源，必须由业务层读取并计算后透传。
         self._registry = registry
         # 「可用功能块」= 功能开关里 enabled 的那些，见 `_available_blocks`。
@@ -185,18 +188,43 @@ class DefaultWorkspaceService(WorkspaceService):
         )
 
     async def list_sessions_summary(self, user_id: str) -> list[StagePanel]:
+        """左栏会话摘要。
+
+        `title` 在这里的含义是**该会话的显示名**，取会话记录里的 `task_name`
+        （= 动态任务入口文案）；拿不到才回落到环节名。
+
+        为什么要专门说明：`StagePanel.title` 在环节面板那条路上是"环节名"，而会话摘要
+        这条路把它当"任务名"用。此前摘要直接写 `STAGE_LABELS[...]`，于是左栏显示的是
+        "② 诊断匹配"而不是用户当初选的"想验证某方向行不行"——而且 `task/enter` 返回的是
+        入口文案，前端把它 push 进列表后**刷新一次名字就变了**。
+        """
         memories = await self._memories.list_by_user(user_id)
-        return [
-            StagePanel(
-                stage=memory.loop_stage,
-                title=STAGE_LABELS[memory.loop_stage],
-                evaluation=memory.summary,
-                updated_at=memory.last_active_at,
-                task_id=memory.task_id,
-                lead_agent=memory.lead_agent,
+        # 一次批量取回该用户的会话，避免按会话逐条查（N+1）
+        sessions = {
+            session.id: session for session in await self._sessions.list_by_user(user_id)
+        }
+        # 历史行的 `task_name` 曾直接写 `task_code`（旧口径），读时用动态入口文案兜住，
+        # 免得为了显示正确去做一次数据回填——"名字等于 code"就当作"没设置过"。
+        labels = {
+            entry.code: entry.label for entry in await self._registry.list_task_entries()
+        }
+        panels: list[StagePanel] = []
+        for memory in memories:
+            session = sessions.get(memory.task_id or "")
+            stored = session.task_name if session else ""
+            if session and (not stored or stored == session.task_code):
+                stored = labels.get(session.task_code, "")
+            panels.append(
+                StagePanel(
+                    stage=memory.loop_stage,
+                    title=stored or STAGE_LABELS[memory.loop_stage],
+                    evaluation=memory.summary,
+                    updated_at=memory.last_active_at,
+                    task_id=memory.task_id,
+                    lead_agent=memory.lead_agent,
+                )
             )
-            for memory in memories
-        ]
+        return panels
 
 
 async def _safe(awaitable: Awaitable[T], default: T) -> T:
