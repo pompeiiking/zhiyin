@@ -150,12 +150,18 @@ async def test_authority_backfill_filters_status_expiry_and_private_scope(tmp_pa
         org_id="org-1",
         user_id="user-1",
     )
-    result = await store.hydrate(request, hits)
+    outcome = await store.hydrate(request, hits)
+    result = outcome.hits
     assert [item.evidence_id for item in result] == ["resume:visible"]
     assert result[0].content == "数据库中的最新脱敏简历"
-    assert await store.hydrate(
+    # D13：被丢弃的条数必须交出来，否则调用方分不清"没命中"与"被权威门挡掉"
+    assert (outcome.checked, outcome.dropped) == (2, 1)
+    assert outcome.all_dropped is False
+    empty = await store.hydrate(
         request.model_copy(update={"user_id": "another-user"}), hits
-    ) == []
+    )
+    assert empty.hits == []
+    assert empty.all_dropped is True, "全部被挡掉时必须能识别出来"
     store.close()
     engine.dispose()
 

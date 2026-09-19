@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Sequence
@@ -15,6 +16,31 @@ from zhiyin_kernel.retrieval import RetrievalEvidence, RetrievalQuery
 
 from .database import _sync_url
 from .models import RetrievalDocumentRow
+
+
+@dataclass(frozen=True)
+class HydrationOutcome:
+    """一次权威回填的结果，**含被丢弃的条数**（D13）。
+
+    为什么要把"丢了多少"带出来：回填会把权威库里找不到、或已被过滤的命中整条丢掉。
+    权威表为空时，**每一条**命中都会被丢掉，于是调用方拿到一个空列表——而它与
+    "确实没有命中"完全同形（`degraded=False`、审计与探针都看不出）。这正是
+    《AGENTS.md》§5/§10 说的"静默降级"，所以回填必须把丢弃量交出去。
+
+    没有做成"在 store 上记一个 last_dropped 属性"：容器里同一个 store 被并发请求
+    共享，那样读到的可能是别人那一次的丢弃数（串味）。
+    """
+
+    hits: list[RetrievalEvidence] = field(default_factory=list)
+    checked: int = 0
+    """参与回填的命中条数。"""
+
+    dropped: int = 0
+    """命中存在、但权威库里找不到或对其不可见，因而被丢弃的条数。"""
+
+    @property
+    def all_dropped(self) -> bool:
+        return bool(self.checked) and self.dropped == self.checked
 
 
 class RetrievalDocumentStore:
@@ -70,14 +96,18 @@ class RetrievalDocumentStore:
 
     async def hydrate(
         self, request: RetrievalQuery, hits: Sequence[RetrievalEvidence]
-    ) -> list[RetrievalEvidence]:
+    ) -> HydrationOutcome:
+        """权威回填：只保留权威库里存在且对该用户可见的命中。
+
+        返回 `HydrationOutcome`（含丢弃条数），而不是裸列表——见该数据类的说明。
+        """
         return await asyncio.to_thread(self._hydrate_sync, request, list(hits))
 
     def _hydrate_sync(
         self, request: RetrievalQuery, hits: list[RetrievalEvidence]
-    ) -> list[RetrievalEvidence]:
+    ) -> HydrationOutcome:
         if not hits:
-            return []
+            return HydrationOutcome()
         ids = {hit.evidence_id for hit in hits} | {
             hit.source_id for hit in hits if hit.source_id
         }
@@ -93,9 +123,11 @@ class RetrievalDocumentStore:
         by_key = {row.id: row for row in rows}
         by_key.update({row.source_id: row for row in rows})
         hydrated: list[RetrievalEvidence] = []
+        dropped = 0
         for hit in hits:
             row = by_key.get(hit.evidence_id) or by_key.get(hit.source_id)
             if row is None or not self._visible(row, request, now):
+                dropped += 1
                 continue
             hydrated.append(
                 hit.model_copy(
@@ -111,7 +143,7 @@ class RetrievalDocumentStore:
                     }
                 )
             )
-        return hydrated
+        return HydrationOutcome(hits=hydrated, checked=len(hits), dropped=dropped)
 
     def expire_due(self, *, now: datetime | None = None) -> list[str]:
         """把**已过截止时间**的文档落成 `expired`，并标记为历史样本。

@@ -38,6 +38,13 @@ class RrfHybridSearchGateway(SearchGateway):
     这里**只写异常类名，不写异常消息**：异常文本可能带上 DSN、口令或上游地址，而
     检索 metadata 会随报告与接口响应外流（《AGENTS.md》§10 禁止秘密进入日志、
     动态资源与响应）。类名已足够区分"配置错"与"连不上"，需要细节时按类名去查日志。
+
+    ⚠️ 还有第二种"静默变空"：权威回填把命中丢光（D13）
+    --------------------------------------------------
+    有 authority 时，命中必须能在权威库里找到才算数。权威表为空时**每一条**都会被
+    丢掉，于是返回空列表——而它与"确实没有命中"完全同形（`degraded=False`、审计与
+    `/healthz` 都正常）。现在丢弃量会进入 (`retrieval.dropped_non_authoritative`)
+    与审计的 `degraded`，至少让"空结果到底是没内容还是被门挡掉"可分辨。
     """
 
     IMPLEMENTATION_STATUS = "wired"
@@ -144,8 +151,30 @@ class RrfHybridSearchGateway(SearchGateway):
             degraded=degraded,
             reasons=reasons,
         )
+        dropped_any = False
         if self._authority is not None:
-            result = await self._authority.hydrate(request, result)
+            outcome = await self._authority.hydrate(request, result)
+            result = outcome.hits
+            dropped_any = bool(outcome.dropped)
+            if outcome.dropped:
+                # 权威回填把命中丢掉了（D13）。必须让它**可识别**：权威表为空时
+                # 每一条都会被丢掉，调用方只会看到一个空列表——与"确实没命中"
+                # 完全同形。这里把丢弃量写进 (a) 幸存命中的 metadata、(b) 审计。
+                # 一条都没幸存时 (a) 无处可写，只能靠审计——所以 (b) 是主通道。
+                result = [
+                    hit.model_copy(
+                        update={
+                            "metadata": {
+                                **hit.metadata,
+                                "retrieval": {
+                                    **hit.metadata.get("retrieval", {}),
+                                    "dropped_non_authoritative": outcome.dropped,
+                                },
+                            }
+                        }
+                    )
+                    for hit in result
+                ]
         if self._audit is not None:
             await self._audit.record(
                 org_id=request.org_id or self._org_id,
@@ -154,7 +183,12 @@ class RrfHybridSearchGateway(SearchGateway):
                 top_k=request.top_k,
                 source_ids=[hit.source_id or hit.evidence_id for hit in result],
                 latency_ms=int((time.perf_counter() - started) * 1000),
-                degraded=bool(degraded),
+                # 审计里的 `degraded` 覆盖两种情况，二者都意味着"这次结果不可全信"：
+                # (1) 通道故障（`degraded` 非空）；(2) 命中被权威门挡掉（D13）。
+                # ⚠️ 现在这两种在日志里只能靠"有没有通道故障"反推，
+                # 要在审计里**分别**记成两个字段需要给 `retrieval_log` 加列——那是
+                # 数据库语义变更，需先确认，故此处只做零 schema 变更的最小改动。
+                degraded=bool(degraded) or dropped_any,
                 query=request.query,
             )
         return result

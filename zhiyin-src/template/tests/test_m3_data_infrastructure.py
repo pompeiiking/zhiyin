@@ -287,6 +287,24 @@ class UnreachablePool:
         raise OSError("network unreachable")
 
 
+class AuditSpy:
+    """与生产同形状的审计接收方，只记不写库。
+
+    为什么要用审计来判断降级：命中全被权威门挡掉时**没有任何命中**可承载 metadata，
+    审计是唯一还能说话的通道（D13）。
+    """
+
+    def __init__(self) -> None:
+        self.records: list[dict[str, Any]] = []
+
+    async def record(self, **kwargs: Any) -> None:
+        self.records.append(kwargs)
+
+    @property
+    def last_degraded(self) -> bool | None:
+        return self.records[-1]["degraded"] if self.records else None
+
+
 class FailingVector(VectorGateway):
     """pgvector 不可用（库连不上 / 表被锁 / 向量维度不匹配）。"""
 
@@ -494,6 +512,113 @@ async def test_rerank_not_configured_does_not_break_retrieval() -> None:
     assert hits, "Rerank 缺失不应导致没有结果"
     assert hits[0].metadata["retrieval"]["algorithm"] == "rrf"
     assert hits[0].metadata["retrieval"]["degraded_channels"] == []
+
+
+@pytest.mark.asyncio
+async def test_authority_drop_is_reported_instead_of_silently_empty() -> None:
+    """命中被权威回填丢光时，必须**可识别**，不能只回一个空列表（D13）。
+
+    这是本仓库真实的踩坑：权威表 `retrieval_document` 为空时，回填把**每一条**命中
+    都判为"非权威"丢掉，于是线上检索对任何问题都返回空——而它与"确实没有命中"
+    完全同形（`degraded=False`、审计与探针都看不出）。真实报告里 `sources` 为空就是
+    这么来的。
+
+    这里用一个"全部丢光"的 authority 锁住两条信号：审计 `degraded=True`，
+    以及有幸存命中时 metadata 里的丢弃条数。
+    """
+    embedding = LocalHashEmbedder(dim=4, model_id="test-model")
+    vector = LocalVectorStore()
+    seeded, = await embedding.embed(["目标"])
+    await vector.upsert(
+        "theory",
+        [VectorRecord(id="doc-1", vector=seeded, text="命中")],
+        model=embedding.model_id,
+    )
+
+    class DroppingAuthority:
+        async def hydrate(self, request, hits):  # noqa: ANN001, ANN201
+            from zhiyin_infrastructure.persistence.retrieval_documents import (
+                HydrationOutcome,
+            )
+
+            return HydrationOutcome(hits=[], checked=len(hits), dropped=len(hits))
+
+    spy = AuditSpy()
+    search = RrfHybridSearchGateway(
+        FakeKeywordSearch(), embedding, vector, rrf_k=60, audit=spy
+    )
+    search.configure_authority(DroppingAuthority())
+
+    hits = await search.search(
+        RetrievalQuery(query="目标", namespace=RetrievalNamespace.THEORY, top_k=3)
+    )
+    assert hits == [], "权威门挡掉后结果为空（策略不变）"
+    assert spy.last_degraded is True, "空了但**不能**静默：审计必须标记降级"
+
+
+@pytest.mark.asyncio
+async def test_authority_partial_drop_is_recorded_on_surviving_hits() -> None:
+    """部分被挡掉时，幸存命中要带上丢弃条数，便于回答"这次是不是少了很多证据"。"""
+    embedding = LocalHashEmbedder(dim=4, model_id="test-model")
+    vector = LocalVectorStore()
+    seeded, = await embedding.embed(["目标"])
+    await vector.upsert(
+        "theory",
+        [VectorRecord(id="doc-1", vector=seeded, text="命中")],
+        model=embedding.model_id,
+    )
+
+    class HalfAuthority:
+        async def hydrate(self, request, hits):  # noqa: ANN001, ANN201
+            from zhiyin_infrastructure.persistence.retrieval_documents import (
+                HydrationOutcome,
+            )
+
+            kept = list(hits)[:1]
+            return HydrationOutcome(
+                hits=kept, checked=len(hits), dropped=len(hits) - len(kept)
+            )
+
+    spy = AuditSpy()
+    search = RrfHybridSearchGateway(
+        FakeKeywordSearch(), embedding, vector, rrf_k=60, audit=spy
+    )
+    search.configure_authority(HalfAuthority())
+
+    hits = await search.search(
+        RetrievalQuery(query="目标", namespace=RetrievalNamespace.THEORY, top_k=3)
+    )
+    assert hits, "应至少保留一条"
+    assert hits[0].metadata["retrieval"]["dropped_non_authoritative"] == 2
+    assert spy.last_degraded is True
+
+
+@pytest.mark.asyncio
+async def test_no_drop_keeps_audit_not_degraded() -> None:
+    """反向用例：没有命中被挡掉时，审计**不得**被标成降级（避免"到处都降级"而失效）。"""
+    embedding = LocalHashEmbedder(dim=4, model_id="test-model")
+    vector = LocalVectorStore()
+
+    class KeepingAuthority:
+        async def hydrate(self, request, hits):  # noqa: ANN001, ANN201
+            from zhiyin_infrastructure.persistence.retrieval_documents import (
+                HydrationOutcome,
+            )
+
+            return HydrationOutcome(hits=list(hits), checked=len(hits), dropped=0)
+
+    spy = AuditSpy()
+    search = RrfHybridSearchGateway(
+        FakeKeywordSearch(), embedding, vector, rrf_k=60, audit=spy
+    )
+    search.configure_authority(KeepingAuthority())
+
+    hits = await search.search(
+        RetrievalQuery(query="目标", namespace=RetrievalNamespace.THEORY, top_k=3)
+    )
+    assert hits, "关键词通道有命中"
+    assert spy.last_degraded is False
+    assert "dropped_non_authoritative" not in hits[0].metadata["retrieval"]
 
 
 @pytest.mark.asyncio
