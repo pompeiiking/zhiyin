@@ -263,6 +263,8 @@ def _test_settings():
     data_dir = TEMPLATE_ROOT / "data"
     return Settings(
         env="test",
+        # 刻意用本地占位模型（D1），故显式许可；否则启动前置校验拒绝装配。
+        allow_placeholder_llm=True,
         local_data_dir=str(data_dir),
         local_registry_dir=str(data_dir / "registry"),
         local_knowledge_dir=str(data_dir / "knowledge"),

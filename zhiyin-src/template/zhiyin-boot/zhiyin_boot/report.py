@@ -82,9 +82,12 @@ def describe_assembly(container: "Container") -> "AssemblyReport":
     registry_dir = container.settings.local_registry_dir
 
     for name in GATEWAY_PORTS:
-        report.gateways[name] = _status_of(
-            getattr(container, name, None), skeleton_markers=(".pami.",)
-        )
+        value = getattr(container, name, None)
+        report.gateways[name] = _status_of(value, skeleton_markers=(".pami.",))
+        # 占位实现单独成类：状态仍是 wired（实现完整、过产出契约），但它产出的是
+        # **虚构内容**，必须与"真实现"区分开，否则漏配环境看起来一切正常。
+        if getattr(type(value), "IS_PLACEHOLDER", False):
+            report.placeholders.append(name)
 
     for name in REPOSITORY_PORTS:
         report.repositories[name] = _status_of(

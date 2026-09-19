@@ -12,12 +12,11 @@
 ⚠️ 部署环境不装配本类：`ZHIYIN_USE_PAMI_LLM=1` 时 `build_gateways` 会用
    `PamiLLMGateway` 覆盖它。本类保留为**本地/测试实现**。
 
-⚠️ 未收口的风险：本类没有声明 `IMPLEMENTATION_STATUS`，装配报告会按兜底逻辑把它
-   报成 `wired`；它只在 `LLMResult.degraded=True` 里自述降级，而该标记目前没有
-   消费方。也就是说**漏配 `ZHIYIN_USE_PAMI_LLM` 的环境，占位产出不会被门禁、
-   装配报告或界面任何一处拦住**。改法与取舍见
-   docs/数据全链路/04-实施与验收/职引-待决问题与改法选项-v1.0.md（D1）——
-   在拍板前不要自行改状态或加标注。
+⚠️ 安全性由两处保证（2026-09-19 收口，见待决问题 D1）：
+   1. **装配期硬失败**：既没接真实模型、又没设 `ZHIYIN_ALLOW_PLACEHOLDER_LLM=1`
+      时，服务启动前置校验会直接拒绝启动；
+   2. **如实上报**：装配报告把它列进 `placeholders`，`/healthz` 状态变为 `degraded`，
+      `--check` 的 JSON 里也能看到，不再谎报成"一切正常"。
 """
 
 from __future__ import annotations
@@ -127,7 +126,22 @@ def _is_nullable(node: dict[str, Any]) -> bool:
 
 
 class LocalOrMockLLM(LLMGateway):
-    """有模型用模型，没有模型用固定结果。"""
+    """有模型用模型，没有模型用固定结果。
+
+    **本类是占位实现，不是骨架**：`chat()` 方法体完整，产出能通过产出契约校验。
+    所以它**如实声明 `IMPLEMENTATION_STATUS = "wired"`**——把它标成 `skeleton` 是
+    另一种不如实（骨架的含义是方法体未填）。真正需要区分的是"这是不是真模型"，
+    那由下面的 `IS_PLACEHOLDER` 标记 + 装配报告的 `placeholders` 表达。
+
+    装配侧约束（待决问题 D1）：既不接真实模型（`ZHIYIN_USE_PAMI_LLM=0`）、
+    又没有显式许可（`ZHIYIN_ALLOW_PLACEHOLDER_LLM=0`）时，
+    `assert_minimum_viable` 会让服务**拒绝启动**，而不是带着占位产出对外服务。
+    """
+
+    IMPLEMENTATION_STATUS = "wired"
+
+    IS_PLACEHOLDER = True
+    """占位实现标记。装配报告据此把它列入 `placeholders`，`/healthz` 随之降级。"""
 
     def __init__(
         self, model: str = "local-mock", provider_env: str = "ZHIYIN_LLM_PROVIDER"

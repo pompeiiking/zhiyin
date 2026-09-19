@@ -39,6 +39,9 @@ DATA_DIR = TEMPLATE_ROOT / "data"
 def _settings() -> Settings:
     return Settings(
         env="test",
+        # 这些用例刻意用本地占位模型（D1）：它产出过契约校验，正好用来验链路；
+        # 没有这行显式许可，启动前置校验会拒绝装配。
+        allow_placeholder_llm=True,
         local_data_dir=str(DATA_DIR),
         local_registry_dir=str(DATA_DIR / "registry"),
         local_knowledge_dir=str(DATA_DIR / "knowledge"),

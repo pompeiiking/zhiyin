@@ -383,7 +383,7 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
         except Exception as exc:  # 结构合法但类型不匹配
             return await self._degraded_result(context, [str(exc)], result.degraded)
 
-        return await self._to_loop_result(context, output)
+        return await self._to_loop_result(context, output, model_degraded=result.degraded)
 
     async def _stage_instruction(self, context: LoopContext) -> str:
         """组装本轮交给模型的环节指令。
@@ -500,7 +500,13 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
             theory_refs=list(theory_refs or []),
         )
 
-    async def _to_loop_result(self, context: LoopContext, output: BaseModel) -> LoopResult:
+    async def _to_loop_result(
+        self,
+        context: LoopContext,
+        output: BaseModel,
+        *,
+        model_degraded: bool = False,
+    ) -> LoopResult:
         # ②③ 的理论依据以调用方按检索证据算好的为准，**哪怕算出来是空的**：
         # "没有检索命中"必须表现为"没有理论引用"，不能回落到模型自由生成的名字，
         # 否则用户会看到一条无法追溯出处的理论依据。
@@ -544,6 +550,7 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
             guide=guide,
             next_stage=next_stage,
             next_stage_reason=next_reason,
+            model_degraded=model_degraded,
         )
 
     @staticmethod
@@ -586,6 +593,7 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
             },
             badge=await self._badge(context, []),
             guide=BehaviorGuide(kind="question", text=self._degraded_guide_text),
+            model_degraded=degraded,
         )
 
     async def _resolve_lead(self, context: LoopContext, to_stage: LoopStage) -> str:

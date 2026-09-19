@@ -34,6 +34,8 @@ def _container():
     return build_container(
         Settings(
             env="test",
+            # 刻意用本地占位模型（D1），故显式许可；否则启动前置校验拒绝装配。
+            allow_placeholder_llm=True,
             local_data_dir=str(DATA_DIR),
             local_registry_dir=str(DATA_DIR / "registry"),
             local_knowledge_dir=str(DATA_DIR / "knowledge"),
@@ -516,3 +518,35 @@ async def test_undecided_message_does_not_auto_advance_to_decide() -> None:
     assert await container.asset_service.list_versions(
         "no-auto-advance-user", AssetType.REPORT
     )
+
+
+@pytest.mark.asyncio
+async def test_placeholder_model_output_is_marked_in_the_reply() -> None:
+    """占位模型的产出必须在应答里显式说明（D1）。
+
+    本用例的容器用 `LocalOrMockLLM`（占位实现）：它产出**过契约校验**，所以既不会
+    走降级分支、也不会被门禁拦下。此前模型级降级标记在成功路径被丢弃，用户看到的
+    就是一份"看起来正常"的诊断结论。现在编排器必须把
+    `copies.json::notice.placeholder_output` 追加到应答里。
+    """
+    from zhiyin_api.dto.conversation import TaskEnterRequest
+    from zhiyin_business.ports.orchestrator import TurnRequest
+
+    container = _container()
+    session = await container.facade.enter_task(
+        "placeholder-notice-user", TaskEnterRequest(task_code="verify_direction")
+    )
+    turn = await container.orchestrator.handle_message(
+        TurnRequest(
+            user_id="placeholder-notice-user",
+            task_id=session.task_id,
+            message="想验证某方向行不行",
+        )
+    )
+
+    bundle = await container.registry_service.get_copy_bundle()
+    expected = bundle["notice.placeholder_output"]
+    assert expected, "占位提示文案必须存在于动态资源里"
+    texts = [m.text for m in turn.messages]
+    assert any(expected in text for text in texts), f"应答里没有占位提示：{texts}"
+

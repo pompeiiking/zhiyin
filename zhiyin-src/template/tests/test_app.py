@@ -17,6 +17,8 @@ def settings() -> Settings:
     data_dir = Path(__file__).resolve().parents[1] / "data"
     return Settings(
         env="test",
+        # 刻意用本地占位模型（D1），故显式许可；否则启动前置校验拒绝装配。
+        allow_placeholder_llm=True,
         local_registry_dir=str(data_dir / "registry"),
         local_knowledge_dir=str(data_dir / "knowledge"),
         local_object_dir=str(data_dir / "objects"),

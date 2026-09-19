@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from zhiyin_boot.container.gateways import build_gateways
-from zhiyin_boot.container.ports import MINIMUM_VIABLE
+from zhiyin_boot.container.ports import GATEWAY_PORTS, MINIMUM_VIABLE
 from zhiyin_boot.container.repositories import (
     build_feature_flags,
     build_repositories,
@@ -167,10 +167,32 @@ def build_container(settings: Optional[Settings] = None) -> Container:
 
 
 def assert_minimum_viable(container: Container) -> None:
-    """启动前置校验：缺任何一个最低可用部件都直接失败，别让服务带病启动。"""
+    """启动前置校验：缺任何一个最低可用部件都直接失败，别让服务带病启动。
+
+    除"缺部件"外还拦一类**看起来正常的病**：装上了占位模型（`LocalOrMockLLM`）
+    却没显式许可。占位实现能通过产出契约校验，产出的是结构合法但内容虚构的结果——
+    此前漏配 `ZHIYIN_USE_PAMI_LLM` 的环境会把这种产出当业务结果落库，而门禁、
+    装配报告与界面三处都不会报警。现在变成启动即失败（待决问题 D1）。
+
+    为什么不用"env 名字"判断：部署环境的 `ZHIYIN_ENV` 就是 `local`，按环境名放行
+    等于没有拦截。所以只有**显式**打开 `ZHIYIN_ALLOW_PLACEHOLDER_LLM` 才允许。
+    """
     missing = [name for name in MINIMUM_VIABLE if getattr(container, name, None) is None]
     if missing:
         raise RuntimeError(f"装配不完整，缺少必需部件：{missing}")
+
+    placeholders = [
+        name
+        for name in GATEWAY_PORTS
+        if getattr(type(getattr(container, name, None)), "IS_PLACEHOLDER", False)
+    ]
+    if placeholders and not container.settings.allow_placeholder_llm:
+        raise RuntimeError(
+            f"以下能力位装配了**占位实现**：{placeholders}。"
+            "占位产出结构合法但内容虚构，不得对外服务。"
+            "请配置真实模型（如 ZHIYIN_USE_PAMI_LLM=1），"
+            "或在本地/测试环境显式设置 ZHIYIN_ALLOW_PLACEHOLDER_LLM=1 表示知情使用。"
+        )
 
 
 def wire_application(container: Optional[Container] = None) -> Any:

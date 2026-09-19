@@ -123,6 +123,23 @@ async def test_all_stages_run(coordinator) -> None:
         assert "degraded" not in result.output, f"{stage} 产出被降级：{result.output}"
 
 
+async def test_success_path_carries_model_degraded(coordinator) -> None:
+    """成功路径也必须带上模型级降级标记（D1）。
+
+    回归点：`LocalOrMockLLM` 每次都返回 `LLMResult.degraded=True`，但产出**通过了**
+    契约校验，所以它既不走降级分支、也不被任何门禁拦下。此前 `result.degraded`
+    只在失败路径被塞进 `output`，成功路径直接丢弃——于是占位产出会被当真实资产落库，
+    而"看起来一切正常"。现在 `LoopResult.model_degraded` 在成功路径上也如实为 True。
+    """
+    context = await coordinator.start(_entry(LoopStage.COLLECT, "profile_analyst"))
+    result = await coordinator.run_stage(context, "我想做结构设计")
+
+    # 契约校验通过：不是降级产出
+    assert "degraded" not in result.output
+    # 但模型自述降级，必须如实透出，不能被丢掉
+    assert result.model_degraded is True
+
+
 # --------------------------------------------------------------------------
 # 可拆可续
 # --------------------------------------------------------------------------

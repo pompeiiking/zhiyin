@@ -179,6 +179,8 @@ async def test_phase3_container_keeps_authority_as_internal_extra(tmp_path: Path
         Settings(
             database_url=database_url,
             use_mysql=True,
+            # 本用例只验检索装配，未接真实模型；按 D1 需显式许可占位实现。
+            allow_placeholder_llm=True,
             use_pami_embedding=True,
             pami_base_url="http://127.0.0.1:8081",
             pami_embedding_model_id="test-model",

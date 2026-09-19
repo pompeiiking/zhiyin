@@ -49,6 +49,19 @@ class Settings:
     use_pgvector: bool = False
     use_minio: bool = False
 
+    # ---------- 占位实现的显式许可（默认拒绝，见待决问题 D1） ----------
+    allow_placeholder_llm: bool = False
+    """是否允许装配**占位模型**（`LocalOrMockLLM`）来提供服务。
+
+    默认 False：既不接真实模型、又没有显式许可时，服务**拒绝启动**。
+    理由：占位实现会产出结构合法但内容虚构的结果，此前漏配 `ZHIYIN_USE_PAMI_LLM`
+    的环境会把这种产出当业务结果落库，而门禁、装配报告与界面**都不会报警**。
+    写成显式开关而不是靠"env 名字"判断，是因为部署环境的 `ZHIYIN_ENV` 就是 `local`
+    （见 `deploy/compose.yaml`），按环境名放行等于没有拦截。
+
+    本地开发与 CI 需要占位实现时，显式设为 1。
+    """
+
     # ---------- pami 接入 ----------
     pami_base_url: str = ""
     # 旧的通用 Key 仅为兼容已有环境；Agent / RAG 同时启用时必须分别配置。
@@ -103,6 +116,7 @@ class Settings:
                 _env("ZHIYIN_REDIS_SOCKET_TIMEOUT_S", "2.0")
             ),
             use_pami_llm=_env_bool("ZHIYIN_USE_PAMI_LLM"),
+        allow_placeholder_llm=_env_bool("ZHIYIN_ALLOW_PLACEHOLDER_LLM"),
             use_pami_embedding=_env_bool("ZHIYIN_USE_PAMI_EMBEDDING"),
             use_pami_search=_env_bool("ZHIYIN_USE_PAMI_SEARCH"),
             use_pami_auth=_env_bool("ZHIYIN_USE_PAMI_AUTH"),

@@ -23,6 +23,8 @@ def settings() -> Settings:
     data_dir = template_root / "data"
     return Settings(
         env="test",
+        # 刻意用本地占位模型（D1），故显式许可；否则启动前置校验拒绝装配。
+        allow_placeholder_llm=True,
         local_data_dir=str(data_dir),
         local_registry_dir=str(data_dir / "registry"),
         local_knowledge_dir=str(data_dir / "knowledge"),
@@ -33,6 +35,43 @@ def settings() -> Settings:
 def test_container_builds(settings: Settings) -> None:
     container = build_container(settings)
     assert_minimum_viable(container)  # 不抛异常即为通过
+
+
+def test_placeholder_llm_is_refused_without_explicit_consent(settings: Settings) -> None:
+    """没接真实模型又没显式许可时，启动前置校验必须**拒绝启动**（D1）。
+
+    这是本轮唯一的 P0 安全项：占位实现能通过产出契约校验，产出的是"结构合法但内容
+    虚构"的结果。此前漏配 `ZHIYIN_USE_PAMI_LLM` 的环境会把这种产出当业务结果落库，
+    而门禁、装配报告与界面三处都不报警。现在变成启动即失败。
+    """
+    from dataclasses import replace
+
+    from zhiyin_boot import describe_assembly
+
+    # 显式关掉许可：默认就是关的，这里写明是为了让用例读起来自洽
+    strict = replace(settings, allow_placeholder_llm=False)
+    container = build_container(strict)
+
+    # 状态仍是 wired —— 它是完整实现，不是骨架；但必须被单独标成占位
+    report = describe_assembly(container)
+    assert report.gateways["llm"] == WIRED
+    assert report.placeholders == ["llm"]
+    # 对外提供虚构内容 → /healthz 必须降级
+    assert report.serves_fabricated_content is True
+
+    with pytest.raises(RuntimeError, match="占位实现"):
+        assert_minimum_viable(container)
+
+
+def test_placeholder_llm_allowed_with_explicit_consent(settings: Settings) -> None:
+    """显式许可后可以启动——本地开发与 CI 靠这一行（D1）。"""
+    from zhiyin_boot import describe_assembly
+
+    assert settings.allow_placeholder_llm is True
+    container = build_container(settings)
+    assert_minimum_viable(container)  # 不抛异常即为通过
+    # 但"允许启动"不等于"假装是真的"：占位标记照样如实上报
+    assert describe_assembly(container).placeholders == ["llm"]
 
 
 def test_orchestration_primitives_are_wired(settings: Settings) -> None:

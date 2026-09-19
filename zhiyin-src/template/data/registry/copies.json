@@ -176,6 +176,14 @@
       "status": "enabled",
       "sort_order": 35,
       "note": "同上"
+    },
+    {
+      "code": "notice.placeholder_output",
+      "text": "（本次内容由本地演示模型生成，仅用于联调，不作为诊断结论。）",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 36,
+      "note": "占位模型提示（待决问题 D1）。仅当模型自述降级（`LoopResult.model_degraded`）时由编排器追加到应答末尾；部署环境走真实 PAMI 模型，不会出现。文案属动态资源，改本文件不需要发版。"
     }
   ]
 }

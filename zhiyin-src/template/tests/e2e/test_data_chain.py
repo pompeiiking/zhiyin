@@ -26,6 +26,8 @@ def _container(tmp_path: Path):
     return build_container(
         Settings(
             env="test",
+            # 刻意用本地占位模型（D1），故显式许可；否则启动前置校验拒绝装配。
+            allow_placeholder_llm=True,
             local_data_dir=str(DATA_DIR),
             local_registry_dir=str(DATA_DIR / "registry"),
             local_knowledge_dir=str(DATA_DIR / "knowledge"),

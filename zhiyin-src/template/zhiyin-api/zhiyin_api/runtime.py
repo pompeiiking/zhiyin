@@ -38,6 +38,19 @@ class AssemblyReport:
     workers: dict[str, str] = field(default_factory=dict)
     missing: list[str] = field(default_factory=list)
     skeletons: list[str] = field(default_factory=list)
+    placeholders: list[str] = field(default_factory=list)
+    """装上了、但实现是**占位**的能力位（当前只会是 `llm`）。
+
+    与 `skeletons` / `missing` 是三件事：`missing` = 外壳都没有；`skeleton` = 外壳
+    有了但方法体没填；`placeholders` = 实现完整、能跑通产出契约，但**产出内容不是
+    真的**（例如按 Schema 合成结果的本地模型）。后者的危险在于它看起来一切正常，
+    所以必须单独成一类，不能混进 `wired`。
+    """
+
+    @property
+    def serves_fabricated_content(self) -> bool:
+        """是否在对外提供**虚构内容**（占位实现）。供 `/healthz` 降级使用。"""
+        return bool(self.placeholders)
 
     @property
     def healthy(self) -> bool:
@@ -69,6 +82,7 @@ class AssemblyReport:
             "workers": dict(self.workers),
             "missing": list(self.missing),
             "skeletons": list(self.skeletons),
+            "placeholders": list(self.placeholders),
         }
 
 

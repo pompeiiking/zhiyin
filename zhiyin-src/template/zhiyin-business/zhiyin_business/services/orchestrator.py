@@ -390,6 +390,17 @@ class DefaultOrchestrator(Orchestrator):
         where = f"进入{label}环节" if label else "进入下一个环节"
         return f"接下来{where}，由「{to_name}」接手继续帮助你：{decision.reason}"
 
+    async def _placeholder_notice(self) -> str:
+        """占位模型的应答提示；文案取自动态资源（AGENTS.md §8）。
+
+        取不到时返回空串——宁可少一行提示，也不在这里硬编码一句用户可见的话。
+        """
+        try:
+            bundle = await self._registry.get_copy_bundle()
+        except NotImplementedError:
+            return ""
+        return str(bundle.get("notice.placeholder_output", "")).strip()
+
     async def handle_message(self, request: TurnRequest) -> TurnResult:
         existing = await self._sessions.get(request.task_id)
         if existing is not None and existing.user_id != request.user_id:
@@ -507,6 +518,24 @@ class DefaultOrchestrator(Orchestrator):
                 theory_refs = list(getattr(output, "theory_refs", []))
             guide = loop_result.guide
             messages = list(loop_result.messages)
+
+        if loop_result.model_degraded:
+            # 模型自述降级（例如本地占位实现）：产出**通过了契约校验**，所以它既不会
+            # 走上面的降级分支、也不会被任何门禁拦下，但它并不是真实模型生成的结论。
+            # 此前这个标记在成功路径上被直接丢弃，于是"看起来正常的演示产出"会被当成
+            # 诊断结论——这正是待决问题 D1 要堵的坑。现在显式在应答里说明一次。
+            notice = await self._placeholder_notice()
+            if notice:
+                if messages:
+                    messages[-1] = messages[-1].model_copy(
+                        update={"text": f"{messages[-1].text}\n{notice}"}
+                    )
+                else:
+                    messages = [
+                        ConversationMessage(
+                            role="agent", text=notice, agent_id=session.lead_agent
+                        )
+                    ]
 
         # 交接口径：环节执行者按产出判定"本轮结束时是否需要交接"
         # （① 只有 ready_to_handoff=True 才交接，⑤ 按 next_handoff_stage 再入环）。

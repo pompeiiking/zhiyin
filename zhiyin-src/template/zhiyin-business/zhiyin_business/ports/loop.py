@@ -96,6 +96,15 @@ class LoopResult(BaseModel):
         default=None, description="非空表示本轮结束时需要交接"
     )
     next_stage_reason: str = ""
+    model_degraded: bool = Field(
+        default=False,
+        description=(
+            "模型层降级：产出虽然通过了契约校验，但模型自述走了降级"
+            "（例如本地占位实现）。**成功路径也必须带上它**——"
+            "此前只在失败路径把它塞进 output，成功路径直接丢弃，"
+            "于是占位产出会被当真实资产落库且无人知晓"
+        ),
+    )
 
 
 class LoopCoordinator(ABC):

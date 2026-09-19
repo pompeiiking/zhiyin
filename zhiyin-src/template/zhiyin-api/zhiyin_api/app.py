@@ -132,7 +132,10 @@ def _install_error_handlers(app: FastAPI) -> None:
     @app.get("/healthz", tags=["ops"], summary="装配健康检查")
     async def healthz() -> dict[str, Any]:
         report = get_runtime()
-        return {"status": "ok" if report.healthy else "degraded", "assembly": report.to_dict()}
+        # 占位实现（`placeholders` 非空）说明服务在对外提供**虚构内容**，
+        # 即使没有 not_wired 也必须报 degraded——否则漏配环境看起来一切正常。
+        ok = report.healthy and not report.serves_fabricated_content
+        return {"status": "ok" if ok else "degraded", "assembly": report.to_dict()}
 
 
 __all__ = ["create_app"]
