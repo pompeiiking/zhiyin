@@ -18,6 +18,7 @@ contracts
 scripts/*
 !scripts/verify_m3_runtime.py
 !scripts/run_mysql_contracts.py
+!scripts/sync_registry.py
 zhiyin-web/node_modules
 zhiyin-web/dist
 data/objects

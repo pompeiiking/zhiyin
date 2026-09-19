@@ -123,6 +123,26 @@ class PlanRole(str, Enum):
     FALLBACK = "fallback"  # 保底
 
 
+class DimensionEvidenceLevel(str, Enum):
+    """15 维单维的**证据充分度**等级（`ReportDimensionItem.tag`）。
+
+    只回答"这一维的结论有多少依据"，**不回答"这一维好不好"**。
+
+    为什么不做 0-100 分：PRD `FR-DIAG-001` 只要求"每维有结论与证据引用"，
+    没有任何评分口径；给分要么另立评分算法（第一期不做），要么由模型即兴编造，
+    后者会产出"看起来精确"的数字。而"有没有依据"是报告能自证、用户也能逐条核对的
+    事实，因此用它作为可上色的等级轴；细腻判断留给 `conclusion` / `evidence` 正文。
+
+    本枚举是"删掉前端臆造的 15 维分数"之后，为可视化需求提供的**如实替代**：
+    热力图按等级上色，不依赖任何数值。
+    """
+
+    CONFIRMED = "confirmed"  # 已确认：画像字段或检索证据直接支撑，可溯源
+    PARTIAL = "partial"      # 部分支撑：有支撑但证据链不完整（如字段有值、检索为空）
+    PENDING = "pending"      # 待验证：有线索，尚未确认
+    MISSING = "missing"      # 无依据：没有任何证据，结论仅为待验证假设
+
+
 class ReviewAttribution(str, Enum):
     """复盘归因判别结果（FR-REVIEW-002）。"""
 

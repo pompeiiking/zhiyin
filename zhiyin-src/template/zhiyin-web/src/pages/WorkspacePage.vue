@@ -655,21 +655,6 @@ onMounted(() => {
   color: var(--color-text-primary);
 }
 
-.swot-cell {
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-}
-
-.swot-cell b { display: inline-block; font-size: var(--font-size-xs); font-weight: 800; }
-.swot-cell em { float: right; font-style: normal; font-size: var(--font-size-xs); font-weight: 800; }
-.swot-cell p { margin: 8px 0 0; color: var(--color-text-secondary); font-size: var(--font-size-xs); line-height: 1.6; }
-
-.swot-cell.t-green b, .swot-cell.t-green em { color: var(--greenD); }
-.swot-cell.t-blue b, .swot-cell.t-blue em { color: var(--blueD); }
-.swot-cell.t-amber b, .swot-cell.t-amber em { color: var(--amber); }
-.swot-cell.t-red b, .swot-cell.t-red em { color: var(--red); }
-
 /* ============ 时间线 ============ */
 .wb-timeline {
   display: flex;

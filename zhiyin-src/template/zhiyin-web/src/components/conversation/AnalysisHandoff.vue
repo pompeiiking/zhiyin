@@ -82,8 +82,6 @@ function toReport() {
   transition: width var(--duration-base) var(--ease-standard);
 }
 
-.pct { flex: none; color: var(--blueD); font-size: var(--font-size-xs); }
-
 .act {
   flex: none;
   padding: 7px 15px;

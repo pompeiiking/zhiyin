@@ -49,11 +49,24 @@ from zhiyin_infrastructure.persistence.models import RegistryResourceRow  # noqa
 
 
 def desired_items(seed_dir: Path) -> dict[tuple[str, str], dict[str, Any]]:
-    """按唯一键收集 JSON 里期望存在的资源。"""
+    """按唯一键收集 JSON 里期望存在的资源。
+
+    **读不到就报错，不返回空集**：真实事故——把脚本拷到别处执行时
+    `REPO_ROOT` 解析错，seed 目录不存在，本函数静默返回空字典，
+    于是 101 行正常的库内数据全被报成"库中存在但 JSON 已无"，
+    看起来像严重的配置漂移，实际是脚本没读到文件。
+    """
+    if not seed_dir.is_dir():
+        raise FileNotFoundError(
+            f"动态资源目录不存在：{seed_dir}。请用 --seed-dir 指定，"
+            "或从仓库根目录执行本脚本"
+        )
     desired: dict[tuple[str, str], dict[str, Any]] = {}
+    missing_files: list[str] = []
     for kind, filename in SqlAlchemyRegistryRepository.FILES.items():
         path = seed_dir / filename
         if not path.is_file():
+            missing_files.append(filename)
             continue
         raw = json.loads(path.read_text(encoding="utf-8"))
         items = raw.get("items", []) if isinstance(raw, dict) else raw
@@ -62,6 +75,12 @@ def desired_items(seed_dir: Path) -> dict[tuple[str, str], dict[str, Any]]:
             if not key:
                 continue
             desired[(kind, key)] = item
+    if not desired:
+        raise ValueError(
+            f"{seed_dir} 下没有读到任何动态资源"
+            + (f"（缺失文件：{', '.join(missing_files)}）" if missing_files else "")
+            + "；拒绝按“全部下架”解读，请检查 --seed-dir 与 JSON 内容"
+        )
     return desired
 
 
@@ -145,7 +164,13 @@ def main() -> int:
     if args.apply and args.check:
         print("--apply 与 --check 不能同时使用")
         return 2
-    code = asyncio.run(sync(seed_dir=Path(args.seed_dir), apply=args.apply))
+    try:
+        code = asyncio.run(sync(seed_dir=Path(args.seed_dir), apply=args.apply))
+    except (FileNotFoundError, ValueError) as exc:
+        # 读不到动态资源时**必须显式失败**：静默返回空集会让正常的库内数据
+        # 全部被报成"库中存在但 JSON 已无"，把脚本自身的路径错误伪装成配置漂移。
+        print(f"[registry-sync] 无法读取动态资源：{exc}")
+        return 2
     if args.check:
         return code
     return 0 if code in (0, 1) else code

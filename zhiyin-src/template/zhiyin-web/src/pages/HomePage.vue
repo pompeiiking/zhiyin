@@ -246,11 +246,6 @@ async function selectTask(code: string) {
   font-size: 15px;
 }
 
-.btn-sm {
-  padding: 8px 16px;
-  font-size: 13px;
-}
-
 .btn[disabled] {
   opacity: 0.45;
   pointer-events: none;
@@ -485,17 +480,6 @@ async function selectTask(code: string) {
   font-weight: 700;
 }
 
-.hp-live {
-  margin-left: auto;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--greenD);
-  background: var(--greenSoft);
-  border: 1px solid var(--greenLine);
-  padding: 2px 9px;
-  border-radius: 999px;
-}
-
 .hp-msg {
   font-size: 13px;
   line-height: 1.65;
@@ -522,58 +506,6 @@ async function selectTask(code: string) {
 
 .hp-msg p {
   margin: 0;
-}
-
-.hp-progress {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-top: 14px;
-  padding-top: 13px;
-  border-top: 1px dashed var(--line);
-  font-size: 11.5px;
-  color: var(--gray);
-  font-weight: 600;
-}
-
-.hp-progress .bar {
-  flex: 1;
-  height: 6px;
-  background: var(--paper);
-  border-radius: 6px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-}
-
-.hp-progress .bar i {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--blue), var(--green));
-  border-radius: 6px;
-}
-
-.hp-progress b {
-  color: var(--blueD);
-  white-space: nowrap;
-}
-
-.mtag {
-  display: inline-block;
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--blueD);
-  background: var(--blueSoft);
-  border: 1px solid var(--blueLine);
-  padding: 2px 9px;
-  border-radius: 999px;
-  margin-bottom: 7px;
-  letter-spacing: 0.02em;
-}
-
-.mtag::before {
-  content: "依据 · ";
-  font-weight: 600;
-  color: #7fb3e8;
 }
 
 /* landing sections common */
@@ -697,48 +629,6 @@ async function selectTask(code: string) {
   border-radius: var(--pill);
   background: var(--paper);
   border: 1px solid var(--line);
-}
-
-.cat .sample {
-  background: var(--paper);
-  border: 1px dashed var(--line);
-  border-radius: 12px;
-  padding: 12px 14px;
-}
-
-.cat .sample-title {
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--blueD);
-  margin-bottom: 8px;
-  letter-spacing: 0.02em;
-}
-
-.cat .sample ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.cat .sample li {
-  font-size: 12px;
-  color: var(--gray);
-  padding-left: 12px;
-  position: relative;
-}
-
-.cat .sample li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 7px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--blue);
 }
 
 .cat .wb-action {

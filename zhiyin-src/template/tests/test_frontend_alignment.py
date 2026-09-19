@@ -314,3 +314,235 @@ def test_api_directory_is_documented(relative: str) -> None:
     assert Path(relative).name in WEB_README.read_text(encoding="utf-8"), (
         f"{relative} 没有写进《前端 README》§一 目录职责表"
     )
+
+
+# --- 死 CSS 守卫 -----------------------------------------------------------
+#
+# 这一节的来历：清除前端演示数据时，**删了标记却留下样式**，两轮共潜藏 600+ 行
+# 没有对应元素的 CSS（雷达图、维恩图、热力图、演示对话框…）。它不报错、不影响构建，
+# 只在后来人读代码时制造"这些功能存在"的错觉。症状是典型的"不报错的错"，
+# 因此变成机械可判。
+#
+# 判定一个类"被引用"的口径（**宁漏不误杀**，避免守卫逼人删真在用的样式）：
+#   1. 任意 `.vue` 模板里 `class="a b"` 的字面量（含**父组件给子组件根元素**加类）；
+#   2. 任意 `:class` 绑定里的对象键（`{ done: x }`）、字符串字面量，以及模板字面量的
+#      字面前缀（`:class="`is-${s.status}`"` → 放行 `is-` 开头的类）；
+#   3. **整条**字符串字面量恰好等于类名——覆盖 `:class="agent.theme"` 这类数据驱动取值。
+#      必须是整条相等：`'/app/track'` 不等于 `track`，所以 `.track` 仍会被判死；
+#   4. `:deep(...)` / `:slotted(...)` 里的类：那是**故意**伸进子组件的，父组件无权断言；
+#   5. `<Transition name="pop">` 对应的 `pop-enter-active` 等过渡类。
+#
+# 已知局限（宁可漏）：`.bar` 这类**跨组件同名**的共用类，只要有一个组件用了，
+# 另一个组件里的同名死规则就不会被发现。要覆盖它需要解析组件依赖图，收益不值当。
+
+_TRANSITION_NAMES = re.compile(r"<[Tt]ransition[^>]*\bname=\"([\w-]+)\"")
+_TRANSITION_SUFFIXES = (
+    "enter-from", "enter-active", "enter-to", "leave-from", "leave-active", "leave-to",
+)
+_TEMPLATE_LITERAL_PREFIX = re.compile(r"`([A-Za-z][\w-]*-)\$\{")
+_PSEUDO = re.compile(r"::?[a-zA-Z-]+(\([^)]*\))?")
+_COMBINATOR = re.compile(r"\s*[>+~]\s*|\s+")
+_COMMENT = re.compile(r"/\*.*?\*/", re.S)
+_CLASS_ATTR = re.compile(r'class="([^"]*)"')
+_IMPORT_VUE = re.compile(r"import\s+(\w+)\s+from\s+['\"][^'\"]*/([\w-]+)\.vue['\"]")
+_VUE_SOURCES = sorted(SRC.rglob("*.vue"))
+_SCRIPT_SOURCES = sorted(p for p in SRC.rglob("*") if p.suffix in {".ts", ".js"})
+
+# 需要按“父组件的 scoped 样式可以给子组件根元素加类”处理的标签名。
+_NATIVE_TAGS = {
+    "template", "div", "span", "p", "a", "ul", "ol", "li", "section", "header", "footer",
+    "main", "nav", "aside", "h1", "h2", "h3", "h4", "h5", "h6", "button", "input", "form",
+    "label", "select", "option", "textarea", "img", "svg", "path", "circle", "g", "line",
+    "polyline", "polygon", "text", "table", "thead", "tbody", "tr", "th", "td", "b", "i",
+    "em", "strong", "small", "code", "pre", "br", "hr", "dl", "dt", "dd", "figure",
+    "figcaption", "article", "time", "mark", "abbr", "blockquote", "transition",
+    "transition-group", "keep-alive", "teleport", "suspense", "component", "slot", "iframe",
+}
+
+
+def _template_of(text: str) -> str:
+    return text[: text.rindex("</template>")] if "</template>" in text else ""
+
+
+def _root_classes(text: str) -> frozenset[str]:
+    """组件模板里第一个带 `class` 的元素（其根元素）的类集合。"""
+    remainder = _COMMENT.sub("", _template_of(text))
+    match = re.search(r"<([A-Za-z][\w-]*)([^>]*)>", remainder)
+    while match:
+        classes = _CLASS_ATTR.search(match.group(2))
+        if classes:
+            return frozenset(classes.group(1).split())
+        # 必须真的把剩余串截短：`match.end()` 是相对当前剩余串的偏移，
+        # 拿它去切原串会让位置回退，在两个匹配点之间无限振荡。
+        remainder = remainder[match.end() :]
+        match = re.search(r"<([A-Za-z][\w-]*)([^>]*)>", remainder)
+    return frozenset()
+
+
+def _element_class_sets(text: str) -> list[frozenset[str]]:
+    return [frozenset(attr.split()) for attr in _CLASS_ATTR.findall(_template_of(text))]
+
+
+def _dynamic_classes(text: str) -> tuple[set[str], set[str]]:
+    """(动态类名, 动态类名前缀)——静态分析无从断言，一律放行。"""
+    names: set[str] = set()
+    prefixes: set[str] = set()
+    template = _template_of(text)
+    for binding in re.findall(r':class="([^"]*)"', template):
+        for obj in re.findall(r"\{([^}]*)\}", binding):
+            names.update(re.findall(r"([A-Za-z_][\w-]*)\s*:", obj))
+        names.update(re.findall(r"'([^'\n]*)'", binding))
+        prefixes.update(_TEMPLATE_LITERAL_PREFIX.findall(binding))
+    for transition in _TRANSITION_NAMES.findall(template):
+        names.update(f"{transition}-{suffix}" for suffix in _TRANSITION_SUFFIXES)
+    return names, prefixes
+
+
+def _global_string_literals() -> set[str]:
+    """全前端整条字符串字面量：`:class="agent.theme"` 这类数据驱动取值的来源。
+
+    必须是**整条相等**才算引用：`'/app/track'` 不等于 `track`，所以 `.track` 仍会被判死。
+    """
+    found: set[str] = set()
+    for path in _VUE_SOURCES + _SCRIPT_SOURCES:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        found.update(re.findall(r"'([^'\n]*)'", text))
+        found.update(re.findall(r'"([^"\n]*)"', text))
+    return found
+
+
+def _reachable_universe() -> dict[str, set[frozenset[str]]]:
+    """每个组件"自己的 scoped 样式可能命中的元素类集合"。
+
+    作用域口径：本项目所有 `<style>` 都是 `scoped`，所以父组件的规则只能命中
+    **自己模板里的元素**，以及**它渲染的子组件根元素**（Vue scoped 的既定行为）。
+    不能拿兄弟组件的模板来"证明"某个类还活着——那正是
+    `WorkspacePage` 里 11 条 `.swot-cell*` 死规则此前一直没被发现的原因。
+    """
+    texts: dict[Path, str] = {}
+    for path in _VUE_SOURCES:
+        texts[path] = path.read_text(encoding="utf-8")
+
+    by_stem = {path.stem: path for path in _VUE_SOURCES}
+    universe: dict[str, set[frozenset[str]]] = {}
+    for path, text in texts.items():
+        sets = set(_element_class_sets(text))
+        # `:deep(.x)` / `:slotted(.x)` 是**故意**伸进子组件的选择器，父组件确实能命中它。
+        if "<style" in text:
+            style = text[text.index("<style") : text.rindex("</style>")]
+            for arg in re.findall(r":(?:deep|slotted)\(([^)]*)\)", style):
+                for name in re.findall(r"\.(-?[A-Za-z_][\w-]*)", arg):
+                    sets.add(frozenset({name}))
+        script = text[: text.index("<template>")] if "<template>" in text else text
+        for _local, stem in _IMPORT_VUE.findall(script):
+            child = by_stem.get(stem)
+            if child is not None and child != path:
+                root = _root_classes(texts[child])
+                if root:
+                    sets.add(root)
+        universe[path.relative_to(WEB_ROOT).as_posix()] = sets
+    return universe
+
+
+def _iter_style_rules(style: str, base: int = 0):
+    """产出 (选择器, 删除起点, 删除终点)；能正确处理 `@media` 嵌套与注释。
+
+    删除起点取"上一条规则结束之后"，这样连同行间空行一起删掉，不留空段落。
+    """
+    cursor = 0
+    length = len(style)
+    while cursor < length:
+        brace = style.find("{", cursor)
+        if brace == -1:
+            return
+        raw_selector = _COMMENT.sub("", style[cursor:brace]).strip()
+        depth = 1
+        end = brace + 1
+        while end < length and depth:
+            if style[end] == "{":
+                depth += 1
+            elif style[end] == "}":
+                depth -= 1
+            end += 1
+        if raw_selector.startswith("@"):
+            yield from _iter_style_rules(style[brace + 1 : end - 1], base + brace + 1)
+        elif raw_selector:
+            yield raw_selector, base + cursor, base + end
+        cursor = end
+
+
+def _selector_is_reachable(
+    selector: str,
+    element_sets: set[frozenset[str]],
+    dynamic: set[str],
+    prefixes: set[str],
+) -> bool:
+    """**逗号列表里的任一分支**可能命中真实元素即为可达。
+
+    单条分支再逐"复合部分"（空格/`>`/`+`/`~` 分隔）判定：没有类名的部分（纯标签、`*`）
+    恒可满足；含动态类名的部分无法静态断言，放行；否则要求某个真实元素的类集合
+    **包含**该部分的全部类名——`.heat-cell.strong` 这类"每个类名各自有人用、组合却没人用"
+    的规则正是在这一步被检出。
+    """
+    for alternative in selector.split(","):
+        reachable = True
+        for part in _COMBINATOR.split(alternative.strip()):
+            classes = set(re.findall(r"\.(-?[A-Za-z_][\w-]*)", part))
+            if not classes:
+                continue
+            if any(name in dynamic for name in classes):
+                continue
+            if any(name.startswith(prefix) for name in classes for prefix in prefixes):
+                continue
+            if not any(classes <= element_set for element_set in element_sets):
+                reachable = False
+                break
+        if reachable:
+            return True
+    return False
+
+
+def orphan_css_rules() -> list[tuple[str, str, int, int]]:
+    """全前端"本组件里无人能命中"的样式规则。
+
+    → [(相对路径, 选择器, 删除起点, 删除终点)]，偏移相对于文件内 `<style>` 之后，
+    供修复脚本直接切片删除（测试只关心它是否为空）。
+    """
+    global_strings = _global_string_literals()
+    universe = _reachable_universe()
+    orphans: list[tuple[str, str, int, int]] = []
+    for path in _VUE_SOURCES:
+        text = path.read_text(encoding="utf-8")
+        if "<style" not in text or "<template>" not in text:
+            continue
+        relative = path.relative_to(WEB_ROOT).as_posix()
+        element_sets = set(universe.get(relative, set()))
+        dynamic, prefixes = _dynamic_classes(text)
+        dynamic |= global_strings
+        style_start = text.index("<style")
+        style = text[style_start : text.rindex("</style>")]
+        for selector, start, end in _iter_style_rules(style):
+            if _selector_is_reachable(selector, element_sets, dynamic, prefixes):
+                continue
+            orphans.append((relative, selector, start, end))
+    return orphans
+
+
+def test_no_orphan_css_classes_in_components() -> None:
+    """组件 `<style scoped>` 里不得留下**本组件没有任何元素能命中**的规则。
+
+    症状是"删了元素忘了删样式"：不报错、不影响构建，但会让后来人以为功能还在。
+    判定口径见 `_reachable_universe` / `_selector_is_reachable` 的注释。
+    出现红时按此二选一：**要么删样式，要么在判定口径里说明它为什么算可达**
+    （例如由动态类名前缀生成、或属于 `:deep()` 伸入的子组件）。
+    不要靠放宽本守卫来变绿。
+    """
+    orphans = orphan_css_rules()
+    assert not orphans, (
+        "以下 CSS 规则在本组件内没有任何元素能命中，疑似删除元素后遗留的死样式：\n  "
+        + "\n  ".join(f"{path}  {selector}" for path, selector, _, _ in orphans)
+    )
+
+
+
+

@@ -11,7 +11,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from zhiyin_kernel.enums import PlanRole
+from zhiyin_kernel.enums import DimensionEvidenceLevel, PlanRole
 
 
 class Verdict(BaseModel):
@@ -35,13 +35,21 @@ class Swot(BaseModel):
 
 
 class ReportDimensionItem(BaseModel):
-    """15 维中的单维。"""
+    """15 维中的单维。
+
+    `tag` 原为自由字符串，实测模型产出 11 种措辞（已确认/待验证/未定义/缺失/
+    待确认/部分匹配/无依据/严重不足/未知/低/未建立），既无法上色，也把
+    "证据够不够"和"这一维好不好"两件事混在一句里。现收紧为**证据充分度**闭合枚举，
+    让热力图有稳定的等级轴，并约束模型只能在这四档里选。
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     index: int
     name: str
-    tag: str = Field(description="维度标签，如优势/短板/待验证")
+    tag: DimensionEvidenceLevel = Field(
+        description="证据充分度等级，只能取 confirmed/partial/pending/missing"
+    )
     conclusion: str
     evidence: str = Field(description="证据引用，必须可溯源")
 

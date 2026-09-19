@@ -256,6 +256,54 @@ async def test_contract_schema_comes_from_registry_when_present(sessions, regist
     assert "guide" in schema.get("properties", {})
 
 
+async def test_dimension_tag_is_a_closed_enum_not_free_text(sessions, registry) -> None:
+    """15 维的 `tag` 必须是闭合枚举，且这个约束要真的进到模型的 Schema 里。
+
+    背景：`tag` 原为自由字符串，实测模型产出 11 种措辞（已确认/待验证/未定义/缺失/
+    待确认/部分匹配/无依据/严重不足/未知/低/未建立）。它对前端有两个后果：
+    既无法上色（没有稳定取值集合），又把"证据够不够"与"这一维好不好"混在一句里。
+    收敛成 `DimensionEvidenceLevel` 四档后，本测试锁三件事：
+    1. 非法自由串被拒（否则收紧无效）；
+    2. Schema 里以 enum 形式暴露（否则模型不受约束，只是后端事后报错）；
+    3. 四档取值稳定（改枚举就是改契约，必须让本测试红）。
+    """
+    from pydantic import ValidationError
+
+    from zhiyin_kernel.assets import ReportDimensionItem
+    from zhiyin_kernel.enums import DimensionEvidenceLevel
+
+    assert [level.value for level in DimensionEvidenceLevel] == [
+        "confirmed",
+        "partial",
+        "pending",
+        "missing",
+    ]
+
+    for level in DimensionEvidenceLevel:
+        item = ReportDimensionItem(
+            index=1, name="职业兴趣", tag=level, conclusion="结论", evidence="依据"
+        )
+        # 落到 DTO/JSON 里必须是字符串值，前端才能直接比对
+        assert item.model_dump(mode="json")["tag"] == level.value
+
+    for bad in ("已确认", "优势", "confirmed "):
+        with pytest.raises(ValidationError):
+            ReportDimensionItem(
+                index=1, name="职业兴趣", tag=bad, conclusion="结论", evidence="依据"
+            )
+
+    # 模型实际收到的是模型自省生成的 Schema（output_contracts.json 的 json_schema 为空）
+    spec = await registry.get_output_contract("career_advisor", LoopStage.DIAGNOSE)
+    assert spec is not None and spec.json_schema == {}
+    coord = AgentDrivenLoopCoordinator(ContractAgentEngine(LocalOrMockLLM()), sessions, registry)
+    context = await coord.start(_entry(LoopStage.DIAGNOSE, "career_advisor"))
+    schema = await coord._output_schema(context)
+    tag_schema = schema["$defs"]["ReportDimensionItem"]["properties"]["tag"]
+    level_def = schema["$defs"]["DimensionEvidenceLevel"]
+    assert tag_schema["$ref"].endswith("DimensionEvidenceLevel")
+    assert level_def["enum"] == ["confirmed", "partial", "pending", "missing"]
+
+
 async def test_contract_lookup_is_per_stage_not_per_agent(sessions, registry) -> None:
     """同一个智能体在不同环节必须取到不同的契约。
 

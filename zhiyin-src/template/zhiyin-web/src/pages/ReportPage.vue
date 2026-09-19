@@ -75,6 +75,33 @@ interface DimensionGroup {
   items: DimensionItem[]
 }
 
+// 15 维的 `tag` 是内核冻结枚举 `DimensionEvidenceLevel`（英文值），
+// 这里按既有 `ROLE_LABELS` 的做法映射为中文显示名。枚举本身是契约的一部分，
+// 显示名与枚举同步冻结，所以放在代码里而不是动态资源——放注册表反而会让
+// 文案与契约漂移（改了契约不改注册表，界面就会显示不存在的等级）。
+const LEVEL_LABELS: Record<string, string> = {
+  confirmed: '已确认',
+  partial: '部分支撑',
+  pending: '待验证',
+  missing: '无依据',
+}
+
+// 分组码同样是内核 `ReportDimensionGroup.group` 的冻结字面量。
+// 此前报告页把 `SELF-PORTRAIT` 直接当标题显示给用户，这里一并修正。
+const GROUP_LABELS: Record<string, string> = {
+  'SELF-PORTRAIT': '自我画像',
+  'JOB-MARKET': '职业环境',
+  'DECISION-RISK': '决策与风险',
+}
+
+function levelLabel(tag: string): string {
+  return LEVEL_LABELS[tag] ?? tag
+}
+
+function groupLabel(group: string): string {
+  return GROUP_LABELS[group] ?? group
+}
+
 const dimensionGroups = computed<DimensionGroup[]>(() =>
   sections.value
     .filter((item) => String(item.id).startsWith('dimension-'))
@@ -95,6 +122,41 @@ const dimensionGroups = computed<DimensionGroup[]>(() =>
     })
     .filter((group) => group.items.length > 0),
 )
+
+/**
+ * 15 维证据覆盖热力图的数据。
+ *
+ * 为什么是"证据覆盖"而不是"能力高低"：PRD `FR-DIAG-001` 只要求每维有结论与证据引用，
+ * 没有任何评分口径。此前用前端硬编码的 0-100 分画雷达图，那是编造数据；
+ * 现在按内核枚举 `DimensionEvidenceLevel` 上色，展示的是报告真的能自证的东西——
+ * 每一维有多少依据。没有依据的维度会被显眼标出，正好引导用户回①补采（FR-DIAG-006）。
+ */
+const heatCells = computed(() =>
+  dimensionGroups.value.flatMap((group) =>
+    group.items.map((item) => ({
+      key: `${group.id}-${item.name}`,
+      group: groupLabel(group.group),
+      name: item.name,
+      tag: item.tag,
+      level: levelLabel(item.tag),
+      detail: item.conclusion,
+      evidence: item.evidence,
+    })),
+  ),
+)
+
+/** 证据覆盖统计：让"这份诊断有多少是靠得住的"变成可核对的数字。 */
+const heatSummary = computed(() => {
+  const total = heatCells.value.length
+  const count = (level: string) => heatCells.value.filter((cell) => cell.tag === level).length
+  return {
+    total,
+    confirmed: count('confirmed'),
+    partial: count('partial'),
+    pending: count('pending'),
+    missing: count('missing'),
+  }
+})
 
 interface PlanGap {
   requirement: string
@@ -302,6 +364,39 @@ onMounted(() => {
             </div>
           </section>
 
+          <!-- 15 维证据覆盖热力图（§4.4 数据可视化）。
+               上色依据是内核枚举 DimensionEvidenceLevel「证据充分度」，不是能力分数：
+               PRD FR-DIAG-001 只要求每维有结论与证据引用，没有任何评分口径。
+               悬停任一格显示该维的结论与证据；明细列表保留在下方。 -->
+          <section v-if="heatCells.length" id="heatmap" class="rp-block rp-heat">
+            <div class="rp-block-head">
+              <h2 class="rp-block-title">15 维证据覆盖</h2>
+              <span class="rp-block-method">
+                共 {{ heatSummary.total }} 维 · 已确认 {{ heatSummary.confirmed }} ·
+                部分支撑 {{ heatSummary.partial }} · 待验证 {{ heatSummary.pending }} ·
+                无依据 {{ heatSummary.missing }}
+              </span>
+            </div>
+
+            <ul class="heat-grid">
+              <li
+                v-for="cell in heatCells"
+                :key="cell.key"
+                class="heat-cell"
+                :class="`is-${cell.tag}`"
+                :title="`${cell.name}（${cell.level}）\n${cell.detail}\n依据：${cell.evidence}`"
+              >
+                <span class="heat-name">{{ cell.name }}</span>
+                <span class="heat-level">{{ cell.level }}</span>
+              </li>
+            </ul>
+
+            <p class="heat-note">
+              「无依据」表示这一维还没有任何画像字段或检索证据支撑，结论只作待验证假设。
+              补上对应信息后重跑诊断，该维等级会随之变化。
+            </p>
+          </section>
+
           <section
             v-for="group in dimensionGroups"
             :id="group.id"
@@ -309,14 +404,14 @@ onMounted(() => {
             class="rp-block"
           >
             <div class="rp-block-head">
-              <h2 class="rp-block-title">{{ group.group }}</h2>
+              <h2 class="rp-block-title">{{ groupLabel(group.group) }}</h2>
               <span v-if="group.method" class="rp-block-method">{{ group.method }}</span>
             </div>
             <ul class="rp-items">
               <li v-for="(item, index) in group.items" :key="index" class="rp-item">
                 <div class="rp-item-head">
                   <b class="rp-item-name">{{ item.name }}</b>
-                  <span v-if="item.tag" class="rp-item-tag">{{ item.tag }}</span>
+                  <span v-if="item.tag" class="rp-item-tag">{{ levelLabel(item.tag) }}</span>
                 </div>
                 <p class="rp-item-text">{{ item.conclusion }}</p>
                 <p v-if="item.evidence" class="rp-item-evidence">依据：{{ item.evidence }}</p>
@@ -454,26 +549,12 @@ onMounted(() => {
   gap: var(--space-4);
   min-width: 0;
 }
-.chip.strong { border-color: var(--greenLine); background: var(--greenSoft); color: var(--greenD); }
-.chip.option { border-color: var(--blueLine); background: var(--blueSoft); color: var(--blueD); }
-.chip.gap { border-color: var(--amberLine); background: var(--amberSoft); color: var(--amber); }
 .chip.risk { border-color: var(--redLine); background: var(--redSoft); color: var(--red); }
-.dim-track i.strong { background: linear-gradient(90deg, var(--green), var(--greenD)); }
-.dim-track i.option { background: linear-gradient(90deg, var(--blue), var(--blueD)); }
-.dim-track i.gap { background: linear-gradient(90deg, var(--amberLine), var(--amber)); }
-.dim-track i.risk { background: linear-gradient(90deg, #e8a090, var(--red)); }
-.dim-score.strong { color: var(--greenD); }
-.dim-score.option { color: var(--blueD); }
-.dim-score.gap { color: var(--amber); }
 .dim-score.risk { color: var(--red); }
 .heat-cell.strong { background: var(--greenSoft); border: 1px solid var(--greenLine); }
-.heat-cell.strong .heat-score { color: var(--greenD); }
 .heat-cell.option { background: var(--blueSoft); border: 1px solid var(--blueLine); }
-.heat-cell.option .heat-score { color: var(--blueD); }
 .heat-cell.gap { background: var(--amberSoft); border: 1px solid var(--amberLine); }
-.heat-cell.gap .heat-score { color: var(--amber); }
 .heat-cell.risk { background: var(--redSoft); border: 1px solid var(--redLine); }
-.heat-cell.risk .heat-score { color: var(--red); }
 
 /* 综合结论：深色 verdict 卡 + SWOT 四象限 */
 .rp-verdict {
@@ -513,13 +594,6 @@ onMounted(() => {
 .swot-cell b { display: block; margin-bottom: var(--space-2); font-size: var(--font-size-xs); letter-spacing: 0.06em; }
 .swot-cell ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .swot-cell li { padding: 2px 10px; border-radius: var(--radius-pill); background: rgba(255, 255, 255, 0.1); font-size: var(--font-size-xs); }
-.dir-table td.recommended, .dir-table th.recommended { background: var(--greenSoft); }
-.dir-table td.recommended strong { color: var(--greenD); }
-.clover-items .track { height: 8px; border-radius: var(--radius-pill); background: var(--color-bg); overflow: hidden; }
-.clover-items .track i { display: block; height: 100%; border-radius: inherit; }
-.c-int .track i { background: var(--blue); }
-.c-skill .track i { background: var(--green); }
-.c-val .track i { background: var(--amber); }
 
 .rp-empty {
   margin: 0;
@@ -554,8 +628,7 @@ onMounted(() => {
 @media print {
   .rp-actions,
   .rp-notice,
-  .rp-layout > :first-child,
-  .rp-strip {
+  .rp-layout > :first-child {
     display: none !important;
   }
 
@@ -591,4 +664,37 @@ onMounted(() => {
 .rp-tasks li.done { color: var(--muted); text-decoration: line-through; }
 .rp-task-mark { flex: none; color: var(--greenD); font-weight: 800; }
 .rp-task-due { margin-left: auto; color: var(--muted); white-space: nowrap; }
+
+/* 15 维证据覆盖热力图。色阶按内核枚举 DimensionEvidenceLevel 的四档，
+   从"证据充分"到"无依据"逐级变浅/转红，不表达能力好坏。 */
+.heat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.heat-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-left-width: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  cursor: help;
+}
+.heat-name { font-size: var(--font-size-xs); font-weight: 700; color: var(--color-text-primary); }
+.heat-level { font-size: var(--font-size-xs); font-weight: 700; }
+.heat-cell.is-confirmed { border-left-color: var(--greenD); background: var(--greenSoft); }
+.heat-cell.is-confirmed .heat-level { color: var(--greenD); }
+.heat-cell.is-partial { border-left-color: var(--blueD); background: var(--blueSoft); }
+.heat-cell.is-partial .heat-level { color: var(--blueD); }
+.heat-cell.is-pending { border-left-color: var(--amber); background: var(--amberSoft); }
+.heat-cell.is-pending .heat-level { color: var(--amber); }
+.heat-cell.is-missing { border-left-color: var(--red); background: var(--redSoft); }
+.heat-cell.is-missing .heat-level { color: var(--red); }
+.heat-note { margin: var(--space-3) 0 0; color: var(--color-text-muted); font-size: var(--font-size-xs); line-height: 1.7; }
 </style>
