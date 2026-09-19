@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { PipelineCardView } from '@/api/schema'
+import TheoryTag from './TheoryTag.vue'
 
 const props = defineProps<{ card: PipelineCardView; index: number; leadName?: string }>()
 
@@ -70,15 +71,16 @@ function hint(index: number) {
             <dd>{{ display(item[1]) }}</dd>
           </template>
         </dl>
+        <button v-if="open === 'output'" type="button" class="detail-link">查看明细 →</button>
       </div>
 
       <div v-if="card.theory_models?.length" class="mode">
         <button type="button" class="mode-head" :aria-expanded="open === 'theory'" @click="toggle('theory')">
           理论模型 <span aria-hidden="true">{{ open === 'theory' ? '−' : '＋' }}</span>
         </button>
-        <ul v-if="open === 'theory'" class="theory-list">
-          <li v-for="(item, itemIndex) in card.theory_models" :key="itemIndex">{{ String(item.name ?? item.title ?? display(item)) }}</li>
-        </ul>
+        <div v-if="open === 'theory'" class="theory-list">
+          <TheoryTag v-for="(item, itemIndex) in card.theory_models" :key="itemIndex" :theory="item" />
+        </div>
       </div>
 
       <div v-if="card.evaluation" class="mode">
@@ -184,7 +186,6 @@ function hint(index: number) {
   margin-top: var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-bg);
-  overflow: hidden;
 }
 
 .mode-head {
@@ -227,19 +228,32 @@ dt {
 
 dd {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   border-bottom: 1px solid var(--color-border);
   padding-bottom: var(--space-1);
 }
 
 .theory-list {
-  margin: 0;
-  padding: 0 var(--space-3) var(--space-3) var(--space-8);
-  font-size: var(--font-size-xs);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 var(--space-3) var(--space-3);
 }
 
-.theory-list li {
-  border-bottom: 1px solid var(--color-border);
-  padding-block: var(--space-1);
+.detail-link {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--color-link);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.detail-link:hover {
+  color: var(--color-brand-strong);
 }
 </style>

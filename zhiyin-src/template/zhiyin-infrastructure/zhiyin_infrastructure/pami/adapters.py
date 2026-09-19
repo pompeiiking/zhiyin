@@ -16,16 +16,14 @@ import httpx
 from zhiyin_data_sdk.errors import UnavailableError, ValidationError
 from zhiyin_data_sdk.gateways.ai import (
     EmbedGateway,
-    KnowledgeGateway,
-    KnowledgeHit,
     LLMGateway,
     LLMMessage,
     LLMResult,
     SearchGateway,
-    SearchHit,
 )
 from zhiyin_data_sdk.gateways.security import AuthGateway, AuthPrincipal
 from zhiyin_kernel.enums import UserRole
+from zhiyin_kernel.retrieval import RetrievalEvidence, RetrievalQuery
 
 
 def _clean_base_url(base_url: str) -> str:
@@ -270,12 +268,12 @@ class PamiEmbedGateway(EmbedGateway):
         return normalized
 
 
-def _knowledge_hits(body: dict[str, Any], *, namespace: str | None) -> list[KnowledgeHit]:
+def _search_hits(body: dict[str, Any], request: RetrievalQuery) -> list[RetrievalEvidence]:
     data = body.get("data") if isinstance(body.get("data"), dict) else {}
     raw_hits = data.get("searchList") or body.get("search_list") or []
     if not isinstance(raw_hits, list):
         return []
-    hits: list[KnowledgeHit] = []
+    hits: list[RetrievalEvidence] = []
     for index, item in enumerate(raw_hits):
         if not isinstance(item, dict):
             continue
@@ -286,23 +284,26 @@ def _knowledge_hits(body: dict[str, Any], *, namespace: str | None) -> list[Know
             f"{knowledge_base}\0{title}\0{snippet}".encode("utf-8")
         ).hexdigest()[:24]
         hits.append(
-            KnowledgeHit(
-                doc_id=f"pami:{stable or index}",
+            RetrievalEvidence(
+                evidence_id=f"pami:{stable or index}",
+                namespace=request.namespace,
+                source_id=str(item.get("source_id") or item.get("doc_id") or ""),
+                source_url=str(item.get("source_url") or item.get("url") or ""),
                 title=title,
-                snippet=snippet,
+                content=snippet or title,
                 score=float(item.get("score") or 0.0),
                 metadata={
                     "provider": "pami-rag",
                     "knowledge_base": knowledge_base,
-                    "namespace": namespace or "",
+                    "namespace": request.namespace.value,
                 },
             )
         )
     return hits
 
 
-class PamiKnowledgeGateway(KnowledgeGateway):
-    """通过已发布 PAMI RAG 应用检索知识。"""
+class PamiSearchGateway(SearchGateway):
+    """通过已发布 PAMI RAG 应用提供统一检索。"""
 
     IMPLEMENTATION_STATUS = "wired"
 
@@ -315,57 +316,24 @@ class PamiKnowledgeGateway(KnowledgeGateway):
         client: httpx.AsyncClient | None = None,
     ) -> None:
         if not api_key.strip():
-            raise ValueError("启用 PAMI Knowledge 时必须配置应用 API Key")
+            raise ValueError("启用 PAMI Search 时必须配置 RAG 应用 API Key")
         self._http = _PamiHttp(
             base_url, credential=api_key, timeout_s=timeout_s, client=client
         )
 
-    async def search(
-        self,
-        query: str,
-        *,
-        top_k: int = 5,
-        namespace: Optional[str] = None,
-        filters: Optional[dict[str, Any]] = None,
-    ) -> list[KnowledgeHit]:
-        if filters:
+    async def search(self, request: RetrievalQuery) -> list[RetrievalEvidence]:
+        if request.filters:
             raise UnavailableError("PAMI RAG OpenAPI 不支持调用方 metadata filters")
+        if request.mode == "vector":
+            raise UnavailableError("PAMI RAG OpenAPI 不接受调用方提供的裸向量")
         body = await self._http.request(
             "POST",
             "/service/api/openapi/v1/rag/chat",
             # 实际知识范围由 API Key 所绑定的 RAG 应用决定；不能把 namespace
             # 拼入自然语言后冒充服务端隔离。namespace 只作为命中来源标签返回。
-            payload={"query": query, "stream": False},
+            payload={"query": request.query, "stream": False},
         )
-        return _knowledge_hits(body, namespace=namespace)[: max(top_k, 0)]
-
-
-class PamiSearchGateway(SearchGateway):
-    """把 PAMI RAG 命中映射为统一 SearchGateway。"""
-
-    IMPLEMENTATION_STATUS = "wired"
-
-    def __init__(self, knowledge: PamiKnowledgeGateway) -> None:
-        self._knowledge = knowledge
-
-    async def keyword(self, query: str, *, top_k: int = 10) -> list[SearchHit]:
-        hits = await self._knowledge.search(query, top_k=top_k)
-        return [
-            SearchHit(
-                id=hit.doc_id,
-                content=hit.snippet or hit.title,
-                score=hit.score,
-                metadata=hit.metadata,
-            )
-            for hit in hits
-        ]
-
-    async def vector(self, embedding: list[float], *, top_k: int = 10) -> list[SearchHit]:
-        del embedding, top_k
-        raise UnavailableError("PAMI RAG OpenAPI 不接受调用方提供的裸向量")
-
-    async def hybrid(self, query: str, *, top_k: int = 10) -> list[SearchHit]:
-        return await self.keyword(query, top_k=top_k)
+        return _search_hits(body, request)[: request.top_k]
 
 
 def _request_headers(request: dict[str, Any]) -> dict[str, str]:
@@ -446,7 +414,6 @@ class PamiAuthGateway(AuthGateway):
 __all__ = [
     "PamiAuthGateway",
     "PamiEmbedGateway",
-    "PamiKnowledgeGateway",
     "PamiLLMGateway",
     "PamiSearchGateway",
 ]

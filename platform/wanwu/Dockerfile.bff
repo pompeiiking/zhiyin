@@ -1,0 +1,16 @@
+ARG WANWU_ARCH=amd64
+
+FROM --platform=linux/${WANWU_ARCH} golang:1.22.12-bookworm AS builder
+ARG WANWU_ARCH
+WORKDIR /app
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${WANWU_ARCH} \
+    go build -mod=mod -o /app/bin/bff-service ./cmd/bff-service
+
+FROM --platform=linux/${WANWU_ARCH} golang:1.22-alpine
+ARG WANWU_ARCH
+WORKDIR /app
+COPY configs/microservice/bff-service ./configs/microservice/bff-service
+COPY --from=builder /app/bin/bff-service ./bin/bff-service
+EXPOSE 6668
+CMD ["./bin/bff-service"]

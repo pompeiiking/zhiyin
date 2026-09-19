@@ -10,18 +10,19 @@ import pytest
 from zhiyin_boot.container.gateways import build_gateways
 from zhiyin_boot.settings import Settings
 from zhiyin_infrastructure.local.auth import DefaultPassAuth
-from zhiyin_infrastructure.local.knowledge import LocalKnowledgeRepo
+from zhiyin_infrastructure.local.knowledge import LocalSearchGateway
 from zhiyin_infrastructure.local.llm import LocalOrMockLLM
 from zhiyin_infrastructure.pami.adapters import (
     PamiAuthGateway,
     PamiEmbedGateway,
-    PamiKnowledgeGateway,
     PamiLLMGateway,
     PamiSearchGateway,
 )
 from zhiyin_data_sdk.errors import UnavailableError
 from zhiyin_data_sdk.gateways.ai import LLMMessage
 from zhiyin_kernel.enums import UserRole
+from zhiyin_kernel.enums import RetrievalNamespace
+from zhiyin_kernel.retrieval import RetrievalQuery
 
 
 TEMPLATE_ROOT = Path(__file__).resolve().parents[1]
@@ -40,7 +41,7 @@ def test_default_gateway_wiring_remains_local(monkeypatch: pytest.MonkeyPatch) -
     for name in (
         "ZHIYIN_USE_PAMI_LLM",
         "ZHIYIN_USE_PAMI_EMBEDDING",
-        "ZHIYIN_USE_PAMI_KNOWLEDGE",
+        "ZHIYIN_USE_PAMI_SEARCH",
         "ZHIYIN_USE_PAMI_AUTH",
     ):
         monkeypatch.delenv(name, raising=False)
@@ -48,7 +49,7 @@ def test_default_gateway_wiring_remains_local(monkeypatch: pytest.MonkeyPatch) -
     gateways = build_gateways(Settings.from_env())
 
     assert isinstance(gateways["llm"], LocalOrMockLLM)
-    assert isinstance(gateways["knowledge"], LocalKnowledgeRepo)
+    assert isinstance(gateways["search"], LocalSearchGateway)
     assert isinstance(gateways["auth"], DefaultPassAuth)
 
 
@@ -79,7 +80,7 @@ async def test_pami_agent_adapter_maps_conversation_and_structured_result() -> N
 
 
 @pytest.mark.asyncio
-async def test_pami_rag_maps_knowledge_and_search_hits() -> None:
+async def test_pami_rag_maps_unified_search_hits() -> None:
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
@@ -95,22 +96,29 @@ async def test_pami_rag_maps_knowledge_and_search_hits() -> None:
         )
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        knowledge = PamiKnowledgeGateway(
-            "http://nginx:8081", "api-key", client=client
+        search = PamiSearchGateway("http://nginx:8081", "api-key", client=client)
+        hits = await search.search(
+            RetrievalQuery(
+                query="职业兴趣", namespace=RetrievalNamespace.THEORY,
+                mode="keyword"
+            )
         )
-        hits = await knowledge.search("职业兴趣", namespace="theory")
-        search_hits = await PamiSearchGateway(knowledge).keyword("职业兴趣")
 
     assert hits[0].metadata["provider"] == "pami-rag"
     assert hits[0].metadata["namespace"] == "theory"
-    assert search_hits[0].content == "兴趣理论"
+    assert hits[0].content == "兴趣理论"
 
 
 @pytest.mark.asyncio
 async def test_pami_search_rejects_raw_vector_explicitly() -> None:
-    knowledge = PamiKnowledgeGateway("http://nginx:8081", "api-key")
+    search = PamiSearchGateway("http://nginx:8081", "api-key")
     with pytest.raises(UnavailableError, match="裸向量"):
-        await PamiSearchGateway(knowledge).vector([0.0] * 1024)
+        await search.search(
+            RetrievalQuery(
+                query="职业兴趣", namespace=RetrievalNamespace.THEORY,
+                mode="vector"
+            )
+        )
 
 
 @pytest.mark.asyncio

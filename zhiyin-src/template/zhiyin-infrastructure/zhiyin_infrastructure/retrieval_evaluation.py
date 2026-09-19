@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from zhiyin_data_sdk.gateways.ai import SearchGateway
+from zhiyin_kernel.enums import RetrievalNamespace
+from zhiyin_kernel.retrieval import RetrievalQuery
 
 
 async def evaluate_retrieval(
@@ -19,8 +21,15 @@ async def evaluate_retrieval(
     details: list[dict[str, Any]] = []
     for case in cases:
         expected = {str(value) for value in case.get("expected_ids", [])}
-        hits = await search.hybrid(str(case["query"]), top_k=top_k)
-        actual = [hit.id for hit in hits]
+        hits = await search.search(
+            RetrievalQuery(
+                query=str(case["query"]),
+                namespace=RetrievalNamespace(str(case.get("namespace") or "theory")),
+                mode="hybrid",
+                top_k=top_k,
+            )
+        )
+        actual = [hit.evidence_id for hit in hits]
         matched = expected.intersection(actual)
         recall = len(matched) / len(expected) if expected else 1.0
         first_rank = next((index for index, item_id in enumerate(actual, 1) if item_id in expected), 0)

@@ -20,10 +20,7 @@ def build_gateways(settings: Settings) -> dict[str, Any]:
     from zhiyin_infrastructure.local.auth import DefaultPassAuth
     from zhiyin_infrastructure.local.cache import InMemoryCache
     from zhiyin_infrastructure.local.embedding import LocalHashEmbedder
-    from zhiyin_infrastructure.local.knowledge import (
-        LocalKeywordSearch,
-        LocalKnowledgeRepo,
-    )
+    from zhiyin_infrastructure.local.knowledge import LocalSearchGateway
     from zhiyin_infrastructure.local.llm import LocalOrMockLLM
     from zhiyin_infrastructure.local.messaging import (
         InMemoryEventBus,
@@ -39,8 +36,7 @@ def build_gateways(settings: Settings) -> dict[str, Any]:
     gateways: dict[str, Any] = {
         "llm": LocalOrMockLLM(),
         "embedding": LocalHashEmbedder(),
-        "knowledge": LocalKnowledgeRepo(settings.local_knowledge_dir),
-        "search": LocalKeywordSearch(settings.local_knowledge_dir),
+        "search": LocalSearchGateway(settings.local_knowledge_dir),
         "vector": LocalVectorStore(),
         "cache": InMemoryCache(),
         "object_store": LocalFileStore(settings.local_object_dir),
@@ -93,19 +89,14 @@ def build_gateways(settings: Settings) -> dict[str, Any]:
             settings.pami_embedding_model_id,
             timeout_s=settings.pami_timeout_s,
         )
-    if settings.use_pami_knowledge:
-        from zhiyin_infrastructure.pami.adapters import (
-            PamiKnowledgeGateway,
-            PamiSearchGateway,
-        )
+    if settings.use_pami_search:
+        from zhiyin_infrastructure.pami.adapters import PamiSearchGateway
 
-        knowledge = PamiKnowledgeGateway(
+        gateways["search"] = PamiSearchGateway(
             settings.pami_base_url,
             settings.pami_rag_api_key or settings.pami_api_key,
             timeout_s=settings.pami_timeout_s,
         )
-        gateways["knowledge"] = knowledge
-        gateways["search"] = PamiSearchGateway(knowledge)
     if settings.use_pami_auth:
         from zhiyin_infrastructure.pami.adapters import PamiAuthGateway
 
@@ -128,7 +119,6 @@ def build_gateways(settings: Settings) -> dict[str, Any]:
             gateways["search"],
             gateways["embedding"],
             gateways["vector"],
-            namespace=settings.vector_search_namespace,
             rrf_k=settings.search_rrf_k,
         )
 
@@ -136,6 +126,15 @@ def build_gateways(settings: Settings) -> dict[str, Any]:
         from zhiyin_infrastructure.mysql import SqlAlchemyRawQueryGateway
 
         gateways["raw_query"] = SqlAlchemyRawQueryGateway(settings.database_url)
+        search = gateways.get("search")
+        if hasattr(search, "configure_authority"):
+            from zhiyin_infrastructure.persistence.retrieval_documents import (
+                RetrievalDocumentStore,
+            )
+
+            authority = RetrievalDocumentStore(settings.database_url)
+            search.configure_authority(authority)
+            gateways["retrieval_authority"] = authority
 
     if settings.use_minio:
         from zhiyin_infrastructure.minio import MinioObjectStore

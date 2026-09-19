@@ -1,0 +1,14 @@
+{
+  "version": "1.0",
+  "namespaces": {
+    "theory": {"visibility": "public", "required": ["id", "title", "summary", "source_id", "source_url", "version", "status", "content_hash"]},
+    "occupation": {"visibility": "public", "required": ["id", "title", "summary", "content_type", "source_id", "source_url", "version", "status", "content_hash"]},
+    "jd": {"visibility": "public", "required": ["id", "title", "summary", "source_id", "source_url", "effective_at", "expires_at", "version", "status", "content_hash"]},
+    "report": {"visibility": "private", "required": ["id", "user_id", "org_id", "asset_version", "content", "version", "status", "content_hash"]},
+    "memory": {"visibility": "private", "required": ["id", "user_id", "org_id", "task_id", "content", "version", "status", "content_hash"]},
+    "resume": {"visibility": "private", "required": ["id", "user_id", "org_id", "content", "version", "status", "content_hash"]}
+  },
+  "common_required": ["namespace", "source_id", "version", "status", "content_hash"],
+  "production_index_status": ["enabled"],
+  "forbidden_production_status": ["pending_review", "disabled", "expired"]
+}

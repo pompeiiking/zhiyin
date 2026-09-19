@@ -50,6 +50,7 @@ from zhiyin_business.policies.routing import (
     StagePolicy,
 )
 from zhiyin_business.policies.teaming import LeadPolicy, RegistryLeadPolicy
+from zhiyin_business.policies.retrieval import RetrievalPlanningPolicy
 
 __all__ = [
     "AxisAInferencePolicy",
@@ -66,4 +67,5 @@ __all__ = [
     "RegistryLeadPolicy",
     "StagePolicy",
     "DefaultStagePolicy",
+    "RetrievalPlanningPolicy",
 ]

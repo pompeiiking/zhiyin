@@ -344,8 +344,8 @@ async def test_invalid_agent_output_does_not_persist_asset_but_records_turn() ->
     assert len(logs) == 1
 
 
-class _EmptyKnowledge:
-    async def search(self, query, *, top_k=5, namespace=None, filters=None):
+class _EmptySearch:
+    async def search(self, request):
         return []
 
 
@@ -354,7 +354,7 @@ async def test_no_knowledge_hit_exposes_no_unverified_theory_reference() -> None
     from zhiyin_api.dto.conversation import MessageRequest, TaskEnterRequest
 
     container = _container()
-    container.orchestrator._knowledge = _EmptyKnowledge()
+    container.orchestrator._search = _EmptySearch()
     user_id = "no-knowledge-user"
     session = await container.facade.enter_task(
         user_id, TaskEnterRequest(task_code="verify_direction")

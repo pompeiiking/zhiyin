@@ -67,6 +67,7 @@ def build_services(container: "Container") -> None:
         KeywordIntentPolicy,
         RegistryLeadPolicy,
         RuleFirstAxisAInferencePolicy,
+        RetrievalPlanningPolicy,
     )
     from zhiyin_business.services import (
         AgentDrivenLoopCoordinator,
@@ -133,7 +134,8 @@ def build_services(container: "Container") -> None:
         lead_policy=RegistryLeadPolicy(container.registry),
         handoff_policy=DefaultHandoffPolicy(),
         agent_engine=container.agent_engine,
-        knowledge=container.knowledge,
+        search=container.search,
+        retrieval_policy=RetrievalPlanningPolicy(),
         state_store=container.state_store,
         sessions=container.sessions,
         registry=container.registry,

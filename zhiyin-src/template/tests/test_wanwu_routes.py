@@ -9,7 +9,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VERIFIER = REPO_ROOT / "scripts" / "verify_wanwu_routes.py"
-MANIFEST = REPO_ROOT / "deploy" / "wanwu-routes.json"
+MANIFEST = REPO_ROOT / "zhiyin-src" / "template" / "deploy" / "wanwu-routes.json"
 NGINX = (
     REPO_ROOT
     / "platform"
@@ -20,7 +20,7 @@ NGINX = (
     / "conf.d"
     / "aibase.conf"
 )
-COMPOSE_OVERRIDE = REPO_ROOT / "deploy" / "compose.yaml"
+COMPOSE_OVERRIDE = REPO_ROOT / "zhiyin-src" / "template" / "deploy" / "compose.yaml"
 INTERFACE_DOC = (
     REPO_ROOT / "docs" / "技术架构文档" / "pami" / "pami-Wanwu" / "接口.md"
 )

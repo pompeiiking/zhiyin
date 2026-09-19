@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEPLOY = REPO_ROOT / "deploy"
+DEPLOY = REPO_ROOT / "zhiyin-src" / "template" / "deploy"
 
 
 def test_compose_includes_wanwu_and_keeps_zhiyin_internal() -> None:
@@ -15,15 +15,21 @@ def test_compose_includes_wanwu_and_keeps_zhiyin_internal() -> None:
         assert f"  {service}:\n    ports: !reset []" in text
     assert '"127.0.0.1:8081:8081"' in text
     assert "context: ../../zhiyin-src/template" in text
-    assert "- ../../deploy/.env" in text
+    assert "dockerfile: Dockerfile.bff" in text
+    assert "image: zhiyin/pami-bff:dev" in text
+    assert (REPO_ROOT / "platform" / "wanwu" / "Dockerfile.bff").is_file()
+    assert "- ../../zhiyin-src/template/deploy/.env" in text
     assert "KAFKA_CFG_ADVERTISED_LISTENERS: BROKER://${WANWU_KAFKA_HOST}:9092" in text
     assert 'test: ["CMD", "redis-cli", "-a", "${WANWU_REDIS_PASSWORD}", "ping"]' in text
 
 
 def test_env_example_has_no_committed_secrets() -> None:
     text = (DEPLOY / ".env.example").read_text(encoding="utf-8")
-    assert "WANWU_PROJECT_DIR=../../deploy/runtime\n" in text
+    assert "WANWU_PROJECT_DIR=../../zhiyin-src/template/deploy/runtime\n" in text
     assert "WANWU_ELASTIC_ADDRESS=es-wanwu:9200\n" in text
+    assert "ZHIYIN_PAMI_BASE_URL=http://nginx:8081\n" in text
+    assert "ZHIYIN_USE_PAMI_SEARCH=0\n" in text
+    assert "ZHIYIN_USE_PAMI_KNOWLEDGE" not in text
     for key in (
         "WANWU_MYSQL_PASSWORD",
         "WANWU_REDIS_PASSWORD",

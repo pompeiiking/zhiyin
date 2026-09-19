@@ -294,7 +294,6 @@ def test_wired_skeleton_is_reported_as_skeleton() -> None:
         settings=_test_settings(),
         llm=None,
         embedding=None,
-        knowledge=None,
         search=None,
         vector=None,
         cache=None,

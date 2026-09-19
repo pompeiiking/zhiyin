@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useConversationStore } from '@/stores/conversation'
-import { enterTask } from '@/api/endpoints'
+import { enterTask, trackEvent } from '@/api/endpoints'
 import { ApiError, ErrorCode } from '@/api/client'
 import { useGuestGuard } from '@/composables'
-import TaskCardGroup from '@/components/home/TaskCardGroup.vue'
-import TrustSection from '@/components/home/TrustSection.vue'
+import ShowcaseStage from '@/components/home/ShowcaseStage.vue'
+import AgentsShowcase from '@/components/home/AgentsShowcase.vue'
 
 const session = useSessionStore()
 const conversation = useConversationStore()
@@ -16,8 +16,21 @@ const { handleGuestError } = useGuestGuard()
 const selected = ref('')
 const busy = ref(false)
 const message = ref('')
-const freeChat = computed(() => session.taskEntries.find(x => x.target_stage == null))
-const isGuest = computed(() => !session.isLoggedIn)
+// 工作台矩阵（HOME-005）：4 张卡内容化——场景名 / 说明 / 时间窗口 / 产出样例 / 状态动作。
+// 未开放项不再死块，点击「预约提醒」有明确反馈。
+const workbenches = [
+  { key: 'campus', name: '校招求职', desc: '秋招 / 春招 / 网申窗口，岗位画像与面试节点全流程', window: '秋招 9–11 月 · 春招 3–4 月', audience: '面向大三、大四', open: true, color: 'b-blue', sampleTitle: '方案样例', sample: ['主攻 · 结构设计岗（匹配度 82%）', '关键节点：9 月网申 → 11 月面试'] },
+  { key: 'postgrad', name: '考研 / 保研 / 留学', desc: '择校定位、备考与申请季时间线', window: '考研 12 月 · 申请季 9–1 月', audience: '面向大三、大四', open: false, color: 'b-green', sampleTitle: '定位样例', sample: ['目标梯度：冲 / 稳 / 保三档院校', '时间线：择校 → 备考 → 申请 → 复试'] },
+  { key: 'civil', name: '考公 / 考编', desc: '选岗建议、公告节点、备考节奏', window: '国考 11–12 月 · 省考 3–4 月', audience: '面向大四及以上', open: false, color: 'b-amber', sampleTitle: '选岗样例', sample: ['岗位匹配：专业 / 地区 / 竞争比', '节奏：公告 → 报名 → 笔试 → 面试'] },
+  { key: 'early', name: '职场新人转型', desc: '0–3 年竞争力校准与进阶路径', window: '全年可进入 · 每季度校准', audience: '面向职场新人', open: false, color: 'b-purple', sampleTitle: '校准样例', sample: ['竞争力：技能 / 经历 / 目标三维度', '路径：现状 → 目标岗 → 进阶计划'] },
+]
+
+const reserved = ref<string[]>([])
+function reserve(key: string) {
+  if (reserved.value.includes(key)) return
+  reserved.value.push(key)
+  void trackEvent('home_reserve_click', { code: key }).catch(() => {})
+}
 watch(() => session.isLoggedIn, loggedIn => {
   if (loggedIn && session.pendingTaskCode) {
     const code = session.pendingTaskCode
@@ -49,6 +62,17 @@ onMounted(() => {
 })
 onUnmounted(() => revealObserver?.disconnect())
 
+// 首页主 CTA 与工作台「进入」都直接落到核心对话页（§4.1 兜底「直接开聊」常驻）：
+// 建档与任务进入交给对话页完成，不在首页因为拿不到任务入口而变成无效点击。
+function startChat() {
+  void router.push({ name: 'conversation' })
+}
+
+function openReport() {
+  void trackEvent('diagnosis_view', { source: 'home' }).catch(() => {})
+  void router.push({ name: 'report' })
+}
+
 async function selectTask(code: string) {
   if (busy.value) return
   const entry = session.taskEntries.find(x => x.code === code)
@@ -66,7 +90,6 @@ async function selectTask(code: string) {
   }
   busy.value = true
   try {
-    // 首页只负责入口交接，不实现或调用对话域尚未完成的 action。
     const task = await enterTask(code)
     if (!task?.task_id) throw new Error('Missing task')
     conversation.$patch(state => {
@@ -86,458 +109,745 @@ async function selectTask(code: string) {
 
 <template>
   <main data-anchor="screen-home" class="home">
-    <!-- 动态背景层（HOME-003）：渐变光晕 + 细网格，缓慢流动 -->
-    <div class="bg-layer" aria-hidden="true">
-      <i class="glow glow-a"></i>
-      <i class="glow glow-b"></i>
-      <i class="grid"></i>
+    <!-- HERO -->
+    <div class="hero">
+      <div class="hero-bg" aria-hidden="true">
+        <span class="glow glow-a"></span>
+        <span class="glow glow-b"></span>
+      </div>
+      <div class="hero-float" aria-hidden="true">
+        <span class="float-chip f-1 lg">霍兰德 · RIASEC</span>
+        <span class="float-chip f-2 sm">画像覆盖度 4 / 6</span>
+        <span class="float-chip f-3">五环节闭环</span>
+        <span class="float-chip f-4">SMART 目标</span>
+        <span class="float-chip f-5 sm">长期跟踪</span>
+        <span class="float-chip f-6 lg">CASVE 决策循环</span>
+        <span class="float-chip f-7 sm">能力三核</span>
+        <span class="float-chip f-8">职业锚 · 价值取向</span>
+      </div>
+      <div class="container">
+        <h1>不用填表，开口就能<br /><span class="hl">聊出一条职业路径</span></h1>
+        <p class="hero-sub">上传简历 <b>或直接对话</b>，AI 边聊边<em>沉淀你的个人画像</em>，输出<b>个人分析报告、方向方案与行动计划</b>，并长期跟踪、随成长持续校准。</p>
+        <div class="hero-cta">
+          <button class="btn btn-pri btn-lg" :disabled="busy" @click="startChat">开始和 AI 聊职业 →</button>
+          <button class="btn btn-ghost btn-lg" @click="openReport">先看示例报告 →</button>
+        </div>
+        <p class="hero-note">从「不知道自己适合什么」到「有路径、能执行」｜画像由对话引导生成，不前置表单</p>
+
+        <div class="hero-preview">
+          <div class="hp-shadow-a" aria-hidden="true"></div>
+          <div class="hp-shadow-b" aria-hidden="true"></div>
+          <div class="hp-card">
+            <div class="hp-top"><span class="dot-live"></span><b>职业顾问 · 建档分析师</b><span class="hp-live">对话中</span></div>
+            <div class="hp-msg ai"><span class="mtag">帕森斯 · 了解自我</span><p>先问「学业」——你的学校、专业、年级和成绩排名是？</p></div>
+            <div class="hp-msg user"><p>沈阳建筑大学 · 土木工程 · 大四 · GPA 3.2 / 前 30%</p></div>
+            <div class="hp-msg ai"><p>收到，已沉淀到「学业」。想亲手体验完整建档？下滑到「采集建模」环节试试 ↓</p></div>
+            <div class="hp-progress"><span>个人画像覆盖度</span><div class="bar"><i style="width: 66%"></i></div><b>4 / 6</b></div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <section class="hero container" aria-labelledby="home-title">
-      <div class="hero-copy">
-        <h1 id="home-title">不用一次想清所有答案，<br />从眼前一个困惑开始，找到你的下一步。</h1>
-        <p class="hero-description">有理论依据的职业规划助手，陪你一步步把方向变清晰。</p>
-        <div class="hero-actions">
-          <button v-if="freeChat" class="primary-action" :disabled="busy" @click="selectTask(freeChat.code)">开始对话 <span aria-hidden="true">→</span></button>
-          <a v-else class="primary-action" href="#task-entries">开始对话 <span aria-hidden="true">→</span></a>
-          <RouterLink class="secondary-action" :to="{ name: 'report' }">先看示例报告</RouterLink>
+    <ShowcaseStage />
+
+    <!-- AGENTS -->
+    <AgentsShowcase />
+
+    <!-- WORKBENCH -->
+    <div class="sec" id="workbench">
+      <div class="container">
+        <div class="head">
+          <h2>选择职业工作台</h2>
+          <p>按你的阶段与方向选择入口；各工作台共用解析引擎，配备专属规划模板与时间线。先做透「校招求职」，其余陆续开放。</p>
         </div>
-        <p class="hero-note"><span aria-hidden="true">○</span> 不替你做决定，陪你找到依据。</p>
+        <div class="cats">
+          <div
+            v-for="(w, i) in workbenches"
+            :key="w.key"
+            class="cat reveal"
+            :class="[w.color, { soon: !w.open }]"
+            :style="{ transitionDelay: (i * 0.06).toFixed(2) + 's' }"
+          >
+            <span class="swatch"></span>
+            <span class="cn">{{ w.name }}</span>
+            <span class="ds">{{ w.desc }}</span>
+            <span class="win">{{ w.window }}</span>
+            <div class="sample">
+              <span class="sample-title">{{ w.sampleTitle }} · 演示</span>
+              <ul>
+                <li v-for="line in w.sample" :key="line">{{ line }}</li>
+              </ul>
+            </div>
+            <span class="meta">
+              <span>{{ w.audience }}</span>
+              <span v-if="w.open" class="tag-open">已开放 ↗</span>
+              <span v-else class="tag-soon">即将开放</span>
+            </span>
+            <button v-if="w.open" class="wb-action" type="button" :disabled="busy" @click="startChat">进入 ↗</button>
+            <button v-else class="wb-action" type="button" :class="{ reserved: reserved.includes(w.key) }" @click="reserve(w.key)">
+              {{ reserved.includes(w.key) ? '已登记 ✓' : '预约提醒' }}
+            </button>
+          </div>
+        </div>
       </div>
-
-      <!-- 产品实感预览（HOME-002）：真实对话片段 + 画像逐步填充 -->
-      <div class="preview" aria-label="产品实感预览">
-        <div class="preview-header">产品预览 <span class="preview-tag">演示数据</span></div>
-        <div class="preview-chat">
-          <div class="pc"><span class="who">顾问</span>你最近更想做什么方向的工作？</div>
-          <div class="pc"><span class="who">你</span>想试试数据分析，但不确定合不合适。</div>
-          <div class="pc"><span class="who">顾问</span>我帮你把技能、兴趣、价值三块画像补完整，再给结论。</div>
-        </div>
-        <div class="preview-coverage">
-          <div class="cl">画像覆盖度 <b>3 / 6</b></div>
-          <div class="cb"><i></i></div>
-        </div>
-      </div>
-    </section>
-
-    <div class="container">
-      <TrustSection class="reveal" />
-      <TaskCardGroup class="reveal" :busy="busy" :selected="selected" @select="selectTask" />
-      <p v-if="message" class="task-message" role="status">{{ message }}</p>
-
-      <!-- 身份入口（HOME-007）：游客 / 学生 / 导师给不同路径，文案按身份区分 -->
-      <section class="identity-entry reveal" aria-labelledby="identity-title">
-        <h2 id="identity-title">你是哪种情况？</h2>
-        <p class="identity-sub">按你的身份，给你不同的进入路径</p>
-        <div class="identity-cards">
-          <div class="identity-card" :class="{ current: isGuest }">
-            <strong>游客</strong>
-            <p>先不登录，直接体验一次对话</p>
-            <button type="button" class="identity-action" @click="freeChat ? selectTask(freeChat.code) : session.openLogin()">立即体验</button>
-          </div>
-          <div class="identity-card" :class="{ current: !isGuest }">
-            <strong>学生</strong>
-            <p>进入完整任务，逐步建立你的活资产</p>
-            <a class="identity-action" href="#task-entries">进入任务</a>
-          </div>
-          <div class="identity-card">
-            <strong>导师</strong>
-            <p>查看学生资产并写下建议</p>
-            <span class="identity-soon">导师视图即将开放</span>
-          </div>
-        </div>
-      </section>
-
-      <section v-if="session.faqs.length" class="faq reveal" aria-labelledby="faq-title"><div><h2 id="faq-title">开始之前，你可能想知道</h2></div><div class="faq-list"><details v-for="faq in session.faqs" :key="faq.code"><summary>{{ faq.question }}</summary><p>{{ faq.answer }}</p></details></div></section>
     </div>
 
-    <!-- 页脚（HOME-008）：数据来源与方法论脚注，明确标注示例数据 -->
-    <footer class="site-footer">
-      <div class="footer-inner">
-        <p><strong>数据来源与方法论</strong>：演示数据 · 方法论出自职业咨询成熟方法（帕森斯人职匹配、霍兰德 RIASEC、CASVE 决策等）。</p>
-        <p><strong>示例数据声明</strong>：本站展示的画像、诊断、方案均为演示数据，不包含任何真实个人信息。</p>
+    <!-- FOOTER -->
+    <footer>
+      <div class="container">
+        <div class="footer-brand"><span class="dot"></span>职引 ZHIYIN</div>
+        <p class="footer-tag">面向大学生与职场新人的 AI 职业规划工具</p>
+        <div class="footer-meta">
+          <div class="footer-item"><b>数据来源</b><span>专业 / 职业知识库对接教育部「学职平台」；行业与岗位信息用于演示，不代表实时招录口径。</span></div>
+          <div class="footer-item"><b>方法论出处</b><span>舒伯 · 帕森斯 · 霍兰德 · 三叶草 · CD · CASVE · SMART 等职业咨询经典框架。</span></div>
+          <div class="footer-item"><b>示例数据声明</b><span>页面中的对话、画像、报告、方案与计划均为演示数据，仅供产品评审，不代表真实用户与真实结论。</span></div>
+        </div>
       </div>
     </footer>
   </main>
 </template>
 
 <style scoped>
-.home {
-  position: relative;
-  min-height: 100dvh;
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 26px;
+  border: none;
+  border-radius: var(--pill);
+  font-size: 14px;
+  font-weight: 600;
+  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
 }
 
-.bg-layer {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 720px;
-  overflow: hidden;
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-pri {
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(55, 138, 221, 0.28);
+}
+
+.btn-pri:hover {
+  background: var(--blueD);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--gray);
+  border: 1px solid var(--line);
+}
+
+.btn-ghost:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.btn-lg {
+  padding: 15px 34px;
+  font-size: 15px;
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 13px;
+}
+
+.btn[disabled] {
+  opacity: 0.45;
   pointer-events: none;
 }
 
-.glow {
+/* Landing: hero */
+.hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 14% 12%, rgba(55, 138, 221, 0.1), transparent 30%),
+    radial-gradient(circle at 88% 26%, rgba(56, 185, 121, 0.1), transparent 30%),
+    radial-gradient(circle at 60% 96%, rgba(245, 188, 41, 0.08), transparent 34%),
+    var(--paper);
+  padding: 96px 0 72px;
+  text-align: center;
+}
+
+.hero .container {
+  position: relative;
+  z-index: 1;
+}
+
+/* HOME-003 动态背景层：分层光晕 + 细网格缓慢流动，作为首屏的技术感记忆点。 */
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.hero-bg .glow {
   position: absolute;
   width: 520px;
   height: 520px;
   border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.35;
+  filter: blur(70px);
+  opacity: 0.55;
 }
 
-.glow-a {
-  top: -160px;
-  left: -80px;
-  background: radial-gradient(circle, var(--color-brand), transparent 70%);
-  animation: drift-a 22s ease-in-out infinite alternate;
+.hero-bg .glow-a {
+  background: radial-gradient(circle, rgba(55, 138, 221, 0.32), transparent 66%);
+  top: -140px;
+  left: -90px;
+  animation: heroDriftA 18s var(--ease-standard) infinite alternate;
 }
 
-.glow-b {
-  top: 40px;
-  right: -120px;
-  background: radial-gradient(circle, var(--color-role), transparent 70%);
-  animation: drift-b 26s ease-in-out infinite alternate;
+.hero-bg .glow-b {
+  background: radial-gradient(circle, rgba(56, 185, 121, 0.28), transparent 66%);
+  bottom: -160px;
+  right: -110px;
+  animation: heroDriftB 22s var(--ease-standard) infinite alternate;
 }
 
-.grid {
+@keyframes heroDriftA {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(64px, 42px) scale(1.12); }
+}
+
+@keyframes heroDriftB {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(-52px, -32px) scale(1.08); }
+}
+
+/* 首屏浮动小组件：装饰性标签缓慢上下浮动。容器与正文同宽居中，标签贴近两侧而非屏幕边缘。 */
+.hero-float {
   position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(var(--color-brand-border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--color-brand-border) 1px, transparent 1px);
-  background-size: 48px 48px;
-  opacity: 0.25;
-  mask-image: radial-gradient(ellipse at 50% 0%, #000 30%, transparent 75%);
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(100%, 1240px);
+  z-index: 0;
+  pointer-events: none;
 }
 
-@keyframes drift-a {
-  from { transform: translate(0, 0) scale(1); }
-  to { transform: translate(60px, 40px) scale(1.08); }
-}
-
-@keyframes drift-b {
-  from { transform: translate(0, 0) scale(1); }
-  to { transform: translate(-60px, 60px) scale(1.1); }
-}
-
-.container {
-  position: relative;
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  padding: 0 var(--page-gutter);
-}
-
-.hero {
-  display: grid;
-  grid-template-columns: 1.15fr 1fr;
-  gap: var(--space-12);
-  align-items: center;
-  padding-block: 96px var(--space-12);
-}
-
-h1 {
-  font-size: clamp(30px, 3.4vw, 44px);
-  line-height: 1.4;
-  letter-spacing: -0.03em;
-  margin: 0 0 var(--space-5);
-  max-width: 14em;
-}
-
-.hero-description {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-md);
-  line-height: var(--line-height-relaxed);
-  margin: 0 0 var(--space-8);
-}
-
-.hero-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.primary-action {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 48px;
-  padding: var(--space-3) var(--space-6);
-  border: 0;
+.float-chip {
+  position: absolute;
+  padding: 8px 16px;
   border-radius: var(--radius-pill);
-  background: var(--color-action-bg);
-  color: var(--color-text-inverse);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-  text-decoration: none;
-  cursor: pointer;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.02em;
+  animation: chipFloat 6s var(--ease-standard) infinite;
 }
 
-.primary-action:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.float-chip.lg {
+  padding: 12px 22px;
+  font-size: 15px;
+  box-shadow: 0 10px 26px rgba(18, 26, 39, 0.14);
 }
 
-.primary-action:hover:not(:disabled) {
-  background: var(--color-brand);
+.float-chip.sm {
+  padding: 5px 11px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.float-chip.f-1 { top: 22%; left: 8%; color: var(--green); border-color: var(--greenLine); background: var(--greenSoft); }
+.float-chip.f-2 { top: 40%; right: 6%; color: var(--blue); border-color: var(--blueLine); background: var(--blueSoft); animation-delay: 1.2s; }
+.float-chip.f-3 { top: 13%; right: 13%; color: var(--amber); border-color: var(--amberLine); background: var(--amberSoft); animation-delay: 2.1s; }
+.float-chip.f-4 { bottom: 26%; left: 11%; color: var(--violet); border-color: var(--purpleLine); background: var(--purpleSoft); animation-delay: 0.7s; }
+.float-chip.f-5 { bottom: 12%; right: 15%; color: var(--color-text-secondary); animation-delay: 1.7s; }
+.float-chip.f-6 { top: 56%; left: 4%; color: var(--blue); border-color: var(--blueLine); background: var(--blueSoft); animation-delay: 3.2s; }
+.float-chip.f-7 { top: 66%; right: 8%; color: var(--green); border-color: var(--greenLine); background: var(--greenSoft); animation-delay: 0.4s; }
+.float-chip.f-8 { bottom: 6%; left: 14%; color: var(--amber); border-color: var(--amberLine); background: var(--amberSoft); animation-delay: 2.6s; }
+
+@keyframes chipFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+.hero h1 {
+  font-size: clamp(36px, 5.8vw, 62px);
+  line-height: 1.14;
+  font-weight: 780;
+  letter-spacing: -0.02em;
+  margin: 0 auto;
+  max-width: 800px;
+}
+
+.hero h1 .hl {
+  position: relative;
+  color: var(--ink);
+}
+
+.hero h1 .hl::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  bottom: 6px;
+  height: 12px;
+  background: linear-gradient(90deg, var(--blueSoft), var(--greenSoft));
+  z-index: -1;
+  border-radius: 6px;
+}
+
+.hero-sub {
+  margin: 22px auto 0;
+  max-width: 680px;
+  color: var(--gray);
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+.hero-sub b {
+  color: var(--blue);
+}
+
+.hero-cta {
+  margin-top: 34px;
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .hero-note {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  margin: var(--space-5) 0 0;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 13.5px;
 }
 
-.preview {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-overlay);
-  padding: var(--space-5);
+/* hero conversation preview card */
+.hero-preview {
+  position: relative;
+  max-width: 460px;
+  margin: 46px auto 6px;
+  text-align: left;
 }
 
-.preview-header {
+.hp-shadow-a,
+.hp-shadow-b {
+  position: absolute;
+  inset: 0;
+  border-radius: 20px;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+
+.hp-shadow-a {
+  transform: rotate(-3.2deg) translateY(4px);
+  box-shadow: var(--shadow);
+}
+
+.hp-shadow-b {
+  transform: rotate(2.4deg) translateY(2px);
+  box-shadow: var(--shadow);
+}
+
+.hp-card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadowLg);
+  padding: 18px 20px 20px;
+  animation: heroFloat 5s ease-in-out infinite;
+}
+
+@keyframes heroFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+
+.hp-top {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding-bottom: var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  gap: 9px;
+  font-size: 13px;
+  padding-bottom: 12px;
+  margin-bottom: 13px;
+  border-bottom: 1px solid var(--line);
 }
 
-.preview-tag {
+.hp-top .dot-live {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 4px var(--greenSoft);
+  flex: none;
+}
+
+.hp-top b {
+  font-weight: 700;
+}
+
+.hp-live {
   margin-left: auto;
-  padding: 2px var(--space-3);
-  border-radius: var(--radius-pill);
-  background: var(--color-warning-soft);
-  color: var(--color-warning);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-regular);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--greenD);
+  background: var(--greenSoft);
+  border: 1px solid var(--greenLine);
+  padding: 2px 9px;
+  border-radius: 999px;
 }
 
-.preview-chat {
-  padding-block: var(--space-4);
+.hp-msg {
+  font-size: 13px;
+  line-height: 1.65;
+  border-radius: 14px;
+  padding: 9px 13px;
+  margin-bottom: 9px;
+  max-width: 88%;
 }
 
-.pc {
+.hp-msg.ai {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-top-left-radius: 4px;
+  color: var(--ink);
+}
+
+.hp-msg.user {
+  background: var(--blue);
+  color: #fff;
+  border-top-right-radius: 4px;
+  margin-left: auto;
+  box-shadow: 0 4px 12px rgba(55, 138, 221, 0.22);
+}
+
+.hp-msg p {
+  margin: 0;
+}
+
+.hp-progress {
   display: flex;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border-radius: var(--radius-sm);
-  background: var(--color-brand-soft);
-  margin-bottom: var(--space-2);
-  font-size: var(--font-size-sm);
+  align-items: center;
+  gap: 9px;
+  margin-top: 14px;
+  padding-top: 13px;
+  border-top: 1px dashed var(--line);
+  font-size: 11.5px;
+  color: var(--gray);
+  font-weight: 600;
 }
 
-.pc:nth-child(2) {
-  background: var(--color-role-soft);
-}
-
-.who {
-  flex-shrink: 0;
-  color: var(--color-link);
-  font-weight: var(--font-weight-semibold);
-}
-
-.preview-coverage {
-  padding-top: var(--space-2);
-}
-
-.cl {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-2);
-}
-
-.cl b {
-  color: var(--color-text-primary);
-}
-
-.cb {
-  height: 10px;
-  border-radius: var(--radius-pill);
-  background: var(--color-border);
+.hp-progress .bar {
+  flex: 1;
+  height: 6px;
+  background: var(--paper);
+  border-radius: 6px;
   overflow: hidden;
+  border: 1px solid var(--line);
 }
 
-.cb i {
+.hp-progress .bar i {
   display: block;
   height: 100%;
-  width: 50%;
-  border-radius: var(--radius-pill);
-  background: var(--color-success);
+  background: linear-gradient(90deg, var(--blue), var(--green));
+  border-radius: 6px;
 }
 
-.task-message {
-  padding: var(--space-4);
-  background: var(--color-brand-soft);
-  border: 1px solid var(--color-brand-border);
-  border-radius: var(--radius-sm);
-  margin-bottom: var(--space-8);
+.hp-progress b {
+  color: var(--blueD);
+  white-space: nowrap;
 }
 
-.faq {
-  padding-bottom: var(--space-16);
+.mtag {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--blueD);
+  background: var(--blueSoft);
+  border: 1px solid var(--blueLine);
+  padding: 2px 9px;
+  border-radius: 999px;
+  margin-bottom: 7px;
+  letter-spacing: 0.02em;
 }
 
-.faq h2 {
-  font-size: var(--font-size-xl);
+.mtag::before {
+  content: "依据 · ";
+  font-weight: 600;
+  color: #7fb3e8;
 }
 
-.faq details {
-  border-bottom: 1px solid var(--color-border);
+/* landing sections common */
+.sec {
+  padding: 72px 0;
 }
 
-.faq summary {
-  padding-block: var(--space-5);
-  cursor: pointer;
-  font-weight: var(--font-weight-semibold);
+.sec .head {
+  text-align: center;
+  max-width: 660px;
+  margin: 0 auto 44px;
 }
 
-.faq details p {
-  margin-top: 0;
-  color: var(--color-text-secondary);
-  line-height: var(--line-height-relaxed);
+.sec .head h2 {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0;
 }
 
-/* 身份入口（HOME-007） */
-.identity-entry {
-  padding-block: var(--space-12);
-  margin-bottom: var(--space-4);
+.sec .head p {
+  color: var(--gray);
+  margin-top: 12px;
 }
 
-.identity-entry h2 {
-  font-size: var(--font-size-xl);
-  margin: 0 0 var(--space-2);
-}
-
-.identity-sub {
-  margin: 0 0 var(--space-6);
-  color: var(--color-text-secondary);
-}
-
-.identity-cards {
+/* workbench (category) grid */
+.cats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-4);
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
 }
 
-.identity-card {
+.cat {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 26px 24px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
+  gap: 10px;
+  transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
+  position: relative;
+  overflow: hidden;
+  text-align: left;
 }
 
-.identity-card.current {
-  border-color: var(--color-brand);
-  background: var(--color-brand-soft);
-  box-shadow: inset 3px 0 var(--color-brand);
+.cat:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadowLg);
+  border-color: var(--blueLine);
 }
 
-.identity-card strong {
-  font-size: var(--font-size-md);
+.cat .cn {
+  font-size: 19px;
+  font-weight: 700;
+  margin-top: 2px;
 }
 
-.identity-card p {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
+.cat .ds {
+  color: var(--gray);
+  font-size: 13px;
+  flex: 1;
 }
 
-.identity-action {
-  display: inline-flex;
+.cat .meta {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  margin-top: auto;
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--color-brand);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--color-link);
-  text-decoration: none;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray);
+}
+
+.tag-open {
+  background: var(--greenSoft);
+  color: var(--greenD);
+  padding: 4px 12px;
+  border-radius: var(--pill);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.tag-soon {
+  background: var(--paper);
+  color: var(--muted);
+  padding: 4px 12px;
+  border-radius: var(--pill);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.cat.soon {
+  background: var(--card);
+  border-style: dashed;
+}
+
+.cat.b-blue {
+  background: linear-gradient(160deg, #fff, var(--blueSoft));
+}
+
+.cat .swatch {
+  position: absolute;
+  right: -30px;
+  top: -30px;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  opacity: 0.55;
+  background: var(--blueSoft);
+}
+
+.cat.b-green .swatch { background: var(--greenSoft); }
+.cat.b-amber .swatch { background: var(--amberSoft); }
+.cat.b-purple .swatch { background: var(--purpleSoft); }
+
+.cat .win {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--gray);
+  padding: 3px 10px;
+  border-radius: var(--pill);
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+
+.cat .sample {
+  background: var(--paper);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.cat .sample-title {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--blueD);
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+}
+
+.cat .sample ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.cat .sample li {
+  font-size: 12px;
+  color: var(--gray);
+  padding-left: 12px;
+  position: relative;
+}
+
+.cat .sample li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--blue);
+}
+
+.cat .wb-action {
+  margin-top: 4px;
+  width: 100%;
+  padding: 10px 0;
+  border-radius: var(--pill);
+  border: 1px solid var(--blueLine);
+  background: var(--blue);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13.5px;
   cursor: pointer;
 }
 
-.identity-action:hover {
-  background: var(--color-brand);
-  color: var(--color-text-inverse);
+.cat.soon .wb-action {
+  background: #fff;
+  color: var(--blueD);
 }
 
-.identity-soon {
-  margin-top: auto;
-  padding: var(--space-2) 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+.cat .wb-action.reserved {
+  background: var(--greenSoft);
+  color: var(--greenD);
+  border-color: var(--greenLine);
+  cursor: default;
 }
 
-/* 页脚（HOME-008） */
-.site-footer {
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
+.cat .wb-action:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
-.footer-inner {
-  max-width: var(--content-max-width);
-  margin: 0 auto;
-  padding: var(--space-8) var(--page-gutter);
+/* footer */
+footer {
+  border-top: 1px solid var(--line);
+  padding: 40px 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-align: center;
+  background: var(--paper);
 }
 
-.footer-inner p {
-  margin: 0 0 var(--space-2);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-}
-
-.footer-inner strong {
-  color: var(--color-text-primary);
-}
-
-/* 微交互（§2.5）：主 CTA 按下反馈 */
-.primary-action:active:not(:disabled) {
-  transform: scale(0.98);
-}
-
-.secondary-action {
+.footer-brand {
   display: inline-flex;
   align-items: center;
-  min-height: 48px;
-  padding: 0 var(--space-5);
-  border: 1px solid var(--color-brand-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--color-link);
-  text-decoration: none;
+  gap: 9px;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  color: var(--ink);
 }
 
-.secondary-action:hover { background: var(--color-brand-soft); }
+.footer-brand .dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 4px;
+  background: var(--blue);
+  box-shadow: 0 0 0 4px var(--blueSoft);
+}
+
+.footer-tag {
+  margin: 8px 0 22px;
+}
+
+.footer-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  text-align: left;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.footer-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.footer-item b {
+  color: var(--gray);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.footer-item span {
+  color: var(--muted);
+  line-height: 1.7;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .glow { animation: none; }
-}
-
-/* 响应式三档（HOME-009）：>1280 完整；900–1280 收窄；<900 单列堆叠 */
-@media (max-width: 1280px) {
-  .hero { gap: var(--space-8); }
+  .hp-card { animation: none; }
+  .float-chip { animation: none; }
 }
 
 @media (max-width: 900px) {
-  .hero {
-    grid-template-columns: 1fr;
-    gap: var(--space-6);
-    padding-top: var(--space-10);
-  }
-  .preview { margin-top: var(--space-4); }
-  .identity-cards { grid-template-columns: 1fr; }
+  .hero-float { display: none; }
+  .cats { grid-template-columns: repeat(2, 1fr); }
+  .footer-meta { grid-template-columns: 1fr; text-align: center; }
+  .footer-item { text-align: center; }
 }
 
-@media (max-width: 640px) {
-  .hero { padding-top: var(--space-8); }
-  .bg-layer { height: 560px; }
-  .footer-inner { padding-block: var(--space-6); }
+@media (max-width: 560px) {
+  .hero-preview { max-width: 340px; }
+  .hp-shadow-a, .hp-shadow-b { display: none; }
+  .cats { grid-template-columns: 1fr; }
 }
 </style>

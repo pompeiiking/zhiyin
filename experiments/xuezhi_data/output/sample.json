@@ -1,0 +1,220 @@
+{
+  "_meta": {
+    "experiment": "xuezhi-public-entry-discovery",
+    "source_id": "xuezhi-chsi",
+    "base_url": "https://xz.chsi.com.cn",
+    "pages_checked": 2,
+    "login_used": false,
+    "forms_submitted": false,
+    "raw_pages_persisted": false,
+    "result": "public_sample_collected_pending_access_review",
+    "records_stored": 10
+  },
+  "pages": [
+    {
+      "url": "https://xz.chsi.com.cn/speciality/index.action",
+      "status": 200,
+      "content_type": "text/html;charset=utf-8",
+      "meta_robots": "all",
+      "script_urls": [],
+      "endpoint_candidates": [
+        "https://xz.chsi.com.cn/about.action",
+        "https://xz.chsi.com.cn/ajax/changeaccessmodel.action",
+        "https://xz.chsi.com.cn/ajax/getuserstatus.action",
+        "https://xz.chsi.com.cn/ajax/statistics.action",
+        "https://xz.chsi.com.cn/cp/report/index.action",
+        "https://xz.chsi.com.cn/home.action",
+        "https://xz.chsi.com.cn/jyzdk/index.action",
+        "https://xz.chsi.com.cn/occucase/index.action",
+        "https://xz.chsi.com.cn/occupation/index.action",
+        "https://xz.chsi.com.cn/showoriorg.action",
+        "https://xz.chsi.com.cn/speciality/detail.action?specId=",
+        "https://xz.chsi.com.cn/speciality/index.action",
+        "https://xz.chsi.com.cn/speciality/list.action",
+        "https://xz.chsi.com.cn/speciality/subcategory.action",
+        "https://xz.chsi.com.cn/task/taskback.action",
+        "https://xz.chsi.com.cn/video/index.action",
+        "https://xz.chsi.com.cn/zt/sygs/evaluate.action",
+        "https://xz.chsi.com.cn/zt/sygs/sjfsnj.action",
+        "https://xz.chsi.com.cn/zt/sygs/sjztlx.action",
+        "https://xz.chsi.com.cn/zt/sygs/syjsxx.action",
+        "https://xz.chsi.com.cn/zthz/index.action"
+      ]
+    },
+    {
+      "url": "https://xz.chsi.com.cn/occupation/index.action",
+      "status": 200,
+      "content_type": "text/html;charset=utf-8",
+      "meta_robots": "all",
+      "script_urls": [],
+      "endpoint_candidates": [
+        "https://xz.chsi.com.cn/about.action",
+        "https://xz.chsi.com.cn/ajax/changeaccessmodel.action",
+        "https://xz.chsi.com.cn/ajax/getuserstatus.action",
+        "https://xz.chsi.com.cn/ajax/statistics.action",
+        "https://xz.chsi.com.cn/cp/report/index.action",
+        "https://xz.chsi.com.cn/home.action",
+        "https://xz.chsi.com.cn/jyzdk/index.action",
+        "https://xz.chsi.com.cn/occucase/index.action",
+        "https://xz.chsi.com.cn/occupation/index.action",
+        "https://xz.chsi.com.cn/occupation/occudetail.action?id=",
+        "https://xz.chsi.com.cn/occupation/searchbyhy.action",
+        "https://xz.chsi.com.cn/occupation/searchbyname.action",
+        "https://xz.chsi.com.cn/showoriorg.action",
+        "https://xz.chsi.com.cn/speciality/index.action",
+        "https://xz.chsi.com.cn/task/taskback.action",
+        "https://xz.chsi.com.cn/video/index.action",
+        "https://xz.chsi.com.cn/zt/sygs/evaluate.action",
+        "https://xz.chsi.com.cn/zt/sygs/sjfsnj.action",
+        "https://xz.chsi.com.cn/zt/sygs/sjztlx.action",
+        "https://xz.chsi.com.cn/zt/sygs/syjsxx.action",
+        "https://xz.chsi.com.cn/zthz/index.action"
+      ]
+    }
+  ],
+  "samples": {
+    "counts_reported_by_source": {
+      "majors": 1778,
+      "occupations": 151
+    },
+    "majors": [
+      {
+        "id": "xuezhi-chsi:major:hdyxw5rt5yg54yow",
+        "source_id": "xuezhi-chsi",
+        "source_item_id": "hdyxw5rt5yg54yow",
+        "major_code": "120203",
+        "name": "会计学",
+        "education_level": "本科（普通教育）",
+        "discipline": "管理学",
+        "category": "工商管理类",
+        "satisfaction_rating": 4.4,
+        "rating_count": 215074,
+        "source_url": "https://xz.chsi.com.cn/speciality/detail.action?specId=hdyxw5rt5yg54yow",
+        "fetched_at": "2026-09-16T02:30:16.485531+00:00",
+        "content_hash": "0793c857bc65c7f636ab48413ab5a4c2535e360de27ed8e458cae7922f70e027"
+      },
+      {
+        "id": "xuezhi-chsi:major:17jj7pgv6zlerl1h",
+        "source_id": "xuezhi-chsi",
+        "source_item_id": "17jj7pgv6zlerl1h",
+        "major_code": "050201",
+        "name": "英语",
+        "education_level": "本科（普通教育）",
+        "discipline": "文学",
+        "category": "外国语言文学类",
+        "satisfaction_rating": 4,
+        "rating_count": 155129,
+        "source_url": "https://xz.chsi.com.cn/speciality/detail.action?specId=17jj7pgv6zlerl1h",
+        "fetched_at": "2026-09-16T02:30:16.485531+00:00",
+        "content_hash": "2dc8320094f26989aff5663cf07cb93cc171226ac392fc15f7ae20e8fa020092"
+      },
+      {
+        "id": "xuezhi-chsi:major:obqqf4z0102mkb1q",
+        "source_id": "xuezhi-chsi",
+        "source_item_id": "obqqf4z0102mkb1q",
+        "major_code": "081001",
+        "name": "土木工程",
+        "education_level": "本科（普通教育）",
+        "discipline": "工学",
+        "category": "土木类",
+        "satisfaction_rating": 4.3,
+        "rating_count": 145570,
+        "source_url": "https://xz.chsi.com.cn/speciality/detail.action?specId=obqqf4z0102mkb1q",
+        "fetched_at": "2026-09-16T02:30:16.485531+00:00",
+        "content_hash": "897b0c9f4ec65c90ee7154034a72225e4b8e012615dafa448d57e580c7f11b37"
+      },
+      {
+        "id": "xuezhi-chsi:major:woqt114tyt2flxjh",
+        "source_id": "xuezhi-chsi",
+        "source_item_id": "woqt114tyt2flxjh",
+        "major_code": "080901",
+        "name": "计算机科学与技术",
+        "education_level": "本科（普通教育）",
+        "discipline": "工学",
+        "category": "计算机类",
+        "satisfaction_rating": 4.1,
+        "rating_count": 144076,
+        "source_url": "https://xz.chsi.com.cn/speciality/detail.action?specId=woqt114tyt2flxjh",
+        "fetched_at": "2026-09-16T02:30:16.485531+00:00",
+        "content_hash": "8915f9184d4ce5dfd8c5f22a0d3d1886dc3ec26f181877abfe91f888ac4ba693"
+      },
+      {
+        "id": "xuezhi-chsi:major:tuvdj3n4rumxkcrr",
+        "source_id": "xuezhi-chsi",
+        "source_item_id": "tuvdj3n4rumxkcrr",
+        "major_code": "530302",
+        "name": "大数据与会计",
+        "education_level": "高职（专科）",
+        "discipline": "财经商贸",
+        "category": "财务会计类",
+        "satisfaction_rating": 4.3,
+        "rating_count": 126497,
+        "source_url": "https://xz.chsi.com.cn/speciality/detail.action?specId=tuvdj3n4rumxkcrr",
+        "fetched_at": "2026-09-16T02:30:16.485531+00:00",
+        "content_hash": "8b0ed943fb3f894a2ef2b02e6ff8fcd330bdc8e6b30f0161a40eed9b6b3c0cb8"
+      }
+    ],
+    "occupations": [
+      {
+        "id": "xuezhi-chsi:occupation:vgnlrntzfr89sz97",
+        "source_id": "xuezhi-chsi",
+        "source_item_id": "vgnlrntzfr89sz97",
+        "title": "制造工艺技术人员",
+        "category": "生产制造类",
+        "industry": "建筑/工程/房地产服务",
+        "description_summary": "根据产品设计方案,对产品加工制造的具体方法、技术、流程进行制定优化和监督实施的技术人员。",
+        "source_url": "https://xz.chsi.com.cn/occupation/occudetail.action?id=vgnlrntzfr89sz97",
+        "fetched_at": "2026-09-16T02:30:16.485531+00:00",
+        "content_hash": "acdf3151a1dd21d57ea17982a443600a4558fd80f8693ef20a8fea3024042571"
+      },
+      {
+        "id": "xuezhi-chsi:occupation:7ul9op78ts8iguku",
+        "source_id": "xuezhi-chsi",
+        "source_item_id": "7ul9op78ts8iguku",
+        "title": "地质勘探技术人员",
+        "category": "工程技术类",
+        "industry": "建筑/工程/房地产服务",
+        "description_summary": "地质勘探工程技术人员主要工作是地质勘探，工程技术，地质调查。“地质勘探”即是通过各种手段、方法对地质进行勘查、探测，确定合适的持力层，根据持力层的地基承载力，确定基础类型，计算基础参数的调查研究活动。是在 对矿产普查中发现有工业意义的矿床，为查明矿产的质和量，以及开采利用的技术条件，提供矿山建设设计所需要的矿产储量和地质资料，对一定地区内的岩石、地 层、构造、矿产、水文、地貌等地质情况进行调查研究工作。",
+        "source_url": "https://xz.chsi.com.cn/occupation/occudetail.action?id=7ul9op78ts8iguku",
+        "fetched_at": "2026-09-16T02:30:16.485531+00:00",
+        "content_hash": "ed04e2ae56adf91e1d804052c85f8a66473e2e7dcd9e980b7a42cef98b0529ce"
+      },
+      {
+        "id": "xuezhi-chsi:occupation:auq05qw7o2k4slbi",
+        "source_id": "xuezhi-chsi",
+        "source_item_id": "auq05qw7o2k4slbi",
+        "title": "酒店前厅接待人员",
+        "category": "住宿餐饮类",
+        "industry": "住宿餐饮/旅游",
+        "description_summary": "酒店的前台接待工作人员，其岗位职责热情接待客人，办理各种手续是首要的工作。 1、受理电话、传真、互联网等不同形式的客房预定，将订房资料录入电脑并传达给相关部门和岗位； 2、处理销售部或其他部门发来的预定单； 3、及时按工作标准及程序进行预定变更，取消等数据处理； 4、检查、核实当日及次日抵达酒店的预定信息，做好预定准备工作； 5、为客人办理入住登记手续，安排房间尽可能满足客人的合理需求； 6、为客人办理换房、加床续住等手续； 7、负责保管、制作和发放客房钥匙卡； 8、按规定填写、录入并统计入住散客及团队登记单； 9、保持前台清洁整齐，检查所需表格、文具和宣传品是否齐全，并报告前台领班； 10、认真核对上一个班次输入电脑的客人资料，及时准确的输入当班的客人资料； 11、按规定登记、录入和发送境外客人户籍资料； 12、认真细致做好交接班工作，保证工作的延续性； 13、协助前台收银员为客人做好结帐工作； 14、完成经理交办的其他工作任务。",
+        "source_url": "https://xz.chsi.com.cn/occupation/occudetail.action?id=auq05qw7o2k4slbi",
+        "fetched_at": "2026-09-16T02:30:16.485531+00:00",
+        "content_hash": "f3406b94b77b7eef30ca48ed6ab72b46128abc38d1013354d34f27c638040937"
+      },
+      {
+        "id": "xuezhi-chsi:occupation:hz3wi4tg0g062slw",
+        "source_id": "xuezhi-chsi",
+        "source_item_id": "hz3wi4tg0g062slw",
+        "title": "水产养殖人员",
+        "category": "渔业类",
+        "industry": "农林牧渔",
+        "description_summary": "水产养殖人员是从事鱼、贝、藻等水生动植物饲养、栽培及质量管理的专业人员，涵盖水生动物饲养工、水生植物栽培工、水产养殖潜水工等岗位。这类人员需掌握水生生物、水产养殖、渔业环境及设施设备等基础知识，负责养殖设施运维、水质调控、苗种培育、生长管护、病害防控及水产品收获加工，各岗位分别开展对应专项作业，保障水产养殖生产有序进行。",
+        "source_url": "https://xz.chsi.com.cn/occupation/occudetail.action?id=hz3wi4tg0g062slw",
+        "fetched_at": "2026-09-16T02:30:16.485531+00:00",
+        "content_hash": "5bcac46859eb140691b19e94e7be2c1bd6d7a2088cbce51689391e92e061607e"
+      },
+      {
+        "id": "xuezhi-chsi:occupation:tfi2q7v8n6fihe92",
+        "source_id": "xuezhi-chsi",
+        "source_item_id": "tfi2q7v8n6fihe92",
+        "title": "药剂师",
+        "category": "医疗类",
+        "industry": "医疗/生物/化工",
+        "description_summary": "药剂师是在医疗机构中，根据医师处方进行药物配置和分发，并辅助医师合理用药的人员。由于在我国有中西医之分，药剂师也被分为西医药剂师和中医药剂师。 在医院人员编制中，药剂人员占医院各类人员总人数的8%。药剂人员，包括中药、西药、药检等方面人员。其技术职称为：主任药师、副主任药师、主管药师和药师。",
+        "source_url": "https://xz.chsi.com.cn/occupation/occudetail.action?id=tfi2q7v8n6fihe92",
+        "fetched_at": "2026-09-16T02:30:16.485531+00:00",
+        "content_hash": "82e37137feb73b63890b83fc439b045b2aa268349264bb85e7c82070a566be54"
+      }
+    ]
+  }
+}

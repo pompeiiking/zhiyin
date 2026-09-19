@@ -32,7 +32,9 @@ from zhiyin_infrastructure.crawl import (
 )
 from zhiyin_infrastructure.local.cache import InMemoryCache
 from zhiyin_infrastructure.local.messaging import InMemoryEventBus
-from zhiyin_infrastructure.local.knowledge import LocalKnowledgeRepo
+from zhiyin_infrastructure.local.knowledge import LocalSearchGateway
+from zhiyin_kernel.enums import RetrievalNamespace
+from zhiyin_kernel.retrieval import RetrievalQuery
 from zhiyin_infrastructure.local.object_store import LocalFileStore
 from zhiyin_infrastructure.local.repository import (
     InMemoryAssetRepository,
@@ -622,8 +624,8 @@ async def test_ingestion_requires_review_and_parses_html_file(tmp_path: Path) ->
     )["items"][0]
     assert pending_report.pending_review == 1
     assert pending_item["status"] == "pending_review"
-    assert not await LocalKnowledgeRepo(str(tmp_path / "pending")).search(
-        "数据分析师", namespace="occupation"
+    assert not await LocalSearchGateway(str(tmp_path / "pending")).search(
+        RetrievalQuery(query="数据分析师", namespace=RetrievalNamespace.OCCUPATION)
     )
 
     refreshed: list[str] = []
@@ -638,8 +640,8 @@ async def test_ingestion_requires_review_and_parses_html_file(tmp_path: Path) ->
     approved_report = await approved.run(source, adapter)
     assert approved_report.stored == 1 and approved_report.pending_review == 0
     assert refreshed == ["occupation"]
-    hits = await LocalKnowledgeRepo(str(tmp_path / "pending")).search(
-        "数据分析师", namespace="occupation"
+    hits = await LocalSearchGateway(str(tmp_path / "pending")).search(
+        RetrievalQuery(query="数据分析师", namespace=RetrievalNamespace.OCCUPATION)
     )
     assert hits and hits[0].metadata["reviewed_by"] == "reviewer-2"
     with pytest.raises(ValueError, match="不能处理"):
@@ -676,6 +678,12 @@ async def test_demo_knowledge_is_traceable_hash_valid_and_searchable() -> None:
                 "content_hash"
             ]
 
-    repo = LocalKnowledgeRepo(str(DATA_DIR / "knowledge"))
-    hits = await repo.search("计算机专业", namespace="profession")
+    repo = LocalSearchGateway(str(DATA_DIR / "knowledge"))
+    hits = await repo.search(
+        RetrievalQuery(
+            query="计算机专业",
+            namespace=RetrievalNamespace.OCCUPATION,
+            filters={"content_type": "major"},
+        )
+    )
     assert hits and hits[0].metadata["source_id"] == "src-chsi-major-demo"

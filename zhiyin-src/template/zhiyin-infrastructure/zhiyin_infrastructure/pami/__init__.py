@@ -3,7 +3,6 @@
 from zhiyin_infrastructure.pami.adapters import (
     PamiAuthGateway,
     PamiEmbedGateway,
-    PamiKnowledgeGateway,
     PamiLLMGateway,
     PamiSearchGateway,
 )
@@ -11,7 +10,6 @@ from zhiyin_infrastructure.pami.adapters import (
 __all__ = [
     "PamiAuthGateway",
     "PamiEmbedGateway",
-    "PamiKnowledgeGateway",
     "PamiLLMGateway",
     "PamiSearchGateway",
 ]

@@ -27,6 +27,10 @@ func ModelEmbeddings(ctx *gin.Context, modelID string, req map[string]interface{
 		gin_util.Response(ctx, nil, grpc_util.ErrorStatus(err_code.Code_BFFGeneral, fmt.Sprintf("model %v embeddings err: %v", modelInfo.ModelId, err)))
 		return
 	}
+	// The callback route is addressed by PAMI's internal model ID, while the
+	// upstream provider expects the real vendor model name. Never forward the
+	// internal ID as the provider's `model` parameter.
+	req = embeddingRequestForProvider(req, modelInfo.Model)
 	iEmbedding, ok := embedding.(mp.IEmbedding)
 	if !ok {
 		gin_util.Response(ctx, nil, grpc_util.ErrorStatus(err_code.Code_BFFGeneral, fmt.Sprintf("model %v embeddings err: invalid provider", modelInfo.ModelId)))
@@ -47,4 +51,13 @@ func ModelEmbeddings(ctx *gin.Context, modelID string, req map[string]interface{
 		return
 	}
 	gin_util.Response(ctx, nil, grpc_util.ErrorStatus(err_code.Code_BFFGeneral, fmt.Sprintf("model %v embeddings err: invalid resp", modelInfo.ModelId)))
+}
+
+func embeddingRequestForProvider(req map[string]interface{}, model string) map[string]interface{} {
+	ret := make(map[string]interface{}, len(req)+1)
+	for key, value := range req {
+		ret[key] = value
+	}
+	ret["model"] = model
+	return ret
 }

@@ -1,10 +1,9 @@
-"""AI 相关 Gateway：模型调用 / 嵌入 / 知识库检索 / 全文与向量检索。
+"""AI 相关 Gateway：模型调用、嵌入与统一检索。
 
 第一期默认实现（见 zhiyin-infrastructure）：
 - LLMGateway           → LocalOrMockLLM（有环境变量接模型，否则返回固定结构化结果）
 - EmbedGateway         → LocalHashEmbedder（确定性伪向量，仅用于打通链路）
-- KnowledgeGateway     → LocalKnowledgeRepo（本地 JSON）
-- SearchGateway        → LocalKeywordSearch（简单关键词匹配）
+- SearchGateway        → LocalSearchGateway（本地 JSON）
 """
 
 from __future__ import annotations
@@ -13,6 +12,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+from zhiyin_kernel.retrieval import RetrievalEvidence, RetrievalQuery
 
 
 class LLMMessage(BaseModel):
@@ -77,57 +77,9 @@ class EmbedGateway(ABC):
         """批量嵌入。返回顺序必须与入参一一对应（错位会让检索静默错乱）。"""
 
 
-class KnowledgeHit(BaseModel):
-    """知识库命中。"""
-
-    model_config = ConfigDict(extra="forbid")
-
-    doc_id: str
-    title: str = ""
-    snippet: str = ""
-    score: float = 0.0
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
-class KnowledgeGateway(ABC):
-    """知识库检索 Port。用于给诊断 / 决策 / 行动供事实。"""
-
-    @abstractmethod
-    async def search(
-        self,
-        query: str,
-        *,
-        top_k: int = 5,
-        namespace: Optional[str] = None,
-        filters: Optional[dict[str, Any]] = None,
-    ) -> list[KnowledgeHit]:
-        """按语义检索知识。namespace 如 profession / occupation / policy。"""
-
-
-class SearchHit(BaseModel):
-    """检索命中。"""
-
-    model_config = ConfigDict(extra="forbid")
-
-    id: str
-    content: str
-    score: float = 0.0
-    metadata: dict[str, Any] = Field(default_factory=dict)
-
-
 class SearchGateway(ABC):
-    """检索 Port。屏蔽关键词 / 向量 / 混合检索的差异（R-SDK-004）。"""
+    """唯一检索 Port，统一知识域、过滤条件和召回方式。"""
 
     @abstractmethod
-    async def keyword(self, query: str, *, top_k: int = 10) -> list[SearchHit]:
-        """关键词检索。"""
-
-    @abstractmethod
-    async def vector(
-        self, embedding: list[float], *, top_k: int = 10
-    ) -> list[SearchHit]:
-        """向量检索。第一期固定返回空列表（TODO(第二期) 接 pgvector）。"""
-
-    @abstractmethod
-    async def hybrid(self, query: str, *, top_k: int = 10) -> list[SearchHit]:
-        """混合检索。第一期退化为关键词检索。"""
+    async def search(self, request: RetrievalQuery) -> list[RetrievalEvidence]:
+        """执行关键词、向量或混合检索，并返回统一证据模型。"""

@@ -3,8 +3,7 @@
   "items": [
     { "port": "llm", "owner": "基础设施负责人", "scope": "模型接入与降级策略" },
     { "port": "embedding", "owner": "数据访问负责人", "scope": "嵌入模型接入与版本管理" },
-    { "port": "knowledge", "owner": "数据访问负责人", "scope": "知识库检索（pami knowledge-service）" },
-    { "port": "search", "owner": "数据访问负责人", "scope": "关键词 / 向量 / 混合检索" },
+    { "port": "search", "owner": "数据访问负责人", "scope": "六知识域关键词 / 向量 / 混合检索唯一入口" },
     { "port": "vector", "owner": "数据访问负责人", "scope": "向量库（pgvector）" },
     { "port": "cache", "owner": "数据访问负责人", "scope": "缓存（Redis）" },
     { "port": "object_store", "owner": "基础设施负责人", "scope": "对象存储（MinIO）" },

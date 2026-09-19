@@ -27,7 +27,9 @@ from zhiyin_kernel.enums import (
 from zhiyin_kernel.identity import UserAccount
 
 from zhiyin_infrastructure.local.feature_flag import LocalFeatureFlagStore
-from zhiyin_infrastructure.local.knowledge import LocalKnowledgeRepo
+from zhiyin_infrastructure.local.knowledge import LocalSearchGateway
+from zhiyin_kernel.enums import RetrievalNamespace
+from zhiyin_kernel.retrieval import RetrievalQuery
 from zhiyin_infrastructure.local.llm import synthesize_from_schema
 from zhiyin_infrastructure.local.object_store import LocalFileStore
 from zhiyin_infrastructure.local.repository import (
@@ -451,8 +453,12 @@ async def test_local_file_store_blocks_path_traversal(tmp_path) -> None:
 
 
 async def test_knowledge_search_ranks_and_respects_namespace() -> None:
-    repo = LocalKnowledgeRepo(str(DATA_DIR / "knowledge"))
-    hits = await repo.search("霍兰德", namespace="theory", top_k=3)
+    repo = LocalSearchGateway(str(DATA_DIR / "knowledge"))
+    hits = await repo.search(
+        RetrievalQuery(
+            query="霍兰德", namespace=RetrievalNamespace.THEORY, top_k=3
+        )
+    )
     assert hits, "应能在 theory 命名空间命中霍兰德相关条目"
     assert hits[0].metadata["namespace"] == "theory"
 
@@ -462,11 +468,14 @@ async def test_knowledge_search_ranks_and_respects_namespace() -> None:
 
 
 async def test_knowledge_search_vector_degrades_to_empty() -> None:
-    from zhiyin_infrastructure.local.knowledge import LocalKeywordSearch
-
-    search = LocalKeywordSearch(str(DATA_DIR / "knowledge"))
-    assert await search.vector([0.1, 0.2]) == []
-    assert await search.hybrid("霍兰德", top_k=2) == await search.keyword("霍兰德", top_k=2)
+    search = LocalSearchGateway(str(DATA_DIR / "knowledge"))
+    vector = RetrievalQuery(
+        query="霍兰德", namespace=RetrievalNamespace.THEORY, mode="vector", top_k=2
+    )
+    keyword = vector.model_copy(update={"mode": "keyword"})
+    hybrid = vector.model_copy(update={"mode": "hybrid"})
+    assert await search.search(vector) == []
+    assert await search.search(hybrid) == await search.search(keyword)
 
 
 # --------------------------------------------------------------------------

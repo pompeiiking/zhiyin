@@ -8,7 +8,9 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from zhiyin_data_sdk.errors import ValidationError
-from zhiyin_data_sdk.gateways.ai import SearchGateway, SearchHit
+from zhiyin_data_sdk.gateways.ai import SearchGateway
+from zhiyin_kernel.enums import RetrievalNamespace
+from zhiyin_kernel.retrieval import RetrievalEvidence, RetrievalQuery
 from zhiyin_data_sdk.gateways.vector import VectorRecord
 from zhiyin_infrastructure.local.embedding import LocalHashEmbedder
 from zhiyin_infrastructure.local.vector_store import LocalVectorStore
@@ -147,19 +149,17 @@ def test_transaction_manager_commits_and_rolls_back(tmp_path: Path) -> None:
 
 
 class FakeKeywordSearch(SearchGateway):
-    async def keyword(self, query: str, *, top_k: int = 10) -> list[SearchHit]:
+    async def search(self, request: RetrievalQuery) -> list[RetrievalEvidence]:
         return [
-            SearchHit(id="shared", content="共同命中", score=10),
-            SearchHit(id="keyword", content="关键词命中", score=9),
-        ][:top_k]
-
-    async def vector(
-        self, embedding: list[float], *, top_k: int = 10
-    ) -> list[SearchHit]:
-        return []
-
-    async def hybrid(self, query: str, *, top_k: int = 10) -> list[SearchHit]:
-        return await self.keyword(query, top_k=top_k)
+            RetrievalEvidence(
+                evidence_id="shared", namespace=request.namespace,
+                content="共同命中", score=10
+            ),
+            RetrievalEvidence(
+                evidence_id="keyword", namespace=request.namespace,
+                content="关键词命中", score=9
+            ),
+        ][:request.top_k]
 
 
 @pytest.mark.asyncio
@@ -177,11 +177,15 @@ async def test_rrf_hybrid_search_merges_both_channels() -> None:
     )
     search = RrfHybridSearchGateway(FakeKeywordSearch(), embedding, vector, rrf_k=60)
 
-    hits = await search.hybrid("目标", top_k=3)
+    hits = await search.search(
+        RetrievalQuery(
+            query="目标", namespace=RetrievalNamespace.THEORY, top_k=3
+        )
+    )
 
-    assert hits[0].id == "shared"
+    assert hits[0].evidence_id == "shared"
     assert hits[0].metadata["retrieval"]["ranks"] == {"keyword": 1, "vector": 1}
-    assert {hit.id for hit in hits} == {"shared", "keyword", "vector"}
+    assert {hit.evidence_id for hit in hits} == {"shared", "keyword", "vector"}
 
 
 @pytest.mark.asyncio

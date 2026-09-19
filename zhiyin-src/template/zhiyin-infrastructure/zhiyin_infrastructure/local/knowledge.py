@@ -1,7 +1,7 @@
-"""本地知识与检索（LocalKnowledgeRepo / LocalKeywordSearch）。
+"""本地统一检索实现。
 
-第一期：知识卡与理论卡从本地 JSON 读取；检索退化为关键词匹配。
-TODO(第二期)：替换为 pami 向量检索 / RAG（见 §十替换点）。
+本地模式从 JSON 读取知识卡并提供关键词匹配；生产模式由 Boot 使用
+PAMI Embedding、pgvector 与 RRF 组合成统一 Search 实现。
 
 与《业务数据采集与存储来源设计》的对应关系：
 - `data/knowledge/{namespace}.json` 是**公共知识库**（专业 / 职业 / 岗位 / 政策），
@@ -14,41 +14,27 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
-from zhiyin_data_sdk.gateways.ai import (
-    KnowledgeGateway,
-    KnowledgeHit,
-    SearchGateway,
-    SearchHit,
-)
+from zhiyin_data_sdk.gateways.ai import SearchGateway
+from zhiyin_kernel.retrieval import RetrievalEvidence, RetrievalQuery
 
-# TODO(第一期未闭合): OPEN-2 —— 本文件（知识库 + 关键词检索）与 data/knowledge/ 数据
-# 都已交付并有测试，但 `zhiyin-business` / `zhiyin-orchestration` 中**零处**引用
-# KnowledgeGateway / SearchGateway：② 诊断与 ③ 决策的 theory_refs 仍是模型占位串，
-# 未达成《工作清单》4.5「保证诊断与决策能通过关键词检索引用来源」。
-# 清单：docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md（OPEN-2）。
-_DEFAULT_NAMESPACES = ("profession", "occupation", "jd", "theory")
+class LocalSearchGateway(SearchGateway):
+    """按 namespace 读取本地 JSON；本地环境只提供关键词通道。"""
 
-
-class LocalKnowledgeRepo(KnowledgeGateway):
-    """本地知识库：按 namespace 读 JSON，做分词包含匹配。"""
+    IMPLEMENTATION_STATUS = "wired"
 
     def __init__(self, data_dir: str = "data/knowledge") -> None:
         self._data_dir = Path(data_dir)
         self._cache: dict[str, list[dict[str, Any]]] = {}
 
-    async def search(
-        self,
-        query: str,
-        *,
-        top_k: int = 5,
-        namespace: Optional[str] = None,
-        filters: Optional[dict[str, Any]] = None,
-    ) -> list[KnowledgeHit]:
-        namespaces = [namespace] if namespace else list(_DEFAULT_NAMESPACES)
-        terms = _terms(query)
-        scored: list[tuple[float, KnowledgeHit]] = []
+    async def search(self, request: RetrievalQuery) -> list[RetrievalEvidence]:
+        if request.mode == "vector":
+            return []
+        namespace = request.namespace.value
+        namespaces = [namespace]
+        terms = _terms(request.query)
+        scored: list[tuple[float, RetrievalEvidence]] = []
 
         for space in namespaces:
             for index, raw in enumerate(self._load(space)):
@@ -57,7 +43,7 @@ class LocalKnowledgeRepo(KnowledgeGateway):
                 review_status = raw.get("review_status")
                 if review_status is not None and review_status != "approved":
                     continue
-                if filters and not _match_filters(raw, filters):
+                if request.filters and not _match_filters(raw, request.filters):
                     continue
                 score = _score(raw, terms)
                 if score <= 0:
@@ -66,18 +52,22 @@ class LocalKnowledgeRepo(KnowledgeGateway):
                 scored.append(
                     (
                         score,
-                        KnowledgeHit(
-                            doc_id=str(raw.get("id") or f"{space}-{index}"),
+                        RetrievalEvidence(
+                            evidence_id=str(raw.get("id") or f"{space}-{index}"),
+                            namespace=request.namespace,
+                            source_id=str(raw.get("source_id") or raw.get("id") or ""),
+                            source_url=str(raw.get("source_url") or ""),
                             title=str(raw.get("title") or raw.get("name") or ""),
-                            snippet=str(raw.get("summary") or raw.get("content") or ""),
+                            content=str(raw.get("summary") or raw.get("content") or ""),
                             score=score,
+                            version=max(int(raw.get("version") or 1), 1),
                             metadata=metadata,
                         ),
                     )
                 )
 
-        scored.sort(key=lambda item: (-item[0], item[1].doc_id))
-        return [hit for _, hit in scored[: max(top_k, 0)]]
+        scored.sort(key=lambda item: (-item[0], item[1].evidence_id))
+        return [hit for _, hit in scored[: request.top_k]]
 
     def _load(self, namespace: str) -> list[dict[str, Any]]:
         if namespace in self._cache:
@@ -94,28 +84,6 @@ class LocalKnowledgeRepo(KnowledgeGateway):
     def reload(self) -> None:
         """清缓存，用于演示"改知识库不重启"。"""
         self._cache.clear()
-
-
-class LocalKeywordSearch(SearchGateway):
-    """本地关键词检索。第一期为包含匹配 + 打分排序。"""
-
-    def __init__(self, data_dir: str = "data/knowledge") -> None:
-        self._repo = LocalKnowledgeRepo(data_dir)
-
-    async def keyword(self, query: str, *, top_k: int = 10) -> list[SearchHit]:
-        hits = await self._repo.search(query, top_k=top_k)
-        return [
-            SearchHit(id=hit.doc_id, content=hit.snippet or hit.title, score=hit.score, metadata=hit.metadata)
-            for hit in hits
-        ]
-
-    async def vector(self, embedding: list[float], *, top_k: int = 10) -> list[SearchHit]:
-        """第一期固定返回空列表（TODO(第二期) 接 pgvector）。"""
-        return []
-
-    async def hybrid(self, query: str, *, top_k: int = 10) -> list[SearchHit]:
-        """第一期退化为关键词检索。"""
-        return await self.keyword(query, top_k=top_k)
 
 
 def _terms(query: str) -> list[str]:
@@ -166,4 +134,4 @@ def _match_filters(raw: dict[str, Any], filters: dict[str, Any]) -> bool:
     return True
 
 
-__all__ = ["LocalKeywordSearch", "LocalKnowledgeRepo"]
+__all__ = ["LocalSearchGateway"]

@@ -51,10 +51,10 @@ python -m zhiyin_boot                    # 启动：http://127.0.0.1:8000/api/v1
 zhiyinbase 源码位于 `platform/wanwu/`，职引后端与 zhiyinbase 通过 `wanwu-net` 内部网络运行。
 
 ```powershell
-python deploy/init_env.py
-pwsh deploy/up.ps1
-pwsh deploy/verify.ps1
-pwsh deploy/down.ps1
+python zhiyin-src/template/deploy/init_env.py
+pwsh zhiyin-src/template/deploy/up.ps1
+pwsh zhiyin-src/template/deploy/verify.ps1
+pwsh zhiyin-src/template/deploy/down.ps1
 ```
 
 当前交付包含 zhiyinbase 源码快照、独立构建、统一 Compose 和原生接口路由。

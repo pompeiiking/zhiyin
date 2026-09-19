@@ -52,7 +52,6 @@ class Container:
     # ---- Gateways ----
     llm: Any
     embedding: Any
-    knowledge: Any
     search: Any
     vector: Any
     cache: Any
@@ -119,6 +118,11 @@ def build_container(settings: Optional[Settings] = None) -> Container:
         for key in list(gateway_values)
         if key.startswith("redis_")
     }
+    infrastructure_extras = {
+        key: gateway_values.pop(key)
+        for key in list(gateway_values)
+        if key in {"retrieval_authority"}
+    }
     database_context = repository_values.pop("_database_context", None)
     container = Container(
         settings=settings,
@@ -128,6 +132,7 @@ def build_container(settings: Optional[Settings] = None) -> Container:
         **repository_values,
     )
     container.extra.update(redis_extras)
+    container.extra.update(infrastructure_extras)
     if database_context is not None:
         container.extra["database_context"] = database_context
         configure_audit = getattr(container.search, "configure_audit", None)
@@ -248,6 +253,10 @@ def wire_application(container: Optional[Container] = None) -> Any:
             close_transactions = getattr(container.transactions, "close", None)
             if callable(close_transactions):
                 close_transactions()
+            retrieval_authority = container.extra.get("retrieval_authority")
+            close_authority = getattr(retrieval_authority, "close", None)
+            if callable(close_authority):
+                close_authority()
             database_context = container.extra.get("database_context")
             close_database = getattr(database_context, "close", None)
             if callable(close_database):

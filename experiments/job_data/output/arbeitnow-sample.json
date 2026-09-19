@@ -1,0 +1,198 @@
+{
+  "_meta": {
+    "experiment": "public-job-api-ingestion",
+    "source_id": "arbeitnow-public-api",
+    "api_url": "https://www.arbeitnow.com/api/job-board-api",
+    "stored": 8,
+    "rejected": 0,
+    "raw_response_persisted": false,
+    "notice": "实验快照；展示或复用时必须保留 source_url 和来源归属。"
+  },
+  "items": [
+    {
+      "id": "arbeitnow-public-api:hubspot-crm-consultant-sales-marketing-service-hub-freiburg-im-breisgau-411974",
+      "source_id": "arbeitnow-public-api",
+      "source_item_id": "hubspot-crm-consultant-sales-marketing-service-hub-freiburg-im-breisgau-411974",
+      "title": "HubSpot CRM Consultant - Sales, Marketing & Service Hub (m/w/d)",
+      "company_name": "itelligy - digital experts GmbH & Co. KG",
+      "location": "Freiburg im Breisgau",
+      "remote": true,
+      "job_types": [
+        "berufserfahren"
+      ],
+      "tags": [
+        "Remote",
+        "Consulting",
+        "Engineering"
+      ],
+      "description_summary": "itelligy - digital experts ist eine dynamische IT-Beratung, die sich auf CRM-, ERP- und digitale Geschäftsprozesslösungen spezialisiert hat. Wir arbeiten mit führenden Plattformen wie HubSpot und Microsoft Dynamics 365 und integrieren diese nahtlos in die IT-Infrastruktur unserer Kunden. Unser Ziel ist es, digitale Transformationen voranzutreiben und Kunden zu helfen, effizientere und datenbasierte Entscheidungen zu treffen. Für unser wachsendes HubSpot-Geschäft suchen wir Dich: eine/n erfahrene/n HubSpot-Expert/in, der/die die Plattform in- und auswendig kennt, Kundenprojekte eigenverantwortlich steuert und HubSpot nicht nur einführt, sondern zum echten Wachstumsmotor unserer Kunden macht. Aufgaben Deine Aufgaben: HubSpot-Einführungen von A bis Z: Du verantwortest die Konzeption und Implementierung von Sales Hub, Marketing Hub und Service Hub – von der Anforderungsaufnahme über das Setup bis zum Go-live und Hypercare. Integration & Systemarchitektur: Du bindest HubSpot an bestehende Systemlandschaften an (ERP, BI, Telefonie, Webshops etc.) – via nativer Integrationen, Middleware oder API – und sorgst für saubere Datenflüsse und hohe Datenqualität. Prozessberatung: Du analysierst d",
+      "published_at": "2026-09-16T01:00:36+00:00",
+      "source_url": "https://www.arbeitnow.com/jobs/companies/itelligy-digital-experts-gmbh-co-kg/hubspot-crm-consultant-sales-marketing-service-hub-freiburg-im-breisgau-411974",
+      "fetched_at": "2026-09-16T01:56:54.059006+00:00",
+      "content_hash": "290e4739d90afabc098d36ab905a8ef226b2dbdd8118136a1c4e4a9cb1133986"
+    },
+    {
+      "id": "arbeitnow-public-api:werkstudent-growth-associate-berlin-132806",
+      "source_id": "arbeitnow-public-api",
+      "source_item_id": "werkstudent-growth-associate-berlin-132806",
+      "title": "Werkstudent Growth Associate (m/w/d)",
+      "company_name": "Eneto GmbH",
+      "location": "Berlin",
+      "remote": true,
+      "job_types": [],
+      "tags": [
+        "Remote",
+        "Marketing and Communication"
+      ],
+      "description_summary": "Bei Eneto machen wir moderne Klimaanlagen- und Heizlösungen schnell, einfach und bezahlbar zugänglich. Mit hochwertigen Markenprodukten, klaren Prozessen und transparenten Festpreisen kommen Kunden ohne Aufwand zur optimalen Lösung. Über 70.000 Kundenerfahrungen aus früheren Energieprojekten bilden unsere Basis. Unser Marketingteam ist klein, bewegt aber viel – und genau deshalb suchen wir jemanden, der nicht wartet, bis ihm etwas gesagt wird, sondern selbst denkt, anpackt und mitgestaltet. Wer Verantwortung übernehmen will, bekommt sie bei uns. Aufgaben Du arbeitest direkt mit den Gründern an strategischen und operativen Themen, die gerade anstehen – von Produkt über Business Development bis Marketing. Du übernimmst eigene Projekte entlang der Wachstumshebel: neue Vertriebskanäle aufbauen, Partnerschaften anbahnen, Prozesse aufsetzen, Angebote schärfen. Du analysierst, wo wir Hebel haben, leitest Hypothesen ab und testest sie – ob im Funnel, im Produkt oder im Vertrieb. Du recherchierst Märkte, Wettbewerber und Kooperationsmöglichkeiten und bereitest Entscheidungen vor. Du springst dort ein, wo es brennt – im jungen Unternehmen heißt das: heute Partnergespräche vorbereiten, morgen",
+      "published_at": "2026-09-16T00:00:35+00:00",
+      "source_url": "https://www.arbeitnow.com/jobs/companies/eneto-gmbh/werkstudent-growth-associate-berlin-132806",
+      "fetched_at": "2026-09-16T01:56:54.059006+00:00",
+      "content_hash": "8ac15add4ef150007bc50ac59d5bc8f44b317c135be5b9a5e81a249353e2f2b4"
+    },
+    {
+      "id": "arbeitnow-public-api:produktmanager-managed-services-cloud-infrastructure-remote-259169",
+      "source_id": "arbeitnow-public-api",
+      "source_item_id": "produktmanager-managed-services-cloud-infrastructure-remote-259169",
+      "title": "Produktmanager Managed Services - Cloud & Infrastructure (m/w/d) - Remote",
+      "company_name": "Swissitsecuritygroup",
+      "location": "",
+      "remote": false,
+      "job_types": [],
+      "tags": [
+        "Product Management"
+      ],
+      "description_summary": "Du willst die Zukunft moderner Cloud- und Infrastruktur-Services aktiv mitgestalten? Begeistert es Dich, technische Innovationen in marktfähige Services zu übersetzen und dabei die Schnittstelle zwischen Kunden, Vertrieb und Delivery zu bilden? Dann werde Teil unseres Teams als Produktmanager (m/w/d) Managed Services mit Schwerpunkt Cloud & Infrastructure . In dieser Rolle verantwortest Du die Weiterentwicklung unseres Serviceportfolios und sorgst dafür, dass unsere Managed Services kundenorientiert, wirtschaftlich, vertrieblich nutzbar und operativ erfolgreich bereitstellbar sind. Gemeinsam gestalten wir innovative Serviceangebote für die Herausforderungen von morgen. „Wir suchen keine klassischen Produktverkäufer. Wir suchen Menschen, die Kunden strategisch begleiten, komplexe Herausforderungen verstehen und daraus langfristige Services entwickeln. Wer Managed Services erfolgreich verkaufen will, muss Technologie, Betrieb und Business gleichermaßen verstehen.“ Christoph Wolf, Managing Director Secure IT Services Du fühlst Dich angesprochen? Unser Team wächst stetig und wir suchen Dich als Produktmanager (m/w/d) Managed Services an einem unserer Standorte oder Remote . WAS DU BEI ",
+      "published_at": "2026-09-15T23:55:19+00:00",
+      "source_url": "https://www.arbeitnow.com/jobs/companies/swissitsecuritygroup/produktmanager-managed-services-cloud-infrastructure-remote-259169",
+      "fetched_at": "2026-09-16T01:56:54.059006+00:00",
+      "content_hash": "5450e250c9252bdd43ebf1f289e57b774caa32ebad9eb36fd7f1eff38903b3ab"
+    },
+    {
+      "id": "arbeitnow-public-api:senior-global-hr-business-partner-regensburg-212494",
+      "source_id": "arbeitnow-public-api",
+      "source_item_id": "senior-global-hr-business-partner-regensburg-212494",
+      "title": "Senior Global HR Business Partner (m/f/d)",
+      "company_name": "SGB-SMIT Group",
+      "location": "Regensburg, Bayern, Germany",
+      "remote": false,
+      "job_types": [
+        "Experienced",
+        "fulltime permanent"
+      ],
+      "tags": [
+        "Human Resources"
+      ],
+      "description_summary": "Transform with us the future of energy ⚡ The SGB‑SMIT Group is an international transformer manufacturer with locations in Europe, Asia and the United States . With reliable transformer technology, the company actively supports the global energy transition in areas such as renewable energy, industry and urban energy infrastructure. As a key link between power generation, transmission and distribution, SGB‑SMIT Group develops and manufactures power transformers, distribution transformers, cast‑resin transformers and custom solutions for data centers, industrial applications and e‑mobility. These products ensure efficient, stable and secure energy flows worldwide. With more than 3,800 employees worldwide, the SGB‑SMIT Group stands for quality, innovation and sustainability and offers a stable environment to work on technologies that shape the energy systems of the future. What sets the SGB-SMIT Group apart : 🌍 We combine the strength of an international technology company with an employee-oriented corporate culture : Meaningful work at the heart of the energy transition Short decision-making processes and direct cooperation Stable, growing company with long-term prospects Your contri",
+      "published_at": "2026-09-15T23:30:02+00:00",
+      "source_url": "https://www.arbeitnow.com/jobs/companies/sgb-smit-group/senior-global-hr-business-partner-regensburg-212494",
+      "fetched_at": "2026-09-16T01:56:54.059006+00:00",
+      "content_hash": "df85f6388c00bcdaaad693ad713e895bdf083b959dd9f3b902b2309f40037b7d"
+    },
+    {
+      "id": "arbeitnow-public-api:remote-managing-director-germany-149083",
+      "source_id": "arbeitnow-public-api",
+      "source_item_id": "remote-managing-director-germany-149083",
+      "title": "Managing Director",
+      "company_name": "Valsoft Corp",
+      "location": "Germany",
+      "remote": true,
+      "job_types": [
+        "Full time",
+        "director"
+      ],
+      "tags": [
+        "Management",
+        "Computer Software",
+        "Helios Software Group",
+        "Remote"
+      ],
+      "description_summary": "Description Valsoft specialises in acquiring and growing vertical market software companies. Our mission is to provide a permanent home for software businesses, preserving the legacy of their founders while investing in the long-term growth and success of the companies we acquire. We operate and manage a global portfolio of wholly owned software businesses, delivering mission-critical solutions across multiple verticals. By implementing industry best practices, Valsoft ensures a time-sensitive integration process and operates a decentralised model, fostering rapid growth through reinvestment in its portfolio. The Role: This position provides critical operational leadership to a company and potentially a portfolio of companies within a growing software vertical. As the leader of a company, you will be responsible for developing and implementing the business’s strategic plan across all major functions, including sales and marketing, R&D, customer service, professional services, and human resources. You will work closely with the leadership team to identify, define, and execute strategies required to achieve growth plans and operating objectives, with a focus on improving operational ",
+      "published_at": "2026-09-15T23:20:05+00:00",
+      "source_url": "https://www.arbeitnow.com/jobs/companies/valsoft-corp/remote-managing-director-germany-149083",
+      "fetched_at": "2026-09-16T01:56:54.059006+00:00",
+      "content_hash": "a2a4a4d96e04c64da049f60c59b5718b3a3442bc7d4da8602ed7dd2ea2e8d933"
+    },
+    {
+      "id": "arbeitnow-public-api:tech-advisory-senior-consultant-munchen-445290",
+      "source_id": "arbeitnow-public-api",
+      "source_item_id": "tech-advisory-senior-consultant-munchen-445290",
+      "title": "Tech Advisory Senior Consultant (m/w/d)",
+      "company_name": "Trusteq Gmbh",
+      "location": "München",
+      "remote": false,
+      "job_types": [
+        "Experienced",
+        "Permanent",
+        "Full time"
+      ],
+      "tags": [
+        "Tech Advisory",
+        "Consulting",
+        "Consultant"
+      ],
+      "description_summary": "YOUR TASKS As a Senior Consultant (m/f/d) in the Tech Advisory area, you will take on a key role in complex transformation projects. You will support our clients in the digital and organizational evolution of their business models and processes - from strategy development through to operational implementation. You will work at the intersection of business, technology, and change management, applying agile methodologies in a targeted and effective way. In transformation projects, you will play a central role by bringing structure, clarity, and strong execution capabilities. Your responsibilities will include a wide range of tasks: Supporting transformation initiatives: Assisting clients in the structured development and optimization of organizations, processes, and ways of working Interface management between business and IT: Gathering, structuring, and aligning business requirements while ensuring a shared understanding of project objectives (Partial) project management: Independently planning, coordinating, and delivering projects with a strong focus on sustainable results Applying agile methodologies: Using agile ways of working and taking on relevant roles (e.g. Scrum Master or ",
+      "published_at": "2026-09-15T23:09:56+00:00",
+      "source_url": "https://www.arbeitnow.com/jobs/companies/trusteq-gmbh/tech-advisory-senior-consultant-munchen-445290",
+      "fetched_at": "2026-09-16T01:56:54.059006+00:00",
+      "content_hash": "435e69379838e98c7a0e8b2bec474c60f8a4c9e472778a543edf5a723602f2f9"
+    },
+    {
+      "id": "arbeitnow-public-api:hr-management-intern-working-student-munchen-322412",
+      "source_id": "arbeitnow-public-api",
+      "source_item_id": "hr-management-intern-working-student-munchen-322412",
+      "title": "HR Management Intern / Working Student (m/w/d)",
+      "company_name": "Trusteq Gmbh",
+      "location": "München",
+      "remote": false,
+      "job_types": [
+        "Student",
+        "Intern",
+        "Full time"
+      ],
+      "tags": [
+        "Working Student",
+        "Intern",
+        "People & Culture",
+        "HR",
+        "People Operations",
+        "HR Management",
+        "HR Internship",
+        "HR Generalist",
+        "Employee Life Cycle"
+      ],
+      "description_summary": "YOUR TASKS You support our HR team in day-to-day operations across the entire employee lifecycle - from onboarding and contract changes to offboarding. Together wit the team, you will work on further develop and digitize our HR processes and digital personnel files. You will help us make our workflows more efficient, transparent, user-friendly, and scalable. You will support us capture all HR-related data in our digital HR tool and organize it in a structured manner. You will also take on smaller independent projects (e.g., analyzing employee surveys, organizing training sessions or internal celebrations, and revising retirement plans and benefits). YOUR PROFIL You are a student majoring in Human Resources Management, Business Psychology, Social Sciences, Labor Law, or a comparable degree program. You’re interested in people, operational HR management, employee experience, and digital transformation. Ideally, you have already gained some initial practical experience in HR, for example through internships, working student roles, or student initiatives. You work in a structured, careful, and reliable manner and are able to keep track of multiple tasks running in parallel. You handle ",
+      "published_at": "2026-09-15T23:09:56+00:00",
+      "source_url": "https://www.arbeitnow.com/jobs/companies/trusteq-gmbh/hr-management-intern-working-student-munchen-322412",
+      "fetched_at": "2026-09-16T01:56:54.059006+00:00",
+      "content_hash": "7f863ae214eb4914ef150b0bd4c411d89dccba923da5240d3a592a8eb710581f"
+    },
+    {
+      "id": "arbeitnow-public-api:digital-ecosystem-working-student-munchen-126494",
+      "source_id": "arbeitnow-public-api",
+      "source_item_id": "digital-ecosystem-working-student-munchen-126494",
+      "title": "Digital Ecosystem Working Student (m/w/d)",
+      "company_name": "Trusteq Gmbh",
+      "location": "München",
+      "remote": false,
+      "job_types": [
+        "Student",
+        "Working student",
+        "Part time"
+      ],
+      "tags": [
+        "Working Student",
+        "Digital ecosystem",
+        "KI ecosystem",
+        "Digital Identity",
+        "KI",
+        "AI"
+      ],
+      "description_summary": "YOUR TASKS You support our project teams in consulting engagements focused on holistic digital ecosystems for the deployment of artificial intelligence (AI) and technologies You develop concepts, feasibility studies, and, where applicable, prototypes in close coordination with your project team You conduct initial independent market analyses, strategic reviews, and synergy assessments You review regulatory requirements and derive recommendations to ensure compliance with applicable legal frameworks (e.g., eIDAS 2.0 or the EU AI Act) You collaborate closely with clients and project teams and gain initial experience in presenting complex topics in a clear and structured manner YOUR PROFIL You are currently enrolled in a Master’s program in Business Administration, (Business) Informatics, Engineering, Natural Sciences, Mathematics, or a related discipline You bring initial relevant professional experience for the role (e.g., internships or working student positions), ideally gained in a consulting environment You have a strong interest in IT-oriented management consulting and in working as an IT strategy consultant You are interested in regulatory frameworks or ideally have already ga",
+      "published_at": "2026-09-15T23:09:56+00:00",
+      "source_url": "https://www.arbeitnow.com/jobs/companies/trusteq-gmbh/digital-ecosystem-working-student-munchen-126494",
+      "fetched_at": "2026-09-16T01:56:54.059006+00:00",
+      "content_hash": "9f5baf88283eeaf8855c5b2dfe25b2e30ff9619983bfc718406dd97b001c71b0"
+    }
+  ]
+}

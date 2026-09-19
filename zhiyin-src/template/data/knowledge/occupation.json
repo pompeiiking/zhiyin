@@ -7,6 +7,7 @@
       "summary": "从事软件设计、编码、测试与维护的技术岗位，核心能力为编程语言、数据结构与工程协作。",
       "tags": ["计算机", "编程", "工程"],
       "occupation_code": "2-02-10-01",
+      "content_type": "career",
       "requirement_structure": {
         "knowledge": ["数据结构与算法", "操作系统", "计算机网络"],
         "skill": ["至少一门主流语言", "版本控制", "单元测试"],
@@ -19,7 +20,7 @@
       "namespace": "occupation",
       "version": 1,
       "status": "enabled",
-      "content_hash": "0db3b749c5f0fc3d99b95c1c508e768c74359787f249463e908ae441b1ac698e"
+      "content_hash": "b6dfa71c79b99f4f9944d97d9d2fc75c49bf13e9ba9f870f86cdbd16127e7e46"
     },
     {
       "id": "occ-2-06-03-02",
@@ -27,6 +28,7 @@
       "summary": "负责需求发现、方案设计与跨职能推进，核心能力为需求洞察、方案表达与协作推动。",
       "tags": ["产品", "需求", "协作"],
       "occupation_code": "2-06-03-02",
+      "content_type": "career",
       "requirement_structure": {
         "knowledge": ["用户研究方法", "行业与竞品常识"],
         "skill": ["需求文档", "原型工具", "数据分析"],
@@ -39,7 +41,23 @@
       "namespace": "occupation",
       "version": 1,
       "status": "enabled",
-      "content_hash": "95aacf27b5238143e8a699f1c8e2fd173a47b3117b03dc2d9de949c4a357e9e6"
+      "content_hash": "5f2ef7abc095e0edb374111731977f3062238db414b02576026796a73a63e0f3"
+    },
+    {
+      "id": "mj-0809",
+      "title": "计算机类专业",
+      "summary": "培养计算系统与软件设计能力，主干课程含程序设计、数据结构、操作系统、数据库与计算机网络。",
+      "tags": ["计算机", "专业", "课程"],
+      "major_code": "0809",
+      "content_type": "major",
+      "source_url": "https://gk.chsi.com.cn",
+      "fetched_at": "2026-09-14T00:00:00+00:00",
+      "source": "阳光志愿信息服务系统",
+      "source_id": "src-chsi-major-demo",
+      "namespace": "occupation",
+      "version": 1,
+      "status": "enabled",
+      "content_hash": "3b76c7123e9787403eb4f6ccce698d9eb19c34ec3eca44b4d817cce3a46b63f6"
     }
   ]
 }

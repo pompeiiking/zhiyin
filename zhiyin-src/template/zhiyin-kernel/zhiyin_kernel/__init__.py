@@ -43,6 +43,7 @@ from zhiyin_kernel.enums import (
     PlanRole,
     ProfileSource,
     ReviewAttribution,
+    RetrievalNamespace,
     TaskStatus,
     UserRole,
 )
@@ -95,6 +96,13 @@ from zhiyin_kernel.registry import (
     TrackEventSpec,
 )
 from zhiyin_kernel.worker import Worker
+from zhiyin_kernel.retrieval import (
+    EvidencePacket,
+    RetrievalEvidence,
+    RetrievalMode,
+    RetrievalPlan,
+    RetrievalQuery,
+)
 
 __all__ = [
     "AgentRole",
@@ -108,6 +116,7 @@ __all__ = [
     "PlanRole",
     "ProfileSource",
     "ReviewAttribution",
+    "RetrievalNamespace",
     "TaskStatus",
     "UserRole",
     "AssetVersion",
@@ -149,4 +158,9 @@ __all__ = [
     "TheoryCard",
     "TrackEventSpec",
     "Worker",
+    "EvidencePacket",
+    "RetrievalEvidence",
+    "RetrievalMode",
+    "RetrievalPlan",
+    "RetrievalQuery",
 ]

@@ -15,7 +15,6 @@
 GATEWAY_PORTS: tuple[str, ...] = (
     "llm",
     "embedding",
-    "knowledge",
     "search",
     "vector",
     "cache",
@@ -77,7 +76,6 @@ WORKER_PORTS: tuple[str, ...] = ("impact", "active_event", "vector_sync")
 # 启动前必须齐备的能力位：缺任何一个都不许带病启动。
 MINIMUM_VIABLE: tuple[str, ...] = (
     "llm",
-    "knowledge",
     "search",
     "object_store",
     "event_bus",

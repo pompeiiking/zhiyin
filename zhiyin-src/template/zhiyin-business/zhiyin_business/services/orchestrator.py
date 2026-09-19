@@ -42,6 +42,7 @@ from zhiyin_business.policies.axis_a import AxisAInferencePolicy
 from zhiyin_business.policies.handoff import HandoffPolicy
 from zhiyin_business.policies.routing import IntentPolicy, StagePolicy
 from zhiyin_business.policies.teaming import LeadPolicy
+from zhiyin_business.policies.retrieval import RetrievalPlanningPolicy
 from zhiyin_business.ports.blackboard import (
     AssetService,
     BehaviorService,
@@ -59,7 +60,7 @@ from zhiyin_business.ports.orchestrator import (
     TurnResult,
 )
 from zhiyin_business.services.loop import STAGE_OUTPUT_CONTRACTS, default_conclusion_builder
-from zhiyin_data_sdk.gateways.ai import KnowledgeGateway, KnowledgeHit
+from zhiyin_data_sdk.gateways.ai import SearchGateway
 from zhiyin_data_sdk.repositories import RegistryRepository, TaskSessionRepository
 from zhiyin_kernel.assets import ActionPlan, DirectionPlan, PlanGap, Report
 from zhiyin_kernel.blackboard import AssetVersion, TaskSession
@@ -71,6 +72,7 @@ from zhiyin_kernel.enums import (
     PathFocus,
     TaskStatus,
 )
+from zhiyin_kernel.retrieval import EvidencePacket, RetrievalEvidence
 from zhiyin_orchestration import (
     AgentEngine,
     AgentRequest,
@@ -107,7 +109,8 @@ class DefaultOrchestrator(Orchestrator):
         lead_policy: LeadPolicy,
         handoff_policy: HandoffPolicy,
         agent_engine: AgentEngine,
-        knowledge: KnowledgeGateway,
+        search: SearchGateway,
+        retrieval_policy: RetrievalPlanningPolicy,
         state_store: StateStore,
         sessions: TaskSessionRepository,
         registry: RegistryRepository,
@@ -123,7 +126,8 @@ class DefaultOrchestrator(Orchestrator):
         self._lead_policy = lead_policy
         self._handoff_policy = handoff_policy
         self._agent_engine = agent_engine
-        self._knowledge = knowledge
+        self._search = search
+        self._retrieval_policy = retrieval_policy
         self._state_store = state_store
         self._sessions = sessions
         self._registry = registry
@@ -419,10 +423,12 @@ class DefaultOrchestrator(Orchestrator):
             raise RuntimeError("会话创建后无法读取")
 
         blackboard = await self.read_blackboard(request.user_id, session.id)
-        knowledge_hits = await self._load_knowledge_context(
+        evidence_packet = await self._load_retrieval_context(
             message=request.message,
             agent_id=session.lead_agent,
             stage=stage,
+            intent=intent.value,
+            user_id=request.user_id,
         )
         contract = STAGE_OUTPUT_CONTRACTS[stage]
         agent_result = await self._agent_engine.invoke(
@@ -433,7 +439,7 @@ class DefaultOrchestrator(Orchestrator):
                 prompt_vars={
                     "user_input": request.message,
                     "intent": intent.value,
-                    "knowledge_hits": [hit.model_dump(mode="json") for hit in knowledge_hits],
+                    "evidence_packet": evidence_packet.model_dump(mode="json"),
                 },
                 output_schema=contract.model_json_schema(),
             )
@@ -449,7 +455,9 @@ class DefaultOrchestrator(Orchestrator):
         else:
             output = contract.model_validate(agent_result.structured)
             if stage in {LoopStage.DIAGNOSE, LoopStage.DECIDE}:
-                theory_refs = self._theory_refs_from_hits(knowledge_hits, stage)
+                theory_refs = self._theory_refs_from_hits(
+                    evidence_packet.evidences, stage
+                )
                 output = output.model_copy(update={"theory_refs": theory_refs})
             else:
                 theory_refs = list(getattr(output, "theory_refs", []))
@@ -472,7 +480,7 @@ class DefaultOrchestrator(Orchestrator):
             request.user_id,
             stage,
             output,
-            knowledge_hits=knowledge_hits,
+            evidence_packet=evidence_packet,
         )
         await self._record_turn(
             user_id=request.user_id,
@@ -496,15 +504,23 @@ class DefaultOrchestrator(Orchestrator):
             asset_versions=created_versions,
         )
 
-    async def _load_knowledge_context(
+    async def _load_retrieval_context(
         self,
         *,
         message: str,
         agent_id: str,
         stage: LoopStage,
-    ) -> list[KnowledgeHit]:
-        if stage not in {LoopStage.DIAGNOSE, LoopStage.DECIDE}:
-            return []
+        intent: str,
+        user_id: str,
+    ) -> EvidencePacket:
+        plan = self._retrieval_policy.plan(
+            stage=stage,
+            intent=intent,
+            message=message,
+            user_id=user_id,
+        )
+        if not plan.required:
+            return EvidencePacket(stage=stage, question=message)
         descriptor = await self._registry.get_agent(agent_id)
         theory_cards = (
             await self._registry.list_theory_cards(descriptor.theory_packages)
@@ -514,20 +530,71 @@ class DefaultOrchestrator(Orchestrator):
         query_parts = [message]
         for card in theory_cards:
             query_parts.extend((card.name, card.summary))
-        query = " ".join(part.strip() for part in query_parts if part.strip())
-        if not query:
-            return []
-        return await self._knowledge.search(query, top_k=5, namespace="theory")
+        theory_query = " ".join(part.strip() for part in query_parts if part.strip())
+        queries = [
+            item.model_copy(update={"query": theory_query})
+            if item.namespace.value == "theory" and theory_query
+            else item
+            for item in plan.queries
+        ]
+        results = await asyncio.gather(
+            *(self._search.search(item) for item in queries),
+            return_exceptions=True,
+        )
+        evidences: list[RetrievalEvidence] = []
+        degraded: list[str] = []
+        for query, result in zip(queries, results, strict=True):
+            if isinstance(result, BaseException):
+                degraded.append(query.namespace.value)
+                continue
+            evidences.extend(result)
+        deduplicated: dict[str, RetrievalEvidence] = {}
+        for evidence in sorted(
+            evidences, key=lambda item: (-item.score, item.evidence_id)
+        ):
+            deduplicated.setdefault(evidence.evidence_id, evidence)
+        selected: list[RetrievalEvidence] = []
+        source_counts: dict[str, int] = {}
+        for evidence in deduplicated.values():
+            source_key = evidence.source_id or evidence.evidence_id
+            if source_counts.get(source_key, 0) >= 3:
+                continue
+            selected.append(evidence)
+            source_counts[source_key] = source_counts.get(source_key, 0) + 1
+            if len(selected) == 20:
+                break
+        channels = sorted(
+            {
+                channel
+                for evidence in selected
+                for channel in evidence.metadata.get("retrieval", {})
+                .get("ranks", {})
+                .keys()
+            }
+        )
+        return EvidencePacket(
+            stage=stage,
+            question=message,
+            evidences=selected,
+            channels=channels or (["keyword"] if selected else []),
+            degraded_channels=degraded,
+            model_version=str(
+                getattr(getattr(self._search, "_embedding", None), "model_id", "")
+            ),
+        )
 
     @staticmethod
-    def _theory_refs_from_hits(hits: list[KnowledgeHit], stage: LoopStage) -> list[TheoryRef]:
+    def _theory_refs_from_hits(
+        hits: list[RetrievalEvidence], stage: LoopStage
+    ) -> list[TheoryRef]:
         return [
             TheoryRef(
-                theory_id=hit.doc_id,
-                name=hit.title or hit.doc_id,
+                theory_id=hit.evidence_id,
+                name=hit.title or hit.source_id or hit.evidence_id,
                 stage=stage.value,
             )
             for hit in hits
+            if hit.namespace.value == "theory"
         ]
 
     async def _record_turn(
@@ -591,7 +658,7 @@ class DefaultOrchestrator(Orchestrator):
         stage: LoopStage,
         output,
         *,
-        knowledge_hits: list[KnowledgeHit],
+        evidence_packet: EvidencePacket,
     ) -> list[AssetVersion]:
         if output is None:
             return []
@@ -622,7 +689,7 @@ class DefaultOrchestrator(Orchestrator):
                 swot=output.swot,
                 dimensions=output.dimensions,
                 gap_claims=[],
-                sources=self._report_sources(output, knowledge_hits),
+                sources=self._report_sources(output, evidence_packet.evidences),
                 methodologies=list(
                     dict.fromkeys(ref.name or ref.theory_id for ref in output.theory_refs)
                 ),
@@ -697,15 +764,32 @@ class DefaultOrchestrator(Orchestrator):
     @staticmethod
     def _report_sources(
         output: DiagnoseOutput,
-        knowledge_hits: list[KnowledgeHit],
+        knowledge_hits: list[RetrievalEvidence],
     ) -> list[str]:
         candidates: list[str] = []
+        allowed: set[str] = set()
         for hit in knowledge_hits:
-            source = hit.metadata.get("source_url") or hit.metadata.get("source")
-            if source:
-                candidates.append(str(source))
-        candidates.extend(item.source for item in output.facts if item.source)
-        candidates.extend(item.source for item in output.evidences if item.source)
+            for source in (
+                hit.source_url,
+                hit.source_id,
+                hit.evidence_id,
+                hit.metadata.get("source_url"),
+                hit.metadata.get("source"),
+            ):
+                if source:
+                    allowed.add(str(source).strip())
+            canonical = hit.source_url or hit.source_id or hit.evidence_id
+            if canonical:
+                candidates.append(str(canonical))
+        # 模型只能引用证据包中真实存在的来源；任意生成的 URL/来源名不会进入资产。
+        candidates.extend(
+            item.source for item in output.facts if item.source and item.source in allowed
+        )
+        candidates.extend(
+            item.source
+            for item in output.evidences
+            if item.source and item.source in allowed
+        )
         return list(dict.fromkeys(item.strip() for item in candidates if item.strip()))
 
 

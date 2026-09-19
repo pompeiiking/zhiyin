@@ -13,14 +13,12 @@ pgvector / Redis / Kafka 真实适配器时，上层代码不变。
 
 from zhiyin_data_sdk.gateways.ai import (
     EmbedGateway,
-    KnowledgeGateway,
-    KnowledgeHit,
     LLMGateway,
     LLMMessage,
     LLMResult,
     SearchGateway,
-    SearchHit,
 )
+from zhiyin_kernel.retrieval import RetrievalEvidence, RetrievalQuery
 from zhiyin_data_sdk.gateways.cache import CacheGateway
 from zhiyin_data_sdk.gateways.db import Params, RawQueryGateway
 from zhiyin_data_sdk.gateways.feature_flag import FeatureFlagGateway
@@ -44,15 +42,14 @@ __all__ = [
     "CacheGateway",
     "EmbedGateway",
     "FeatureFlagGateway",
-    "KnowledgeGateway",
-    "KnowledgeHit",
     "LLMGateway",
     "LLMMessage",
     "LLMResult",
     "Params",
     "RawQueryGateway",
     "SearchGateway",
-    "SearchHit",
+    "RetrievalEvidence",
+    "RetrievalQuery",
     "ObjectStoreGateway",
     "StoredObject",
     "EventBusGateway",

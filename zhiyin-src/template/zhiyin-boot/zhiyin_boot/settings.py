@@ -43,7 +43,7 @@ class Settings:
     # ---------- 能力开关：决定装配 local 还是 pami ----------
     use_pami_llm: bool = False
     use_pami_embedding: bool = False
-    use_pami_knowledge: bool = False
+    use_pami_search: bool = False
     use_pami_auth: bool = False
     use_mysql: bool = False
     use_pgvector: bool = False
@@ -64,7 +64,6 @@ class Settings:
 
     # ---------- M3 数据基础设施 ----------
     vector_database_url: str = ""
-    vector_search_namespace: str = "theory"
     search_rrf_k: int = 60
     minio_endpoint: str = ""
     minio_access_key: str = ""
@@ -107,7 +106,7 @@ class Settings:
             ),
             use_pami_llm=_env_bool("ZHIYIN_USE_PAMI_LLM"),
             use_pami_embedding=_env_bool("ZHIYIN_USE_PAMI_EMBEDDING"),
-            use_pami_knowledge=_env_bool("ZHIYIN_USE_PAMI_KNOWLEDGE"),
+            use_pami_search=_env_bool("ZHIYIN_USE_PAMI_SEARCH"),
             use_pami_auth=_env_bool("ZHIYIN_USE_PAMI_AUTH"),
             use_mysql=_env_bool("ZHIYIN_USE_MYSQL"),
             use_pgvector=_env_bool("ZHIYIN_USE_PGVECTOR"),
@@ -122,7 +121,6 @@ class Settings:
             pami_embedding_model_id=_env("ZHIYIN_PAMI_EMBEDDING_MODEL_ID"),
             pami_timeout_s=float(_env("ZHIYIN_PAMI_TIMEOUT_S", "60")),
             vector_database_url=_env("ZHIYIN_VECTOR_DATABASE_URL"),
-            vector_search_namespace=_env("ZHIYIN_VECTOR_SEARCH_NAMESPACE", "theory"),
             search_rrf_k=int(_env("ZHIYIN_SEARCH_RRF_K", "60")),
             minio_endpoint=_env("ZHIYIN_MINIO_ENDPOINT"),
             minio_access_key=_env("ZHIYIN_MINIO_ACCESS_KEY"),

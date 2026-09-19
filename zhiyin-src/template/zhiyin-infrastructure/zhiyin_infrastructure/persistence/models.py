@@ -207,6 +207,36 @@ class RetrievalLogRow(Base):
     query_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+
+class RetrievalDocumentRow(Base):
+    """RAG 文档权威元数据与正文；向量库只保存可重建的检索副本。"""
+
+    __tablename__ = "retrieval_document"
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    namespace: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    source_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    org_id: Mapped[str] = mapped_column(String(128), nullable=False, default="", index=True)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False, default="", index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="enabled")
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    title: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url: Mapped[str] = mapped_column(String(2048), nullable=False, default="")
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    effective_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expire_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "namespace", "source_id", "version", name="uq_retrieval_document_version"
+        ),
+        Index("ix_retrieval_document_scope", "namespace", "status", "org_id", "user_id"),
+    )
+
 # --------------------------------------------------------------------------
 # A 核心业务表
 # --------------------------------------------------------------------------
@@ -237,6 +267,7 @@ CORE_TABLES: dict[str, str] = {
     "asset_content": "资产当前态聚合（报告/方向/行动计划正文）",
     "registry_resource": "动态资源统一读模型（由明确 kind 隔离）",
     "embed_task": "向量同步任务、重试与幂等记账",
+    "retrieval_document": "RAG 权威文档、版本、权限、状态与时效回源",
     "retrieval_log": "检索通道、耗时和降级审计（只存查询哈希）",
 }
 
@@ -334,6 +365,7 @@ __all__ = [
     "RegistryResourceRow",
     "ReportHistoryRow",
     "RetrievalLogRow",
+    "RetrievalDocumentRow",
     "SHARED_WITH_CORE",
     "TABLE_INVENTORY",
     "TaskSessionRow",

@@ -9,7 +9,6 @@
       "require": {
         "gateways": [
           "llm",
-          "knowledge",
           "search",
           "object_store",
           "event_bus",
@@ -50,7 +49,6 @@
       "require": {
         "gateways": [
           "llm",
-          "knowledge",
           "search",
           "object_store",
           "event_bus",
@@ -107,7 +105,6 @@
         "gateways": [
           "llm",
           "embedding",
-          "knowledge",
           "search",
           "vector",
           "cache",
@@ -168,7 +165,6 @@
         "gateways": [
           "llm",
           "embedding",
-          "knowledge",
           "search",
           "vector",
           "cache",

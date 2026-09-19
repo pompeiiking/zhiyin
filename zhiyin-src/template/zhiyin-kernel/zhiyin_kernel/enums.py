@@ -136,3 +136,14 @@ class NotifyChannel(str, Enum):
 
     IN_APP = "in_app"      # 应用内消息
     LOCAL_LOG = "local_log"  # 本地日志
+
+
+class RetrievalNamespace(str, Enum):
+    """第三期 RAG 的六个稳定检索内容域。"""
+
+    THEORY = "theory"
+    OCCUPATION = "occupation"
+    JD = "jd"
+    REPORT = "report"
+    MEMORY = "memory"
+    RESUME = "resume"

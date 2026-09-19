@@ -18,6 +18,7 @@ from typing import Any, Awaitable, Callable, Literal, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
+from zhiyin_kernel.enums import RetrievalNamespace
 
 Fetcher = Callable[["KnowledgeSource"], Any | Awaitable[Any]]
 Reviewer = Callable[
@@ -388,6 +389,8 @@ class KnowledgeIngestionPipeline:
         return stored, unchanged, published
 
     def _namespace_path(self, namespace: str) -> Path:
+        if namespace not in {item.value for item in RetrievalNamespace}:
+            raise ValueError(f"未登记的知识命名空间：{namespace}")
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", namespace):
             raise ValueError(f"非法知识命名空间：{namespace}")
         root = self.knowledge_dir.resolve()

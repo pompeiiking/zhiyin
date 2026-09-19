@@ -62,7 +62,7 @@
 | --- | --- |
 | 第一期 M1 / M2 | 门禁全绿；`--check --phase=2` 通过；7 条端到端验收通过；43 个能力位 wired 39 / skeleton 1 / not_wired 3 |
 | 下一期 M3 | **决策已全部闭环（15 条）**，可开工；实施顺序见登记表 §七 |
-| 第一期未闭合 | OPEN-1 / OPEN-2 / OPEN-3 / OPEN-4 / OPEN-6、MOCK-1 / MOCK-2 —— 清单见 `docs/数据全链路/职引-第一期未闭合项与Mock标注清单.md` |
+| 第一期未闭合 | OPEN-1 / OPEN-2 / OPEN-3 / OPEN-4 / OPEN-6、MOCK-1 / MOCK-2 —— 清单见 `docs/数据全链路/04-实施与验收/职引-第一期未闭合项与Mock标注清单.md` |
 | 分支 | `main` 发布线、`develop` 集成线；`platform-tt`、`frontend-lbx` 基于 develop |
 
 ---

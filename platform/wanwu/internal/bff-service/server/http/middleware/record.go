@@ -62,9 +62,44 @@ func requestBody(ctx *gin.Context) (string, error) {
 	if err = json.Unmarshal(body, &kv); err != nil {
 		return "", err
 	}
-	if b, err := json.Marshal(kv); err != nil {
+	if b, err := json.Marshal(redactSensitiveLogFields(kv)); err != nil {
 		return "", err
 	} else {
 		return string(b), nil
+	}
+}
+
+func redactSensitiveLogFields(value interface{}) interface{} {
+	switch typed := value.(type) {
+	case map[string]interface{}:
+		redacted := make(map[string]interface{}, len(typed))
+		for key, item := range typed {
+			if isSensitiveLogField(key) {
+				redacted[key] = "[REDACTED]"
+				continue
+			}
+			redacted[key] = redactSensitiveLogFields(item)
+		}
+		return redacted
+	case []interface{}:
+		redacted := make([]interface{}, len(typed))
+		for index, item := range typed {
+			redacted[index] = redactSensitiveLogFields(item)
+		}
+		return redacted
+	default:
+		return value
+	}
+}
+
+func isSensitiveLogField(key string) bool {
+	normalized := strings.ToLower(key)
+	normalized = strings.NewReplacer("_", "", "-", "").Replace(normalized)
+	switch normalized {
+	case "apikey", "password", "oldpassword", "newpassword", "token",
+		"authorization", "secret", "secretkey", "accesskey", "jwt", "jwtsecret":
+		return true
+	default:
+		return false
 	}
 }

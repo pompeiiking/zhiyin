@@ -69,9 +69,10 @@ platform/wanwu/.cache/
 platform/wanwu/output/
 platform/wanwu/runtime/
 deploy/runtime/
+zhiyin-src/template/deploy/runtime/
 platform/wanwu/**/*.log
 platform/wanwu/**/*.pid
-deploy/.env
+zhiyin-src/template/deploy/.env
 
 # These upstream files are required by the Wanwu frontend build despite
 # repository-wide generated-file and environment-file ignore rules.

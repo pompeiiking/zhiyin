@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MANIFEST = REPO_ROOT / "deploy" / "wanwu-routes.json"
+DEFAULT_MANIFEST = REPO_ROOT / "zhiyin-src" / "template" / "deploy" / "wanwu-routes.json"
 DEFAULT_NGINX = (
     REPO_ROOT
     / "platform"
