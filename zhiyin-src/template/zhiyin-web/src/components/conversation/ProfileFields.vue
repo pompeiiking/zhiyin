@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ProfilePanelView } from '@/api/schema'
+import { useConversationStore } from '@/stores/conversation'
 import { useSessionStore } from '@/stores/session'
 
 // 画像字段卡（CONV-003）：右栏「详细属性」的层次化落点。
@@ -14,6 +15,15 @@ type Field = Record<string, unknown>
 
 const props = defineProps<{ profile?: ProfilePanelView | null }>()
 const session = useSessionStore()
+const conversation = useConversationStore()
+
+// 环节标签只能来自后端下发的 pipeline_cards（谁是 active 就是谁）。
+// 此前这里硬编码「① 采集建模」，导致在④复盘会话里也显示"①采集建模"，与中栏/左栏矛盾。
+// 管线未下发时不猜环节，整行留空。
+const stageLabel = computed(() => {
+  const card = conversation.pipeline.find((item) => Boolean(item.active))
+  return card ? String((card as Record<string, unknown>).title ?? '').trim() : ''
+})
 
 const groups = computed(() => {
   const fields = (props.profile?.fields ?? []) as Field[]
@@ -65,7 +75,7 @@ function statusClass(f: Field) {
   <section class="profile-fields" aria-label="个人画像字段">
     <header class="pf-head">
       <div>
-        <small>① 采集建模</small>
+        <small v-if="stageLabel">{{ stageLabel }}</small>
         <h3>个人画像</h3>
       </div>
       <div class="pf-metrics">

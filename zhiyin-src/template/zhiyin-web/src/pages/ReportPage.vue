@@ -5,6 +5,7 @@ import {
   claimGap,
   exportAsset,
   getReportFullText,
+  getWorkspace,
   markTaskDone,
   selectDirectionPlan,
   trackEvent,
@@ -48,6 +49,9 @@ const chosenPlanId = ref('')
 const busyTaskKey = ref('')
 const doneTaskKeys = ref<string[]>([])
 const calendaredTaskKeys = ref<string[]>([])
+// 已写进日历的任务文本。日历节点的 `related_task_text` 就是任务原文，用它在刷新后
+// 还原「已入日历」标记——只靠本地 key 的话，刷新即丢，用户会以为没加过而重复写入。
+const calendaredTaskTexts = ref<string[]>([])
 
 // 导出入口的可见性由动态资源的功能开关决定（`feature_flags.export`），
 // 与「前端按开关决定功能块可见性」的口径一致。开关关闭时**不给按钮**，
@@ -324,7 +328,10 @@ function isTaskDone(phase: ActionPhase, task: ActionTask): boolean {
 }
 
 function isTaskInCalendar(phase: ActionPhase, task: ActionTask): boolean {
-  return calendaredTaskKeys.value.includes(taskKey(phase, task))
+  return (
+    calendaredTaskKeys.value.includes(taskKey(phase, task)) ||
+    calendaredTaskTexts.value.includes(task.text)
+  )
 }
 
 /** 认领一条差距（FR-DIAG-004）。幂等：重复点同一条不会重复写行为日志。 */
@@ -390,6 +397,7 @@ async function onAddToCalendar(phase: ActionPhase, task: ActionTask) {
       related_task_text: task.text,
     })
     calendaredTaskKeys.value = [...new Set([...calendaredTaskKeys.value, key])]
+    calendaredTaskTexts.value = [...new Set([...calendaredTaskTexts.value, task.text])]
     actionNotice.value = `已加入日历：${node.title}`
   } catch (err) {
     actionNotice.value = `加入日历失败：${err instanceof Error ? err.message : '未知错误'}`
@@ -471,8 +479,10 @@ async function load() {
     chosenPlanId.value = ''
     doneTaskKeys.value = []
     calendaredTaskKeys.value = []
+    calendaredTaskTexts.value = []
     actionNotice.value = ''
     if (report.value && toc.value.length) activeId.value = String(toc.value[0].id ?? '')
+    await restoreCalendarMarkers()
   } catch (err) {
     report.value = null
     // 404「尚未生成诊断报告」是正常状态，不是故障；如实显示空态。
@@ -482,10 +492,32 @@ async function load() {
   }
 }
 
-function selectSection(id: string) {
-  activeId.value = id
+/**
+ * 从工作台视图回填「已入日历」标记（FR-BLOCK-002）。
+ *
+ * 日历节点是后端资产：写入后刷新页面，按钮不该复活成「加入日历」，否则用户会
+ * 重复写入同一个节点。工作台视图已提供 `calendar_nodes` 读路径，这里按
+ * `related_task_text` 与任务原文对齐；读不到就退回空标记，不影响报告渲染。
+ */
+async function restoreCalendarMarkers() {
+  try {
+    const workspace = await getWorkspace()
+    const nodes = (workspace?.calendar_nodes ?? []) as Array<Record<string, unknown>>
+    calendaredTaskTexts.value = [
+      ...new Set(
+        nodes
+          .map((node) => String(node.related_task_text ?? ''))
+          .filter((text) => text.length > 0),
+      ),
+    ]
+  } catch {
+    calendaredTaskTexts.value = []
+  }
 }
 
+// 目录项既是"当前章节"指示，也要真的把正文滚到该章节。
+// 此前目录绑的是只改 activeId 的旧函数，点击后除高亮外没有任何位移，
+// 目录因此失去导航意义；这里统一走 scrollTo。
 function scrollTo(id: string) {
   activeId.value = id
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -548,7 +580,7 @@ onMounted(() => {
       </p>
 
       <div v-else class="rp-layout">
-        <ReportToc :items="toc" :active-id="activeId" @select="selectSection" />
+        <ReportToc :items="toc" :active-id="activeId" @select="scrollTo" />
         <div class="rp-sections">
           <section id="verdict" class="rp-verdict">
             <div class="vd-top">
@@ -558,7 +590,7 @@ onMounted(() => {
             <h2 class="vd-title">{{ verdict.title || '诊断结论' }}</h2>
             <p class="vd-summary">{{ verdict.summary || '报告未提供结论摘要。' }}</p>
 
-            <div class="vd-swot">
+            <div id="swot" class="vd-swot">
               <div v-if="swotEmpty" class="rp-empty">报告未提供 SWOT 内容。</div>
               <template v-else>
                 <div class="swot-cell strong">
@@ -695,7 +727,14 @@ onMounted(() => {
                 <p class="rp-item-risk">主要风险：{{ plan.main_risk }}</p>
                 <ul v-if="plan.gaps.length" class="rp-gaps">
                   <li v-for="(gap, index) in plan.gaps" :key="index">
-                    {{ gap.requirement }} → 现状：{{ gap.current_state }} → 建议：{{ gap.suggestion }}
+                    {{ gap.requirement }}
+                    <!--
+                      现状/建议来自后端 PlanGap。当前契约层只下发了 requirement，
+                      current_state / suggestion 恒为空串；此处按内容渲染，避免出现
+                      「→ 现状： → 建议：」这种空标签。后端补齐字段后自动生效。
+                    -->
+                    <template v-if="gap.current_state"> → 现状：{{ gap.current_state }}</template>
+                    <template v-if="gap.suggestion"> → 建议：{{ gap.suggestion }}</template>
                   </li>
                 </ul>
               </li>
@@ -888,6 +927,9 @@ onMounted(() => {
 .vd-summary { margin: 0 0 var(--space-5); color: rgba(255, 255, 255, 0.78); font-size: var(--font-size-sm); line-height: 1.7; }
 
 .vd-swot {
+  /* 目录里的「SWOT」指向本块：它嵌在综合结论卡里，需要自己的 scroll-margin
+     才能在跳转后不被顶栏压住。 */
+  scroll-margin-top: calc(72px + var(--space-4));
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: var(--space-3);

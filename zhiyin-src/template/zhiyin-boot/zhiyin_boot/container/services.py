@@ -147,6 +147,9 @@ def build_services(container: "Container") -> None:
         behaviors=container.behavior_service,
         memories=container.memory_service,
         assets=container.asset_service,
+        # ④ 行动的规划师要把关键节点写进日历（FR-ACT-004 / FR-BLOCK-002），
+        # 编排器只调 Port，不自己造日历存储。
+        functions=container.function_service,
         intent_policy=KeywordIntentPolicy(
             params_loader=lambda: container.registry.get_policy_params("routing")
         ),

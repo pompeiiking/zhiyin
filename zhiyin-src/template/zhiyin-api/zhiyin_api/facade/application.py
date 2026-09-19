@@ -31,8 +31,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+from datetime import datetime
 from typing import Optional
-from uuid import uuid4
 
 from fastapi import Request
 
@@ -77,6 +78,30 @@ from zhiyin_business.ports.registry import RegistryService
 from zhiyin_business.ports.workspace import WorkspaceService
 from zhiyin_kernel.assets import CalendarNode
 from zhiyin_kernel.enums import AssetType, BehaviorEventType, LoopStage
+
+
+def calendar_node_id(
+    title: str, due_at: Optional[datetime], related_task_text: str
+) -> str:
+    """由提醒内容派生稳定的日历节点 id（FR-ACT-004 幂等）。
+
+    日历是"规划师写入、教练读取"的共享状态。同一批提醒有两条写入路径：
+    ④ 环节编排器按此规则派生 id 写入，报告页「加入日历」也走这个端点。
+    两条路径只要标题 / 截止时间 / 关联任务一致，就必须落到**同一条**节点上，
+    否则同一个提醒会在日历里叠成两条。
+
+    口径必须与 `zhiyin_business/services/orchestrator.py::_calendar_node_id`
+    逐字一致（分隔符、字段顺序、`isoformat()`、sha1 取前 12 位）；两处任一处改了
+    规则，报告页写入就会与编排器写入错开，日历重新出现重复节点。
+    """
+    key = "|".join(
+        [
+            title,
+            due_at.isoformat() if due_at is not None else "",
+            related_task_text,
+        ]
+    )
+    return f"cal_{hashlib.sha1(key.encode('utf-8')).hexdigest()[:12]}"
 
 
 class DefaultApplicationFacade(ApplicationFacade):
@@ -187,13 +212,25 @@ class DefaultApplicationFacade(ApplicationFacade):
             *(self._registry.get_agent(agent_id) for agent_id in agent_ids)
         )
         names = {item.id: item.name for item in descriptors if item is not None}
+        # 当前会话：取最近活跃（`updated_at` 最新）的那条任务会话。
+        # 会话切换此前只在浏览器内存里保留，刷新后前端只能落到 `sessions[0]`，
+        # 于是中栏标题会从用户选中的任务回落到列表首项。这里把"最近活跃"作为
+        # 后端的当前会话事实返回，前端 `currentTaskId` 直接按它恢复。
+        current = max(
+            (panel for panel in panels if panel.task_id),
+            # 用"是否有时间戳"当首关键字：`updated_at` 可缺省，直接比较
+            # `None` 与 `datetime` 会抛 TypeError。缺时间戳的会话排在后面。
+            key=lambda panel: (panel.updated_at is not None, panel.updated_at),
+            default=None,
+        )
         return mappers.session_list_view(
             [
                 mappers.session_summary_view(
                     panel, lead_agent_name=names.get(panel.lead_agent or "", "")
                 )
                 for panel in panels
-            ]
+            ],
+            current_task_id=current.task_id if current is not None else None,
         )
 
     async def enter_task(self, user_id: str, body: TaskEnterRequest) -> TaskSessionView:
@@ -384,7 +421,9 @@ class DefaultApplicationFacade(ApplicationFacade):
         self, user_id: str, body: CalendarNodeRequest
     ) -> CalendarNodeView:
         node = CalendarNode(
-            node_id=f"cal_{uuid4().hex[:12]}",
+            # 与 ④ 环节编排器同一套幂等口径：同一提醒重复写入只更新同一条节点，
+            # 不再每次 `uuid4` 生成新 id 让日历叠出重复项。
+            node_id=calendar_node_id(body.title, body.due_at, body.related_task_text),
             user_id=user_id,
             title=body.title,
             due_at=body.due_at,

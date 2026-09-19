@@ -32,8 +32,13 @@ onBeforeUnmount(() => { if (dialog.value?.open) document.body.style.overflow = p
 function requestCode() { notice.value = '短信服务尚未接入，未发送验证码。请勿输入真实手机号。' }
 function submit() { if (ready.value) notice.value = '登录服务尚未接入，未提交手机号或验证码。' }
 async function refreshIdentity() {
-  await session.loadBootstrap()
-  if (!session.isLoggedIn) notice.value = session.error || '尚未检测到已登录身份，请等待登录服务接入。'
+  // 必须强制重拉：`loadBootstrap()` 默认命中缓存直接返回，
+  // 那样用户在其他入口登录后点刷新不会发出任何请求，也看不到任何反馈。
+  await session.loadBootstrap(true)
+  if (session.error) { notice.value = session.error; return }
+  notice.value = session.isLoggedIn
+    ? `身份已刷新：${session.identity.nickname || session.identity.user_id || '已登录'}`
+    : '尚未检测到已登录身份，请等待登录服务接入。'
 }
 </script>
 

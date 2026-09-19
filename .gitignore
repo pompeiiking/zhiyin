@@ -33,6 +33,9 @@ coverage.xml
 data/objects/
 data/cache/
 data/logs/
+zhiyin-src/template/data/objects/
+zhiyin-src/template/data/cache/
+zhiyin-src/template/data/logs/
 *.log
 *.sqlite3
 *.db

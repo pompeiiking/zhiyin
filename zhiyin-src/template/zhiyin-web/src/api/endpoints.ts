@@ -1,4 +1,4 @@
-import { request } from './client'
+import { LLM_TIMEOUT, request } from './client'
 import type {
   AssetTypeValue,
   AssetVersionView,
@@ -55,11 +55,17 @@ export const enterTask = (taskCode: string) =>
     data: { task_code: taskCode } satisfies TaskEnterRequest,
   })
 
-/** POST /app/conversation/message —— 一轮对话 */
+/**
+ * POST /app/conversation/message —— 一轮对话。
+ *
+ * 必须用 LLM_TIMEOUT：这一轮会跑完整的多智能体编排（实测约 97 秒），
+ * 用默认 60 秒会让每一次真实发送都超时失败。
+ */
 export const sendMessage = (taskId: string, message: string, clientMsgId?: string) =>
   request<ConversationTurnView>({
     url: '/app/conversation/message',
     method: 'POST',
+    timeout: LLM_TIMEOUT,
     data: { task_id: taskId, message, client_msg_id: clientMsgId } satisfies MessageRequest,
   })
 

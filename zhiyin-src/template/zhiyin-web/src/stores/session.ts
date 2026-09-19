@@ -64,8 +64,15 @@ export const useSessionStore = defineStore('session', {
   },
 
   actions: {
-    async loadBootstrap() {
-      if (this.loaded) return
+    /**
+     * 加载启动数据。
+     *
+     * `force=true` 供登录弹窗的「已在其他入口登录？刷新身份」使用：`loaded` 表示
+     * "本次会话已经拿到过启动数据"，若沿用缓存，用户在其他入口登录后再点刷新
+     * 永远不会重新请求后端，按钮就失去了它唯一的作用。
+     */
+    async loadBootstrap(force = false) {
+      if (this.loaded && !force) return
       if (!inflightBootstrap) {
         inflightBootstrap = this._fetchBootstrap().finally(() => {
           inflightBootstrap = null

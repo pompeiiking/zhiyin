@@ -854,15 +854,15 @@ ES/pgvector 命中只表示“可能相关”。返回业务层前必须：
 
 ### 14.3 联调与验收
 
-- [x] PAMI 凭据由安全配置注入；**（2026-09-19 更正并完成）** 模型 ID / 组织 ID / Agent API Key / Embedding 模型 ID / **RAG API Key 均已注入** `deploy/.env`（gitignored，不入库不入日志）。**经 PAMI 的真实检索已验证可用**（平台缺 rerank，已由职引自建的协议转换桥补上，见[修改日志 §25](../00-索引与变更/职引-数据全链路修改日志.md)）；`ZHIYIN_USE_PAMI_SEARCH` 按约定仍为 0
+- [x] PAMI 凭据由安全配置注入；**（2026-09-19 更正并完成）** 模型 ID / 组织 ID / Agent API Key / Embedding 模型 ID / **RAG API Key 均已注入** `deploy/.env`（gitignored，不入库不入日志）。**经 PAMI 的真实检索已验证可用**（平台缺 rerank，已由职引自建的协议转换桥补上，见[修改日志 §25](../../日志-袁/01-职引-数据全链路修改日志.md)）；`ZHIYIN_USE_PAMI_SEARCH` 按约定仍为 0
 - [x] 真实 Embedding 返回 1024 维，单条与批量边界测试通过；
 - [x] `model_version` 切换后旧空间不会被查询；
 - [x] 六个知识域至少各完成一条真实写入、同步、检索、删除验证；
-- [x] 五环节各完成一个真实检索场景（代码与本地回归完成；**2026-09-19 经 PAMI 的真实检索已验证可用**——平台侧需先由职引自建的 rerank 转换桥补上平台缺失的 rerank，详见[修改日志 §25](../00-索引与变更/职引-数据全链路修改日志.md)。⚠️ 职引的 `ZHIYIN_USE_PAMI_SEARCH` 仍按约定保持 0，端到端切换待开关评审）；
+- [x] 五环节各完成一个真实检索场景（代码与本地回归完成；**2026-09-19 经 PAMI 的真实检索已验证可用**——平台侧需先由职引自建的 rerank 转换桥补上平台缺失的 rerank，详见[修改日志 §25](../../日志-袁/01-职引-数据全链路修改日志.md)。⚠️ 职引的 `ZHIYIN_USE_PAMI_SEARCH` 仍按约定保持 0，端到端切换待开关评审）；
 - [x] 用户私有域完成跨用户、跨组织负例测试；
 - [x] ES、Embedding、pgvector、Rerank 分别完成故障注入；**（2026-09-19 完成）** 6 个故障面单测（降级、双通道全挂显式失败、无命中≠故障、Rerank 缺失不影响检索、降级原因可分辨、降级原因不含秘密）+ 容器内**真实**故障注入探针 `scripts/fault_injection_probe.py`（真实连接被拒 / 真实 DNS 失败，逐项确认故障真实存在）；
 - [ ] 固定评测集达到评审后的质量门槛；
-- [x] 检索引用能从最终资产追溯到来源和版本；**（2026-09-19 完成）** 新增 `Report.source_versions`（纯增量、向后兼容），键的取法与 `Report.sources` **完全一致**、同源多版取最大版本，并有守卫锁 `set(Report.sources) ⊆ set(Report.source_versions)`。**已知后续项**：平台检索响应不含文档 id（只有 `kb_name/title/snippet`），一旦切入 PAMI 检索，关键词通道的来源 id 需另行回填——见[修改日志 §23.4](../00-索引与变更/职引-数据全链路修改日志.md)；
+- [x] 检索引用能从最终资产追溯到来源和版本；**（2026-09-19 完成）** 新增 `Report.source_versions`（纯增量、向后兼容），键的取法与 `Report.sources` **完全一致**、同源多版取最大版本，并有守卫锁 `set(Report.sources) ⊆ set(Report.source_versions)`。**已知后续项**：平台检索响应不含文档 id（只有 `kb_name/title/snippet`），一旦切入 PAMI 检索，关键词通道的来源 id 需另行回填——见[修改日志 §23.4](../../日志-袁/01-职引-数据全链路修改日志.md)；
 - [x] `python -m zhiyin_boot --check --phase=3` 返回 `passed=true`、`unmet=[]`。
 
 ---

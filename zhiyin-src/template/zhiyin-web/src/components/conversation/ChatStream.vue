@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useConversationStore } from '@/stores/conversation'
 import AgentBadge from './AgentBadge.vue'
 import AnalysisHandoff from './AnalysisHandoff.vue'
@@ -46,6 +46,27 @@ const messages = computed(() => conversation.turns
   .filter((item) => item.content))
 const guide = computed(() => conversation.guide)
 const disclosure = computed(() => conversation.disclosure)
+const scrollEl = ref<HTMLElement | null>(null)
+
+/**
+ * 把消息流滚到最新一条。
+ *
+ * 此前 .chat-scroll 永远停在 scrollTop=0：进入会话或发完一轮后，用户看到的
+ * 仍是最早的历史，刚收到的 AI 回复在可视区之外，必须手动往下滚——这是主对话
+ * 最影响可用性的问题。切换会话、进页面、新增消息三种时机都要贴到底。
+ */
+async function scrollToLatest() {
+  await nextTick()
+  const el = scrollEl.value
+  if (el) el.scrollTop = el.scrollHeight
+}
+
+// 会话标识或消息条数变化都会触发：切换会话后要贴到底，新消息到达后也要。
+watch(
+  () => `${conversation.currentTaskId ?? ''}#${messages.value.length}`,
+  () => { void scrollToLatest() },
+)
+onMounted(() => { void scrollToLatest() })
 
 /**
  * 行为引导选项点击：只接受字符串。
@@ -112,7 +133,7 @@ function send() {
     <!-- 建档完成 → ②诊断交接条（最短状态 + 下一步入口；全文在完整报告页，见 §2.3、§4.7） -->
     <AnalysisHandoff />
 
-    <div class="chat-scroll">
+    <div ref="scrollEl" class="chat-scroll">
       <div v-if="messages.length" class="message-list"><MessageBubble v-for="(item, index) in messages" :key="index" :role="item.role" :content="item.content" :author="item.author" :theory="item.theory" /></div>
       <div v-else class="empty-chat">
         <p>在下方写下你现在最想解决的困惑，开始和 AI 聊职业。</p>
@@ -153,12 +174,14 @@ function send() {
   border-bottom: 1px solid var(--line);
 }
 
+/* 标题优先于徽章：徽章的 role_summary 很长，曾经把 .chat-head-l 挤到 41px，
+   会话名被截成「直.」——连当前在哪个任务里都看不出来。给标题留最小宽度，由徽章省略。 */
 .chat-head-l {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: 11px;
-  min-width: 0;
+  min-width: 7em;
 }
 
 .chat-head-l .dot-live {

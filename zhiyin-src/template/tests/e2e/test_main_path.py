@@ -384,7 +384,13 @@ async def test_acceptance_8_orchestrator_persists_full_assets_and_knowledge(
     )
     action_plan = await container.asset_service.get_action_plan(user_id)
     assert action_plan is not None and action_plan.plan_id == selected.id
-    assert action_plan.reminders_synced is False
+    # FR-ACT-004 / FR-BLOCK-002：④ 的规划师要**真的**把关键节点写进日历。
+    # 此前只把 `reminders_synced` 记成"提醒自报了 calendar_synced"，日历里一条节点
+    # 都没有；当时的断言把这个空转口径固化了下来。现在断言真实业务结果：
+    # 计划标记已同步，且日历里确实有规划师写的节点。
+    assert action_plan.reminders_synced is True
+    calendar_nodes = await container.function_service.list_calendar_nodes(user_id)
+    assert calendar_nodes and all(node.source == "planner" for node in calendar_nodes)
 
     workspace = await container.workspace_service.build_view(user_id)
     assert workspace.report is not None

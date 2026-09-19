@@ -50,6 +50,38 @@
       "note": "完整报告页导出按钮"
     },
     {
+      "code": "home.hero_title",
+      "text": "不用填表，开口就能",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 7,
+      "note": "首页首屏主标题第一行；第二行见 home.hero_title_hl，两行合起来读完"
+    },
+    {
+      "code": "home.hero_title_hl",
+      "text": "聊出一条职业路径",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 8,
+      "note": "首页首屏主标题第二行，带高亮下划线样式"
+    },
+    {
+      "code": "home.hero_sub",
+      "text": "直接开聊就能开始，AI 边聊边沉淀你的个人画像，输出个人分析报告、方向方案与行动计划，并长期跟踪、随成长持续校准。",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 9,
+      "note": "首页首屏副标题。原先写的是「上传简历 或直接对话」，但本期不接收简历（见 faqs.json 隐私答复），已改为只讲对话入口"
+    },
+    {
+      "code": "home.hero_note",
+      "text": "从「不知道自己适合什么」到「有路径、能执行」｜画像由对话引导生成，不前置表单",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 10,
+      "note": "首页首屏底部补充说明"
+    },
+    {
       "code": "stage.collect.label",
       "text": "① 采集建模",
       "bundle": "zh-CN",

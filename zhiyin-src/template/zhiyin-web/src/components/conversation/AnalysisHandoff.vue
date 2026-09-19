@@ -24,12 +24,11 @@ const router = useRouter()
 
 const gapText = computed(() => (gaps.value.length ? gaps.value.join(' / ') : ''))
 
-const stageNumbers = ['①', '②', '③', '④', '⑤']
+// 后端下发的 title 已自带圈号（如「② 诊断匹配」），前端不再叠加序号前缀。
 const currentStage = computed(() => {
-  const index = conversation.pipeline.findIndex((card) => Boolean(card.active))
-  if (index < 0) return null
-  const card = conversation.pipeline[index] as Record<string, unknown>
-  return `${stageNumbers[index] ?? ''} ${String(card.title ?? '')}`.trim()
+  const card = conversation.pipeline.find((item) => Boolean(item.active))
+  if (!card) return null
+  return String((card as Record<string, unknown>).title ?? '').trim() || null
 })
 
 function toReport() {

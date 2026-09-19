@@ -22,12 +22,13 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict
 
-from zhiyin_business.contracts.act import ActOutput
+from zhiyin_business.contracts.act import ActOutput, NodeReminder
 from zhiyin_business.contracts.common import (
     AgentBadge,
     BehaviorEventDraft,
@@ -51,6 +52,7 @@ from zhiyin_business.ports.blackboard import (
     ConversationMemoryService,
     ProfileService,
 )
+from zhiyin_business.ports.function import FunctionService
 from zhiyin_business.ports.loop import LoopCoordinator
 from zhiyin_business.ports.orchestrator import (
     ConversationHistory,
@@ -69,7 +71,14 @@ from zhiyin_data_sdk.repositories import (
     RegistryRepository,
     TaskSessionRepository,
 )
-from zhiyin_kernel.assets import ActionPlan, DirectionPlan, PlanGap, Report, ReportGap
+from zhiyin_kernel.assets import (
+    ActionPlan,
+    CalendarNode,
+    DirectionPlan,
+    PlanGap,
+    Report,
+    ReportGap,
+)
 from zhiyin_kernel.blackboard import AssetVersion, TaskSession
 from zhiyin_kernel.enums import (
     AssetType,
@@ -117,6 +126,22 @@ def _theory_card_id(hit: RetrievalEvidence) -> str:
     return hit.evidence_id.removeprefix(prefix)
 
 
+def _calendar_node_id(reminder: NodeReminder) -> str:
+    """由提醒内容派生稳定的日历节点 id（FR-ACT-004 幂等）。
+
+    关键节点日历是"规划师写入、教练读取"的共享状态：同一批提醒重跑一次 ④ 时应该
+    覆盖同一条节点，而不是每次生成新 id 让日历越滚越长。
+    """
+    key = "|".join(
+        [
+            reminder.title,
+            reminder.due_at.isoformat() if reminder.due_at is not None else "",
+            reminder.related_task_text,
+        ]
+    )
+    return f"cal_{hashlib.sha1(key.encode('utf-8')).hexdigest()[:12]}"
+
+
 def _is_demo_evidence(hit: RetrievalEvidence) -> bool:
     """这条证据是否来自**演示语料**（D12）。
 
@@ -143,6 +168,7 @@ class DefaultOrchestrator(Orchestrator):
         behaviors: BehaviorService,
         memories: ConversationMemoryService,
         assets: AssetService,
+        functions: FunctionService,
         intent_policy: IntentPolicy,
         stage_policy: StagePolicy,
         axis_a_policy: AxisAInferencePolicy,
@@ -162,6 +188,7 @@ class DefaultOrchestrator(Orchestrator):
         self._behaviors = behaviors
         self._memories = memories
         self._assets = assets
+        self._functions = functions
         self._intent_policy = intent_policy
         self._stage_policy = stage_policy
         self._axis_a_policy = axis_a_policy
@@ -950,14 +977,31 @@ class DefaultOrchestrator(Orchestrator):
                 raise TypeError("行动环节产出类型不正确")
             directions = await self._assets.list_direction_plans(user_id)
             selected = next((item for item in directions if item.selected), None)
+            # FR-ACT-004 / FR-BLOCK-002：④ 环节的**规划师**把关键节点写进日历，
+            # ⑤ 环节的教练与工作台再从同一份日历读。此前这里只把 `reminders_synced`
+            # 记成"提醒自报了 calendar_synced 就算同步"，日历里一条节点都没有——
+            # `write_calendar_node` 在生产代码里从未被调用，"规划师写入、教练读取"
+            # 两头都没真正发生。
+            for reminder in output.reminders:
+                await self._functions.write_calendar_node(
+                    user_id,
+                    CalendarNode(
+                        # 用提醒内容派生稳定 id：同一批提醒重跑一次 ④ 时按 node_id
+                        # 覆盖，不会在日历里叠出一批重复节点。
+                        node_id=_calendar_node_id(reminder),
+                        user_id=user_id,
+                        title=reminder.title,
+                        due_at=reminder.due_at,
+                        source="planner",
+                        related_task_text=reminder.related_task_text,
+                    ),
+                )
             plan = ActionPlan(
                 id=f"act_{uuid4().hex[:12]}",
                 plan_id=selected.id if selected is not None else None,
                 phases=output.phases,
-                reminders_synced=(
-                    bool(output.reminders)
-                    and all(item.calendar_synced for item in output.reminders)
-                ),
+                # 走到这里说明每条提醒都已落进日历；没有提醒时保持 False。
+                reminders_synced=bool(output.reminders),
             )
             return [
                 await self._assets.save_action_plan(

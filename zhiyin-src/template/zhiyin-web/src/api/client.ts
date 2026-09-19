@@ -69,9 +69,25 @@ export const ERROR_HANDLING: Record<number, string> = {
  */
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 
+/**
+ * 默认超时：只覆盖普通读写接口（bootstrap / sessions / workspace / history / track）。
+ */
+const DEFAULT_TIMEOUT = 60_000
+
+/**
+ * 真实大模型链路专用超时（一轮对话、进入任务）。
+ *
+ * `POST /app/conversation/message` 会跑完整的多智能体 LLM 编排，实测单轮耗时约 97 秒，
+ * 而此前全前端共用一个 60 秒超时——于是**每一次真实发送都必然以
+ * "timeout of 60000ms exceeded" 结束**，用户永远收不到 AI 回复，只能看到报错气泡。
+ * 这不是接口坏了，是前端等不到：后端最终是 200 OK。
+ * 因此凡是会真实触达大模型的端点，必须用这个更长的超时，不能用默认值。
+ */
+export const LLM_TIMEOUT = 180_000
+
 const http: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60_000,
+  timeout: DEFAULT_TIMEOUT,
 })
 
 http.interceptors.response.use(

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSessionStore } from '@/stores/session'
 import { useConversationStore } from '@/stores/conversation'
@@ -18,6 +18,16 @@ const { handleGuestError } = useGuestGuard()
 const selected = ref('')
 const busy = ref(false)
 const message = ref('')
+
+// 首屏文案来自动态资源（AGENTS.md §8：文案不得硬编码到 Vue）。
+// 这里曾写死标题「不用填表，开口就能聊出一条职业路径」，同时副标题宣称
+// 「上传简历 或直接对话」——但本期并不接收简历，`faqs.json` 的答复正好相反
+// （"我们不接收真实简历…将来若支持上传简历，会作为单独功能另行说明"）。
+// 文案包缺失时留空，不退回写死的那一份。
+const heroTitle = computed(() => session.copyBundle['home.hero_title'] ?? '')
+const heroTitleHl = computed(() => session.copyBundle['home.hero_title_hl'] ?? '')
+const heroSub = computed(() => session.copyBundle['home.hero_sub'] ?? '')
+const heroNote = computed(() => session.copyBundle['home.hero_note'] ?? '')
 // 工作台矩阵（HOME-005）：场景名 / 说明 / 时间窗口 / 状态动作。
 // 未开放项点击「预约提醒」会记录一次真实埋点。
 // ⚠️ 这里曾为每张卡内联一份"产出样例"（含编造的匹配度数字与节点），已删除：
@@ -133,13 +143,13 @@ async function selectTask(code: string) {
         <span class="float-chip f-8">职业锚 · 价值取向</span>
       </div>
       <div class="container">
-        <h1>不用填表，开口就能<br /><span class="hl">聊出一条职业路径</span></h1>
-        <p class="hero-sub">上传简历 <b>或直接对话</b>，AI 边聊边<em>沉淀你的个人画像</em>，输出<b>个人分析报告、方向方案与行动计划</b>，并长期跟踪、随成长持续校准。</p>
+        <h1>{{ heroTitle }}<br /><span class="hl">{{ heroTitleHl }}</span></h1>
+        <p class="hero-sub">{{ heroSub }}</p>
         <div class="hero-cta">
           <button class="btn btn-pri btn-lg" :disabled="busy" @click="startChat">开始和 AI 聊职业 →</button>
           <button class="btn btn-ghost btn-lg" @click="openReport">打开完整报告 →</button>
         </div>
-        <p class="hero-note">从「不知道自己适合什么」到「有路径、能执行」｜画像由对话引导生成，不前置表单</p>
+        <p class="hero-note">{{ heroNote }}</p>
 
         <div class="hero-preview">
           <div class="hp-shadow-a" aria-hidden="true"></div>
