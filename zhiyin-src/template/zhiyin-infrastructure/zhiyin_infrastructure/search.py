@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 import time
 from typing import Any
 
@@ -15,6 +15,16 @@ class RrfHybridSearchGateway(SearchGateway):
     """用 Reciprocal Rank Fusion 合并关键词与向量结果。
 
     任一通道不可用时降级到另一通道；命中 metadata 会保留通道排名，便于离线评估。
+
+    ⚠️ 降级必须能**分辨原因**，否则排查会被自己骗
+    ------------------------------------------------
+    只记"vector 通道降级了"是不够的：向量维度不匹配（`ValidationError`，配置/模型换版
+    导致）与连不上向量库（`UnavailableError`）在结果里长得一模一样，而处置动作完全
+    不同。因此除 `degraded_channels` 外还写 `degraded_reasons`。
+
+    这里**只写异常类名，不写异常消息**：异常文本可能带上 DSN、口令或上游地址，而
+    检索 metadata 会随报告与接口响应外流（《AGENTS.md》§10 禁止秘密进入日志、
+    动态资源与响应）。类名已足够区分"配置错"与"连不上"，需要细节时按类名去查日志。
     """
 
     IMPLEMENTATION_STATUS = "wired"
@@ -80,26 +90,33 @@ class RrfHybridSearchGateway(SearchGateway):
         keyword_hits: Sequence[RetrievalEvidence] = []
         vector_hits: Sequence[RetrievalEvidence] = []
         degraded: list[str] = []
+        reasons: dict[str, str] = {}
         if request.mode in {"keyword", "hybrid"}:
             try:
                 keyword_hits = await self._keyword.search(
                     candidate_request.model_copy(update={"mode": "keyword"})
                 )
-            except Exception:
+            except Exception as exc:
                 degraded.append("keyword")
+                reasons["keyword"] = type(exc).__name__
         if request.mode in {"vector", "hybrid"}:
             try:
                 embeddings = await self._embedding.embed([request.query])
                 if len(embeddings) != 1:
                     raise ValueError("嵌入返回数量与输入不一致")
                 vector_hits = await self._vector(candidate_request, embeddings[0])
-            except Exception:
+            except Exception as exc:
                 degraded.append("vector")
+                reasons["vector"] = type(exc).__name__
         expected = {"hybrid": 2, "keyword": 1, "vector": 1}[request.mode]
         if len(degraded) == expected:
             raise RuntimeError("请求的检索通道均不可用")
         result = self._fuse(
-            keyword_hits, vector_hits, top_k=request.top_k, degraded=degraded
+            keyword_hits,
+            vector_hits,
+            top_k=request.top_k,
+            degraded=degraded,
+            reasons=reasons,
         )
         if self._authority is not None:
             result = await self._authority.hydrate(request, result)
@@ -123,6 +140,7 @@ class RrfHybridSearchGateway(SearchGateway):
         *,
         top_k: int,
         degraded: Sequence[str],
+        reasons: Mapping[str, str] | None = None,
     ) -> list[RetrievalEvidence]:
         merged: dict[str, RetrievalEvidence] = {}
         ranks: dict[str, dict[str, int]] = {}
@@ -146,6 +164,7 @@ class RrfHybridSearchGateway(SearchGateway):
                             "algorithm": "rrf",
                             "ranks": ranks[item_id],
                             "degraded_channels": list(degraded),
+                            "degraded_reasons": dict(reasons or {}),
                         },
                     },
                 }
