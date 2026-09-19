@@ -842,7 +842,7 @@ ES/pgvector 命中只表示“可能相关”。返回业务层前必须：
 - [x] 实现五环节 Query Plan；
 - [x] 实现多目标拆分与对称检索；
 - [x] 接入 PAMI Embedding API，生产向量链路不使用本地模型；
-- [ ] 接入 PAMI Chat/Agent API；
+- [x] 接入 PAMI Chat/Agent API；**（2026-09-19 更正为已完成）** 部署环境走 `PamiLLMGateway` → 平台已发布的 Agent 应用，端到端实测产出无占位内容
 - [x] 完成关键词 + 向量并行召回与 RRF；
 - [x] 完成权限、时效、版本、状态过滤；
 - [x] 完成文档去重和来源多样性；Rerank 保持可选且当前 PAMI 未提供已验证接口；
@@ -854,7 +854,7 @@ ES/pgvector 命中只表示“可能相关”。返回业务层前必须：
 
 ### 14.3 联调与验收
 
-- [ ] PAMI 模型 ID、组织 ID、Agent API Key、RAG API Key 均由安全配置注入；
+- [ ] PAMI 凭据由安全配置注入；**（2026-09-19 更正）** 模型 ID / 组织 ID / Agent API Key / Embedding 模型 ID **已注入**（`deploy/.env`，gitignored）；**仅 RAG API Key 未注入**——它依赖平台侧先修好知识库解析（见 18.2）并发布 RAG 应用
 - [x] 真实 Embedding 返回 1024 维，单条与批量边界测试通过；
 - [x] `model_version` 切换后旧空间不会被查询；
 - [x] 六个知识域至少各完成一条真实写入、同步、检索、删除验证；
