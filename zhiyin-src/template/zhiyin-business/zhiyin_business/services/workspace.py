@@ -30,6 +30,7 @@ from zhiyin_business.ports.workspace import (
     WorkspaceView,
 )
 from zhiyin_business.services.loop import STAGE_LABELS
+from zhiyin_data_sdk.gateways.feature_flag import FeatureFlagGateway
 from zhiyin_data_sdk.repositories import RegistryRepository
 from zhiyin_kernel.assets import TrackEvent
 from zhiyin_kernel.enums import AssetType, BehaviorEventType, LoopStage
@@ -50,6 +51,7 @@ class DefaultWorkspaceService(WorkspaceService):
         memories: ConversationMemoryService,
         behaviors: BehaviorService,
         registry: RegistryRepository,
+        features: FeatureFlagGateway,
     ) -> None:
         self._profiles = profiles
         self._assets = assets
@@ -57,6 +59,20 @@ class DefaultWorkspaceService(WorkspaceService):
         self._behaviors = behaviors
         # 覆盖率与整体置信度的口径来自动态资源，必须由业务层读取并计算后透传。
         self._registry = registry
+        # 「可用功能块」= 功能开关里 enabled 的那些，见 `_available_blocks`。
+        self._features = features
+
+    async def _available_blocks(self) -> list[str]:
+        """可用功能块 = `feature_flags` 里 enabled 的条目。
+
+        此前这里是一份**写死在 Python 里的字面量清单**，把 `export` / `mentor`
+        （注册表里 `enabled: false`）与 `demo` 一并列成"available"。两个问题：
+        一是《AGENTS.md》§8 明确禁止把功能开关硬编码进 Python；二是语义错——
+        `available` 应当就是 `enabled`，否则前端按它渲染入口就会放出没开放的功能。
+        改为从开关派生后，加一个功能块只需改 `data/registry/feature_flags.json`。
+        """
+        flags = await self._features.all()
+        return sorted(code for code, enabled in flags.items() if enabled)
 
     async def build_view(self, user_id: str) -> WorkspaceView:
         (
@@ -146,14 +162,7 @@ class DefaultWorkspaceService(WorkspaceService):
             panels=panels,
             dependencies=dependencies,
             achievement_badge_keys=badge_keys,
-            available_blocks=[
-                "report_full_text",
-                "export",
-                "calendar",
-                "achievements",
-                "mentor",
-                "demo",
-            ],
+            available_blocks=await self._available_blocks(),
             profile_coverage=coverage,
             profile_overall_confidence=overall_confidence,
         )

@@ -31,6 +31,7 @@ from zhiyin_infrastructure.crawl import (
     ReviewDecision,
 )
 from zhiyin_infrastructure.local.cache import InMemoryCache
+from zhiyin_infrastructure.local.feature_flag import LocalFeatureFlagStore
 from zhiyin_infrastructure.local.messaging import InMemoryEventBus
 from zhiyin_infrastructure.local.knowledge import LocalSearchGateway
 from zhiyin_kernel.enums import RetrievalNamespace
@@ -380,6 +381,41 @@ class _Behaviors:
         return items[:limit]
 
 
+async def test_workspace_available_blocks_is_derived_from_feature_flags() -> None:
+    """可用功能块必须由功能开关派生，不得在 Python 里再抄一份清单（D8）。
+
+    此前 `available_blocks` 是写死的字面量，把 `export` / `mentor`（注册表里
+    `enabled: false`）和 `demo` 一并列成 "available"：既违反《AGENTS.md》§8
+    （功能开关不得硬编码），语义也错——`available` 应当就是 `enabled`。
+    """
+    import json
+
+    flags_path = DATA_DIR / "registry" / "feature_flags.json"
+    declared = {
+        item["code"]: bool(item["enabled"])
+        for item in json.loads(flags_path.read_text(encoding="utf-8"))["items"]
+    }
+    expected = sorted(code for code, enabled in declared.items() if enabled)
+
+    workspace = DefaultWorkspaceService(
+        profiles=_EmptyProfiles(),
+        assets=DefaultAssetService(
+            InMemoryAssetRepository(), _event_bus(), DependencyImpactPolicy()
+        ),
+        memories=DefaultConversationMemoryService(InMemoryConversationMemoryRepository()),
+        behaviors=_Behaviors(),
+        registry=LocalJsonRegistryRepository(str(DATA_DIR / "registry")),
+        features=LocalFeatureFlagStore(str(DATA_DIR / "registry")),
+    )
+
+    view = await workspace.build_view("u1")
+    assert view.available_blocks == expected
+    # 关掉的开关绝不能出现在"可用"里；`demo` 这个演示能力位已下架
+    assert "export" not in view.available_blocks  # enabled=false
+    assert "mentor" not in view.available_blocks  # enabled=false
+    assert "demo" not in view.available_blocks
+
+
 async def test_workspace_partial_failure_still_returns_five_panels() -> None:
     memories = DefaultConversationMemoryService(InMemoryConversationMemoryRepository())
     assets = DefaultAssetService(InMemoryAssetRepository(), _event_bus(), DependencyImpactPolicy())
@@ -389,6 +425,7 @@ async def test_workspace_partial_failure_still_returns_five_panels() -> None:
         memories=memories,
         behaviors=_Behaviors(),
         registry=LocalJsonRegistryRepository(str(DATA_DIR / "registry")),
+        features=LocalFeatureFlagStore(str(DATA_DIR / "registry")),
     )
 
     view = await workspace.build_view("u1")

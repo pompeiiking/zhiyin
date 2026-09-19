@@ -1,21 +1,13 @@
 {
-  "_note": "职引 · 信任背书块（DEMO）。属动态资源：改本文件不需要发版。口径（《前端设计 v1.0》§4.1）：只讲一条主线——「你做的每步都基于职业咨询的成熟方法」，可点开脱敏方法论示例；不讲 15 维 / 3 套 / 5 分钟这类数字炫技。",
+  "_note": "职引 · 信任背书块（DEMO）。属动态资源：改本文件不需要发版。口径（《前端设计 v1.0》§4.1）：只讲一条主线——「你做的每步都基于职业咨询的成熟方法」；不讲 15 维 / 3 套 / 5 分钟这类数字炫技。**2026-09-19 修正**：删掉了 `methodology_example` 块——它整块的作用是「点开看脱敏示例报告」，而那份示例报告不存在（`expandable_ref: demo_report` 是悬空引用），留着就是一句兑现不了的承诺；主线块的 `expandable_ref` 同时置空。等首页内容真正做出来（D8 的 B 方案）再按真实资产补回。",
   "items": [
     {
       "code": "primary_methodology",
       "title": "你做的每一步，都基于职业咨询的成熟方法",
-      "body": "采集、诊断、决策、行动、复盘五步背后都有可查的咨询理论支撑，点开可以看到具体用了什么。",
-      "expandable_ref": "methodology_example",
+      "body": "采集、诊断、决策、行动、复盘五步背后都有可查的咨询理论支撑。",
+      "expandable_ref": "",
       "status": "enabled",
       "sort_order": 1
-    },
-    {
-      "code": "methodology_example",
-      "title": "看一个方法论示例（脱敏）",
-      "body": "用一份脱敏的示例报告说明每一步分别用了哪套方法、产出了什么。",
-      "expandable_ref": "demo_report",
-      "status": "enabled",
-      "sort_order": 2
     }
   ]
 }

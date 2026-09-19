@@ -71,7 +71,8 @@ class WorkspaceView(BaseModel):
     dependencies: list[DependencyEdge] = Field(default_factory=list)
     achievement_badge_keys: list[str] = Field(default_factory=list)
     available_blocks: list[str] = Field(
-        default_factory=list, description="可用的功能块入口：报告全文/导出/日历/成就/导师/演示"
+        default_factory=list,
+        description="可用功能块 = 功能开关里 enabled 的条目（报告全文/导出/日历/成就/导师等）",
     )
     profile_coverage: float = Field(
         default=0.0,
