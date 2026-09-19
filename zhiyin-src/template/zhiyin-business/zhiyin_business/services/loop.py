@@ -46,8 +46,13 @@ from zhiyin_business.contracts.common import (
     AgentBadge,
     BehaviorGuide,
     ConversationMessage,
+    TheoryRef,
 )
 from zhiyin_business.ports.blackboard import BlackboardView
+from zhiyin_business.policies.profile import (
+    PROFILE_COLLECTION_POLICY,
+    key_fields_from_params,
+)
 from zhiyin_business.ports.loop import (
     EntrySource,
     LoopContext,
@@ -108,7 +113,12 @@ def default_conclusion_builder(stage: LoopStage, output: BaseModel) -> str:
 
 
 def next_stage_after(stage: LoopStage) -> Optional[LoopStage]:
-    """默认下一环节；⑤ 复盘回到环首由业务规则决定，这里返回 None。"""
+    """默认下一环节；⑤ 复盘回到环首由业务规则决定，这里返回 None。
+
+    注意：**这不是交接口径**。是否交接由 `AgentDrivenLoopCoordinator._next_handoff`
+    按环节产出判定（①只有 `ready_to_handoff=True` 才交接），本函数只表达"顺序上下一环
+    是谁"，供展示与测试使用。
+    """
     try:
         index = STAGE_SEQUENCE.index(stage)
     except ValueError:
@@ -116,6 +126,17 @@ def next_stage_after(stage: LoopStage) -> Optional[LoopStage]:
     if index + 1 >= len(STAGE_SEQUENCE):
         return None
     return STAGE_SEQUENCE[index + 1]
+
+
+def _optional_float(value: object) -> Optional[float]:
+    """把动态资源里的数取成 float；形状不对时返回 None，由调用方决定口径。
+
+    动态资源是外部配置，不能假设它一定是数值：这里只做形状收敛，不编默认值——
+    缺参数时指令里会自然省略对应句，而不是用一个假阈值冒充。
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
 
 
 STAGE_LABELS: dict[LoopStage, str] = {
@@ -239,6 +260,12 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
       接入动态资源后应从 `app_copy` / `notify_template` 读取，禁止在代码里写死文案。
     """
 
+    # 本类是生产路径上的环节执行者：`DefaultOrchestrator.handle_message` 通过
+    # `run_stage` 执行环节，并消费 `LoopResult.next_stage` 完成交接。
+    # 声明状态是装配报告的如实口径——此前没有声明，被兜底报成 wired，
+    # 而当时它其实只在测试里被调用。
+    IMPLEMENTATION_STATUS = "wired"
+
     def __init__(
         self,
         agent_engine: AgentEngine,
@@ -300,7 +327,17 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
         return await self._build_context(session, EntrySource.RESUME)
 
     async def run_stage(self, context: LoopContext, user_input: str) -> LoopResult:
-        """执行当前环节的一轮。"""
+        """执行当前环节的一轮。
+
+        `context.scratch` 是调用方（Orchestrator）与本类之间的约定通道，用来传
+        它已经算好、而本类不该重算的东西：
+
+        - `intent`：本轮意图（编排器判定），进提示词；
+        - `evidence_packet`：本轮检索证据（编排器读黑板 + 检索），进提示词；
+        - `theory_refs`：**由证据命中的**理论引用。②③ 的理论依据必须来自真实
+          检索命中，不能采信模型自由生成的名字；编排器用证据包算好传进来，
+          本类据此生成徽章，避免"徽章上的理论是模型编的"。
+        """
         contract = self._contracts[context.stage]
         result = await self._agent.invoke(
             AgentRequest(
@@ -308,7 +345,10 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
                 stage=context.stage.value,
                 blackboard=context.blackboard.model_dump(mode="json"),
                 prompt_vars={
+                    "instruction": await self._stage_instruction(context),
                     "user_input": user_input,
+                    "intent": context.scratch.get("intent"),
+                    "evidence_packet": context.scratch.get("evidence_packet") or {},
                     "task_code": context.session.task_code,
                     "turn_index": context.turn_index,
                     "inherited_assets": [
@@ -329,6 +369,40 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
             return await self._degraded_result(context, [str(exc)], result.degraded)
 
         return await self._to_loop_result(context, output)
+
+    async def _stage_instruction(self, context: LoopContext) -> str:
+        """组装本轮交给模型的环节指令。
+
+        `ContractAgentEngine` 只把 `prompt_vars` 与黑板序列化后交给模型，本身不含
+        任务语义（R-ORC-001）；指令必须由业务层给出，否则模型只拿到裸 JSON 与输出
+        Schema，会自行猜测该抽什么（实测会产出自由命名的画像字段，使六个关键字段
+        永远覆盖不到）。
+
+        关键字段清单与阈值**一律从动态资源读取**，本类不内建任何字段名或阈值。
+        """
+        descriptor = await self._registry.get_agent(context.lead_agent)
+        key_fields: list[str] = []
+        coverage_threshold = confidence_threshold = gap_floor = None
+        if context.stage is LoopStage.COLLECT:
+            params = await self._registry.get_policy_params(PROFILE_COLLECTION_POLICY)
+            if params is None:
+                raise RuntimeError("缺少动态规则参数：profile_collection")
+            key_fields = key_fields_from_params(params)
+            coverage_threshold = _optional_float(params.value.get("coverage_threshold"))
+            confidence_threshold = _optional_float(
+                params.value.get("overall_confidence_threshold")
+            )
+            gap_floor = _optional_float(params.value.get("gap_confidence_floor"))
+        return build_stage_instruction(
+            context.stage,
+            agent_name=descriptor.name if descriptor else context.lead_agent,
+            role_summary=descriptor.role_summary if descriptor else "",
+            not_to_do=descriptor.not_to_do if descriptor else (),
+            key_fields=key_fields,
+            coverage_threshold=coverage_threshold,
+            confidence_threshold=confidence_threshold,
+            gap_confidence_floor=gap_floor,
+        )
 
     async def advance(
         self,
@@ -412,7 +486,19 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
         )
 
     async def _to_loop_result(self, context: LoopContext, output: BaseModel) -> LoopResult:
-        badge = await self._badge(context, list(getattr(output, "theory_refs", []) or []))
+        # ②③ 的理论依据以调用方按检索证据算好的为准，**哪怕算出来是空的**：
+        # "没有检索命中"必须表现为"没有理论引用"，不能回落到模型自由生成的名字，
+        # 否则用户会看到一条无法追溯出处的理论依据。
+        # 调用方未提供该键（①④⑤）时才用产出里的引用。
+        supplied = context.scratch.get("theory_refs")
+        if isinstance(supplied, list):
+            theory_refs = [
+                TheoryRef.model_validate(item) if isinstance(item, dict) else item
+                for item in supplied
+            ]
+        else:
+            theory_refs = list(getattr(output, "theory_refs", []) or [])
+        badge = await self._badge(context, theory_refs)
         guide = getattr(output, "guide", None)
         if not isinstance(guide, BehaviorGuide):
             # 契约里 guide 是必填项；走到这里说明契约被改坏了，走降级而不是抛错。
@@ -432,9 +518,7 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
                 )
             )
 
-        next_stage = next_stage_after(context.stage)
-        if context.stage is LoopStage.REVIEW:
-            next_stage = getattr(output, "next_handoff_stage", None)
+        next_stage, next_reason = self._next_handoff(context.stage, output)
 
         return LoopResult(
             stage=context.stage,
@@ -444,8 +528,32 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
             disclosure=getattr(output, "disclosure", None),
             guide=guide,
             next_stage=next_stage,
-            next_stage_reason="按 ①→⑤ 顺序推进" if next_stage else "",
+            next_stage_reason=next_reason,
         )
+
+    @staticmethod
+    def _next_handoff(
+        stage: LoopStage, output: BaseModel
+    ) -> tuple[Optional[LoopStage], str]:
+        """本轮结束时是否需要交接，以及为什么。
+
+        **不是"按 ①→⑤ 顺序推进"**：只有以下两种情形才算交接信号，其余环节一律
+        等用户表达意图（决策 4=A 的意图→环节口径），否则就会在用户还没确认时
+        一路自动跳到④。
+
+        - ① 采集：产出 `ready_to_handoff=True` 时交接到②（FR-COLLECT-007：
+          结束条件是「达到目标环节所需最低置信度」，不是固定题数）；
+        - ⑤ 复盘：产出显式给出 `next_handoff_stage`（再入环回到指定环节）。
+        """
+        if stage is LoopStage.COLLECT and bool(
+            getattr(output, "ready_to_handoff", False)
+        ):
+            return LoopStage.DIAGNOSE, "画像已达解析门槛，① 采集交接给 ② 诊断"
+        if stage is LoopStage.REVIEW:
+            target = getattr(output, "next_handoff_stage", None)
+            if target is not None:
+                return target, "⑤ 复盘判定需要再入环"
+        return None, ""
 
     async def _degraded_result(
         self, context: LoopContext, errors: list[str], degraded: bool

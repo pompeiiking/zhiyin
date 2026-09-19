@@ -50,6 +50,7 @@ from zhiyin_business.ports.blackboard import (
     ConversationMemoryService,
     ProfileService,
 )
+from zhiyin_business.ports.loop import LoopCoordinator
 from zhiyin_business.ports.orchestrator import (
     HandoffDecision,
     IntentType,
@@ -59,15 +60,7 @@ from zhiyin_business.ports.orchestrator import (
     TurnRequest,
     TurnResult,
 )
-from zhiyin_business.policies.profile import (
-    PROFILE_COLLECTION_POLICY,
-    key_fields_from_params,
-)
-from zhiyin_business.services.loop import (
-    STAGE_OUTPUT_CONTRACTS,
-    build_stage_instruction,
-    default_conclusion_builder,
-)
+from zhiyin_business.services.loop import STAGE_OUTPUT_CONTRACTS
 from zhiyin_data_sdk.gateways.ai import SearchGateway
 from zhiyin_data_sdk.repositories import RegistryRepository, TaskSessionRepository
 from zhiyin_kernel.assets import ActionPlan, DirectionPlan, PlanGap, Report
@@ -117,6 +110,7 @@ class DefaultOrchestrator(Orchestrator):
         lead_policy: LeadPolicy,
         handoff_policy: HandoffPolicy,
         agent_engine: AgentEngine,
+        loop: LoopCoordinator,
         search: SearchGateway,
         retrieval_policy: RetrievalPlanningPolicy,
         state_store: StateStore,
@@ -134,6 +128,9 @@ class DefaultOrchestrator(Orchestrator):
         self._lead_policy = lead_policy
         self._handoff_policy = handoff_policy
         self._agent_engine = agent_engine
+        # 环节执行与交接口径归 LoopCoordinator（五环节状态机 Port）；
+        # 本类只负责读黑板、调规则、落库与发事件。
+        self._loop = loop
         self._search = search
         self._retrieval_policy = retrieval_policy
         self._state_store = state_store
@@ -171,40 +168,6 @@ class DefaultOrchestrator(Orchestrator):
             blackboard=blackboard,
             intent=intent,
             message=intent.value,
-        )
-
-    async def _build_stage_instruction(self, stage: LoopStage, agent_id: str) -> str:
-        """组装本轮交给模型的任务指令。
-
-        `ContractAgentEngine` 只负责把 `prompt_vars` 与黑板序列化后交给模型，
-        本身不含任务语义（R-ORC-001）；指令必须由业务层给出，否则模型只拿到
-        裸 JSON 与输出 Schema，会自行猜测该抽什么。
-
-        指令骨架取自 `services/loop.py`；**关键字段清单与阈值一律从动态资源读取**，
-        编排器不内建任何画像字段名或阈值（与决策 5 共用同一份口径）。
-        """
-        descriptor = await self._registry.get_agent(agent_id)
-        key_fields: list[str] = []
-        coverage_threshold = confidence_threshold = gap_floor = None
-        if stage is LoopStage.COLLECT:
-            params = await self._registry.get_policy_params(PROFILE_COLLECTION_POLICY)
-            if params is None:
-                raise RuntimeError("缺少动态规则参数：profile_collection")
-            key_fields = key_fields_from_params(params)
-            coverage_threshold = _optional_float(params.value.get("coverage_threshold"))
-            confidence_threshold = _optional_float(
-                params.value.get("overall_confidence_threshold")
-            )
-            gap_floor = _optional_float(params.value.get("gap_confidence_floor"))
-        return build_stage_instruction(
-            stage,
-            agent_name=descriptor.name if descriptor else agent_id,
-            role_summary=descriptor.role_summary if descriptor else "",
-            not_to_do=descriptor.not_to_do if descriptor else (),
-            key_fields=key_fields,
-            coverage_threshold=coverage_threshold,
-            confidence_threshold=confidence_threshold,
-            gap_confidence_floor=gap_floor,
         )
 
     async def _detect_stage_for_message(
@@ -366,6 +329,18 @@ class DefaultOrchestrator(Orchestrator):
             reason=reason,
             to_agent=to_agent,
         )
+        # 告知文案在这里组装，而不是在策略里：策略只回答"要不要告知、为什么"，
+        # 它既拿不到环节中文名也拿不到主理展示名。让它拼文案的后果是
+        # 用户会看到「接下来进入 diagnose 环节」这种漏出枚举值的句子。
+        # 文案一律从动态资源取（AGENTS.md §8：展示文案不得硬编码）。
+        if decision.disclosure is not None:
+            decision = decision.model_copy(
+                update={
+                    "disclosure": decision.disclosure.model_copy(
+                        update={"text": await self._handoff_disclosure_text(decision)}
+                    )
+                }
+            )
         await self._sessions.update_stage(session.id, to_stage, decision.to_agent)
         await self._memories.upsert(
             user_id,
@@ -395,6 +370,25 @@ class DefaultOrchestrator(Orchestrator):
             )
         )
         return decision
+
+    async def _handoff_disclosure_text(self, decision: HandoffDecision) -> str:
+        """换主理 / 换环节的显式告知文案（FR-ORCH-003）。
+
+        产品要求这一行讲清"谁接手、依据什么、为什么"：
+        - 主理展示名取自动态资源 `agents.json`；
+        - 环节中文名取自文案包 `copies.json` 的 `stage.<code>.label`；
+        - 取不到时用不含枚举值的兜底说法，**绝不把 `diagnose` 这类内部取值写给用户**。
+        """
+        descriptor = await self._registry.get_agent(decision.to_agent)
+        to_name = descriptor.name if descriptor is not None else "新的主理"
+        label = ""
+        try:
+            bundle = await self._registry.get_copy_bundle()
+            label = str(bundle.get(f"stage.{decision.to_stage.value}.label", ""))
+        except NotImplementedError:  # 动态资源不可用时回落到不含环节名的说法
+            label = ""
+        where = f"进入{label}环节" if label else "进入下一个环节"
+        return f"接下来{where}，由「{to_name}」接手继续帮助你：{decision.reason}"
 
     async def handle_message(self, request: TurnRequest) -> TurnResult:
         existing = await self._sessions.get(request.task_id)
@@ -464,7 +458,7 @@ class DefaultOrchestrator(Orchestrator):
         if session is None:  # pragma: no cover - Repository 违反契约
             raise RuntimeError("会话创建后无法读取")
 
-        blackboard = await self.read_blackboard(request.user_id, session.id)
+        # 环节执行者自己通过 blackboard_loader 读同一份黑板，这里不再重复读取。
         evidence_packet = await self._load_retrieval_context(
             message=request.message,
             agent_id=session.lead_agent,
@@ -473,52 +467,61 @@ class DefaultOrchestrator(Orchestrator):
             user_id=request.user_id,
         )
         contract = STAGE_OUTPUT_CONTRACTS[stage]
-        instruction = await self._build_stage_instruction(stage, session.lead_agent)
-        agent_result = await self._agent_engine.invoke(
-            AgentRequest(
-                agent_id=session.lead_agent,
-                stage=stage.value,
-                blackboard=blackboard.model_dump(mode="json"),
-                prompt_vars={
-                    "instruction": instruction,
-                    "user_input": request.message,
-                    "intent": intent.value,
-                    "evidence_packet": evidence_packet.model_dump(mode="json"),
-                },
-                output_schema=contract.model_json_schema(),
-            )
+        # ②③ 的理论依据必须来自真实检索命中，不能采信模型自由生成的名字；
+        # 算好后经 scratch 交给环节执行者，由它生成徽章与最短结论。
+        evidence_theory_refs = (
+            self._theory_refs_from_hits(evidence_packet.evidences, stage)
+            if stage in {LoopStage.DIAGNOSE, LoopStage.DECIDE}
+            else []
         )
-        if not agent_result.valid:
-            question = "这轮产出暂时不可用，我们换个方式继续。你最想先解决哪一步？"
-            output = None
-            guide = BehaviorGuide(kind="question", text=question, question=question)
-            messages = [
-                ConversationMessage(role="agent", text=question, agent_id=session.lead_agent)
+        context = await self._loop.resume(request.user_id, session.id)
+        scratch: dict[str, object] = {
+            "intent": intent.value,
+            "evidence_packet": evidence_packet.model_dump(mode="json"),
+        }
+        if stage in {LoopStage.DIAGNOSE, LoopStage.DECIDE}:
+            # 只有这两环节的理论依据需要"以证据为准、没有命中就必须为空"，
+            # 所以只在此时下发该键；①④⑤ 仍用产出里的引用。
+            scratch["theory_refs"] = [
+                ref.model_dump(mode="json") for ref in evidence_theory_refs
             ]
+        context = context.model_copy(update={"scratch": scratch})
+        loop_result = await self._loop.run_stage(context, request.message)
+
+        if "degraded" in loop_result.output:
+            # 环节产出不合法或模型不可用：不落库、不发资产事件，只回一句兜底引导。
+            output = None
+            guide = loop_result.guide
+            messages = (
+                [ConversationMessage(role="agent", text=loop_result.guide.text, agent_id=session.lead_agent)]
+                if loop_result.guide.text
+                else []
+            )
             theory_refs = []
         else:
-            output = contract.model_validate(agent_result.structured)
+            output = contract.model_validate(loop_result.output)
             if stage in {LoopStage.DIAGNOSE, LoopStage.DECIDE}:
-                theory_refs = self._theory_refs_from_hits(
-                    evidence_packet.evidences, stage
-                )
+                theory_refs = evidence_theory_refs
                 output = output.model_copy(update={"theory_refs": theory_refs})
             else:
                 theory_refs = list(getattr(output, "theory_refs", []))
-            guide = output.guide
-            conclusion = default_conclusion_builder(stage, output)
-            messages = (
-                [
-                    ConversationMessage(
-                        role="agent",
-                        text=conclusion,
-                        agent_id=session.lead_agent,
-                        theory_refs=theory_refs,
-                    )
-                ]
-                if conclusion
-                else []
+            guide = loop_result.guide
+            messages = list(loop_result.messages)
+
+        # 交接口径：环节执行者按产出判定"本轮结束时是否需要交接"
+        # （① 只有 ready_to_handoff=True 才交接，⑤ 按 next_handoff_stage 再入环）。
+        # 交接由编排器统一落库并发 loop_stage_changed，前端据 disclosure 显示告知行。
+        # 注意：路由已交接时 handoff 已有值，这里只在产出signal更强时覆盖它。
+        if loop_result.next_stage is not None and loop_result.next_stage is not stage:
+            handoff = await self.handoff(
+                request.user_id,
+                session.id,
+                loop_result.next_stage,
+                loop_result.next_stage_reason or "环节产出判定需要交接",
             )
+            refreshed = await self._sessions.get(session.id)
+            if refreshed is not None:
+                session = refreshed
 
         created_versions = await self._persist_output(
             request.user_id,
@@ -543,7 +546,7 @@ class DefaultOrchestrator(Orchestrator):
                 theory_refs=theory_refs,
             ),
             messages=messages,
-            disclosure=(handoff.disclosure if handoff else getattr(output, "disclosure", None)),
+            disclosure=(handoff.disclosure if handoff else getattr(output, "disclosure", None) if output else None),
             guide=guide,
             asset_versions=created_versions,
         )
@@ -835,17 +838,6 @@ class DefaultOrchestrator(Orchestrator):
             if item.source and item.source in allowed
         )
         return list(dict.fromkeys(item.strip() for item in candidates if item.strip()))
-
-
-def _optional_float(value: object) -> float | None:
-    """把动态资源里的数取成 float；形状不对时返回 None，由调用方决定口径。
-
-    动态资源是外部配置，不能假设它一定是数值：这里只做形状收敛，
-    不编默认值——缺参数时指令里会自然省略对应句，而不是用一个假阈值冒充。
-    """
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return float(value)
 
 
 __all__ = ["DefaultOrchestrator"]

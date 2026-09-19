@@ -124,6 +124,17 @@ def build_services(container: "Container") -> None:
         behaviors=container.behavior_service,
         object_store=container.object_store,
     )
+    # 五环节状态机先建：编排器的 `handle_message` 通过它执行环节并拿交接信号，
+    # 而它读黑板又要回调编排器，构成一个环。用惰性 lambda 打破——
+    # `container.orchestrator` 在本函数返回前就已赋值，真正调用只会发生在请求处理时。
+    container.loop = AgentDrivenLoopCoordinator(
+        container.agent_engine,
+        container.sessions,
+        container.registry,
+        blackboard_loader=lambda user_id, task_id: container.orchestrator.read_blackboard(
+            user_id, task_id
+        ),
+    )
     container.orchestrator = DefaultOrchestrator(
         profiles=container.profile_service,
         behaviors=container.behavior_service,
@@ -137,18 +148,13 @@ def build_services(container: "Container") -> None:
         lead_policy=RegistryLeadPolicy(container.registry),
         handoff_policy=DefaultHandoffPolicy(),
         agent_engine=container.agent_engine,
+        loop=container.loop,
         search=container.search,
         retrieval_policy=RetrievalPlanningPolicy(),
         state_store=container.state_store,
         sessions=container.sessions,
         registry=container.registry,
         event_bus=container.event_bus_primitive,
-    )
-    container.loop = AgentDrivenLoopCoordinator(
-        container.agent_engine,
-        container.sessions,
-        container.registry,
-        blackboard_loader=container.orchestrator.read_blackboard,
     )
 
 

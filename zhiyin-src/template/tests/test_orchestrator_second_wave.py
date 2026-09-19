@@ -325,7 +325,9 @@ async def test_invalid_agent_output_does_not_persist_asset_but_records_turn() ->
     from zhiyin_kernel.enums import AssetType
 
     container = _container()
-    container.orchestrator._agent_engine = _InvalidEngine()
+    # 环节执行归 LoopCoordinator（编排器只负责读黑板/调规则/落库/发事件），
+    # 因此"产出不合法"的桩要打在环节执行者持有的引擎上。
+    container.loop._agent = _InvalidEngine()
     user_id = "invalid-output-user"
     session = await container.facade.enter_task(
         user_id, TaskEnterRequest(task_code="verify_direction")
@@ -385,3 +387,132 @@ async def test_handle_message_rejects_another_users_session_before_reading_it() 
             "other-user",
             MessageRequest(task_id=session.task_id, message="查看别人的会话"),
         )
+
+
+class _CollectEngine:
+    """按给定 ready_to_handoff 返回一份契约合法的 CollectOutput。"""
+
+    def __init__(self, *, ready: bool) -> None:
+        self.ready = ready
+
+    async def invoke(self, request: AgentRequest) -> AgentResult:
+        return AgentResult(
+            agent_id=request.agent_id,
+            structured={
+                "field_updates": [
+                    {
+                        "key": "career_interest",
+                        "value": "结构分析与建模",
+                        "confidence": 0.9,
+                        "source": "conversation",
+                        "evidence": ["用户原话"],
+                    }
+                ],
+                "remaining_gaps": [],
+                "confidence_overall": 0.9,
+                "ready_to_handoff": self.ready,
+                "theory_refs": [],
+                "guide": {"kind": "question", "text": "还想补充点什么？", "question": "还想补充点什么？"},
+            },
+            valid=True,
+        )
+
+
+async def _collect_turn(container, user_id: str):
+    """走真实入口建会话，再让编排器处理一轮，拿到带 session 的 TurnResult。"""
+    from zhiyin_api.dto.conversation import TaskEnterRequest
+    from zhiyin_business.ports.orchestrator import TurnRequest
+
+    session = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code="confused")
+    )
+    return await container.orchestrator.handle_message(
+        TurnRequest(
+            user_id=user_id,
+            task_id=session.task_id,
+            message="我是土木工程大四学生",
+        )
+    )
+
+
+@pytest.mark.asyncio
+async def test_collect_hands_off_to_diagnose_when_profile_is_ready() -> None:
+    """FR-COLLECT-007：画像达标的结束条件是**交接**，不是继续追问。
+
+    `CollectOutput.ready_to_handoff` 曾经没有任何消费方，①采集完成后会话停在①，
+    用户必须再说一句能被归到别环节的话才前进。这条测试把交接口径钉住：
+    环节执行者把交接写进 `LoopResult.next_stage`，编排器据此落库并给出显式告知。
+    """
+    container = _container()
+    container.loop._agent = _CollectEngine(ready=True)
+
+    turn = await _collect_turn(container, "handoff-ready-user")
+
+    assert turn.session.loop_stage is LoopStage.DIAGNOSE, "① 达标后应交接到 ②"
+    assert turn.session.lead_agent == "career_advisor", "② 的主理应为职业顾问"
+    assert turn.disclosure is not None, "换环节必须显式告知（FR-ORCH-003）"
+    assert turn.disclosure.text
+    # 告知行是对用户说的话：不得漏出 LoopStage 的内部取值，且主理要用展示名。
+    assert LoopStage.DIAGNOSE.value not in turn.disclosure.text
+    assert "职业顾问" in turn.disclosure.text
+    # 环节中文名取自动态资源 copies.json，不是写死在代码里的映射
+    assert "② 诊断匹配" in turn.disclosure.text
+
+
+@pytest.mark.asyncio
+async def test_collect_stays_when_profile_is_not_ready() -> None:
+    """未达标时不得自动推进——否则会在用户还没说清时就一路跳到④。"""
+    container = _container()
+    container.loop._agent = _CollectEngine(ready=False)
+
+    turn = await _collect_turn(container, "handoff-pending-user")
+
+    assert turn.session.loop_stage is LoopStage.COLLECT
+    assert turn.disclosure is None
+
+
+@pytest.mark.asyncio
+async def test_handoff_is_visible_on_the_user_facing_pipeline() -> None:
+    """交接要能被前端看见：管线卡的当前环节必须已经切到②。"""
+    from zhiyin_api.dto.conversation import MessageRequest, TaskEnterRequest
+
+    container = _container()
+    container.loop._agent = _CollectEngine(ready=True)
+    session = await container.facade.enter_task(
+        "handoff-visible-user", TaskEnterRequest(task_code="confused")
+    )
+    view = await container.facade.send_message(
+        "handoff-visible-user",
+        MessageRequest(task_id=session.task_id, message="我是土木工程大四学生"),
+    )
+
+    active = [card for card in view.pipeline_cards if card.active]
+    assert active and active[0].stage is LoopStage.DIAGNOSE
+    assert view.disclosure is not None
+
+
+@pytest.mark.asyncio
+async def test_undecided_message_does_not_auto_advance_to_decide() -> None:
+    """② 诊断完成后**不**自动进③：方向选择必须由用户显式触发（决策 4=A）。"""
+    from zhiyin_api.dto.conversation import TaskEnterRequest
+    from zhiyin_business.ports.orchestrator import TurnRequest
+    from zhiyin_kernel.enums import AssetType
+
+    container = _container()
+    session = await container.facade.enter_task(
+        "no-auto-advance-user", TaskEnterRequest(task_code="verify_direction")
+    )
+    turn = await container.orchestrator.handle_message(
+        TurnRequest(
+            user_id="no-auto-advance-user",
+            task_id=session.task_id,
+            message="想验证某方向行不行",
+        )
+    )
+
+    assert turn.session.loop_stage is LoopStage.DIAGNOSE
+    assert turn.disclosure is None
+    # 顺带证明一轮真实产出确实落了库（不是靠演示数据撑起来的）
+    assert await container.asset_service.list_versions(
+        "no-auto-advance-user", AssetType.REPORT
+    )
