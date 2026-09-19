@@ -159,3 +159,53 @@ def test_shipped_policy_params_declare_intent_keywords() -> None:
     for intent, words in keywords.items():
         assert IntentType(intent) is not None
         assert words and all(isinstance(word, str) and word.strip() for word in words)
+
+
+# --------------------------------------------------------------------------
+# D5：用户主动要求进入②诊断
+# --------------------------------------------------------------------------
+
+_EXPLICIT_ADVANCE = (
+    "我想开始诊断",
+    "现在进入诊断吧",
+    "帮我做诊断",
+    "我的档案够了",
+    "可以进入下一环节了",
+)
+"""注意这里**故意不含**"进入下一步"：`下一步` 本身就是 `how_to_act` 的关键词，
+而 `how_to_act` 的键序在 `verify_direction` 之前——"下一步"在两处都讲得通，
+按键序归 `how_to_act` 是合理的。想要表达"推进环节"要用无歧义的说法。"""
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("message", _EXPLICIT_ADVANCE)
+async def test_explicit_advance_request_reaches_diagnose(message: str) -> None:
+    """用户主动说"开始诊断"必须真的进②，而不是被留在①。
+
+    这条守卫的是**规则参数**（`policy_params.routing.intent_keywords`）：显式推进
+    不需要新端点，只需让这些表达落进已映射到 `DIAGNOSE` 的 `verify_direction`。
+    参数化到具体句子是刻意的——`KeywordIntentPolicy` 按 JSON 键序**先命中先生效**，
+    若新词与 `confused` / `how_to_act` 等更靠前的组撞车，本测试会直接红。
+    """
+    import json
+    from pathlib import Path
+
+    data_dir = Path(__file__).resolve().parents[1] / "data" / "registry"
+    raw = json.loads((data_dir / "policy_params.json").read_text(encoding="utf-8"))
+    routing = next(
+        item for item in raw["items"] if item["code"] == "routing"
+    )["value"]
+
+    async def loader() -> PolicyParamSet:
+        return _routing_params(routing)
+
+    intent = await KeywordIntentPolicy(params_loader=loader).classify(
+        message=message, blackboard=_blackboard(LoopStage.COLLECT)
+    )
+    assert intent is IntentType.VERIFY_DIRECTION, f"{message!r} 被判成了 {intent}"
+
+    decision = await DefaultStagePolicy().decide(
+        blackboard=_blackboard(LoopStage.COLLECT), intent=intent, message=message
+    )
+    assert decision.stage is LoopStage.DIAGNOSE
+    assert decision.need_clarify is False
