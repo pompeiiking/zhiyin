@@ -19,6 +19,8 @@ scripts/*
 !scripts/verify_m3_runtime.py
 !scripts/run_mysql_contracts.py
 !scripts/sync_registry.py
+# 必须在**容器内**跑：权威表/向量队列都在 wanwu-net 里，宿主机连不上
+!scripts/load_retrieval_documents.py
 zhiyin-web/node_modules
 zhiyin-web/dist
 data/objects

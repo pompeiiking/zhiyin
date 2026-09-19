@@ -108,7 +108,15 @@ class VectorSyncPlanner:
                 text=text,
                 metadata={
                     key: document[key]
-                    for key in ("source_id", "source_url", "fetched_at", "version")
+                    # `status` / `user_id` 必须带上：检索计划会给查询带
+                    # `filters={"status": "enabled"}`（私有域还带 user_id），而
+                    # `PgVectorGateway` 是用 `metadata @> filters` 过滤的——向量行里
+                    # 没有这些字段就会被**全部过滤掉**，表现为"向量通道 0 条"。
+                    # 之前只透传来源字段，于是"权限/状态过滤"在向量通道上等于恒假。
+                    for key in (
+                        "source_id", "source_url", "fetched_at", "version",
+                        "status", "user_id", "org_id",
+                    )
                     if key in document
                 },
             )

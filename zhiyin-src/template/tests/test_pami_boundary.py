@@ -124,6 +124,49 @@ async def test_pami_search_rejects_raw_vector_explicitly() -> None:
 
 
 @pytest.mark.asyncio
+async def test_pami_search_ignores_filters_but_says_so() -> None:
+    """带 filters 时**不整条失败**，但必须让"过滤没被服务端执行"可见。
+
+    这是一次真实故障的回归：编排器的检索计划给**每一条** query 都带
+    `filters={"status": "enabled"}`，而 PAMI 的 OpenAPI 请求体只有 `query/stream`。
+    原先"带 filters 就抛错"把关键词通道整条打挂，于是启用 PAMI 后真实对话里检索恒为
+    0——还伪装成"通道降级"，看着像平台坏了。
+
+    取"忽略但标注"而不是"继续抛错"：`status=enabled` 在 PAMI 侧本就成立（只有启用
+    文档会被索引），但**绝不能假装过滤生效**——所以命中带 `filters_ignored`。
+    """
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "code": 0,
+                "data": {
+                    "output": "answer",
+                    "searchList": [
+                        {"kb_name": "职引知识库", "title": "theory_card_clover.txt",
+                         "snippet": "三叶草模型"}
+                    ],
+                },
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        search = PamiSearchGateway("http://nginx:8081", "api-key", client=client)
+        hits = await search.search(
+            RetrievalQuery(
+                query="三叶草",
+                namespace=RetrievalNamespace.THEORY,
+                mode="keyword",
+                filters={"status": "enabled"},
+            )
+        )
+
+    assert hits, "带 filters 不应导致整条通道失败"
+    assert hits[0].metadata["filters_ignored"] == {"status": "enabled"}
+
+
+@pytest.mark.asyncio
 async def test_pami_auth_uses_remote_user_info() -> None:
     seen: list[httpx.Request] = []
 

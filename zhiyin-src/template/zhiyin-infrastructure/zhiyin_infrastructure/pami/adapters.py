@@ -25,6 +25,8 @@ from zhiyin_data_sdk.gateways.security import AuthGateway, AuthPrincipal
 from zhiyin_kernel.enums import UserRole
 from zhiyin_kernel.retrieval import RetrievalEvidence, RetrievalQuery
 
+from .doc_naming import parse_doc_name
+
 
 def _clean_base_url(base_url: str) -> str:
     value = base_url.strip().rstrip("/")
@@ -283,23 +285,37 @@ def _search_hits(body: dict[str, Any], request: RetrievalQuery) -> list[Retrieva
         stable = hashlib.sha256(
             f"{knowledge_base}\0{title}\0{snippet}".encode("utf-8")
         ).hexdigest()[:24]
+        # 平台不回文档 id（响应只有 kb_name/title/snippet）。但**文件名是我们自己定的**，
+        # 按约定可反解出 `(namespace, id)`——这是唯一能让权威回填与引用溯源对上的线索。
+        # 反解失败时回落到内容哈希：宁可"溯源缺一条"，也不要猜一个错的 id 让权威表静默失配。
+        parsed = parse_doc_name(title)
+        source_id = str(item.get("source_id") or item.get("doc_id") or "")
+        if parsed is not None and parsed.namespace == request.namespace.value:
+            source_id = source_id or parsed.doc_id
+            evidence_id = f"{request.namespace.value}:{parsed.doc_id}"
+        else:
+            evidence_id = f"{request.namespace.value}:{stable or index}"
         hits.append(
             RetrievalEvidence(
-                # 与本地关键词通道、向量通道统一为 `namespace:id`（D11）。PAMI 只回
-                # title/snippet，没有稳定文档 id，故这里的 id 是内容哈希——它**不能**
-                # 与向量通道的同一篇文档对上（PAMI 不回我们的 source_id 时无法跨通道
-                # 去重），这是数据侧的已知限制，不要误当"已经对齐"。
-                evidence_id=f"{request.namespace.value}:{stable or index}",
+                evidence_id=evidence_id,
                 namespace=request.namespace,
-                source_id=str(item.get("source_id") or item.get("doc_id") or ""),
+                source_id=source_id,
                 source_url=str(item.get("source_url") or item.get("url") or ""),
                 title=title,
                 content=snippet or title,
                 score=float(item.get("score") or 0.0),
+                # 是不是演示内容由**权威表那一行**决定（平台不回这个信息）：
+                # `hydrate` 会以 `{**row.metadata_json, **hit.metadata}` 合并，
+                # 所以权威行里的 `demo=True` 不会被这里覆盖掉，D12 的护栏照常生效。
                 metadata={
                     "provider": "pami-rag",
                     "knowledge_base": knowledge_base,
                     "namespace": request.namespace.value,
+                    "doc_name": title,
+                    "doc_kind": "theory_card"
+                    if (parsed is not None and parsed.is_theory_card)
+                    else "doc",
+                    "id_parsed": parsed is not None,
                 },
             )
         )
@@ -326,10 +342,19 @@ class PamiSearchGateway(SearchGateway):
         )
 
     async def search(self, request: RetrievalQuery) -> list[RetrievalEvidence]:
-        if request.filters:
-            raise UnavailableError("PAMI RAG OpenAPI 不支持调用方 metadata filters")
         if request.mode == "vector":
             raise UnavailableError("PAMI RAG OpenAPI 不接受调用方提供的裸向量")
+        # PAMI 的 OpenAPI **不接受**调用方 metadata filters（请求体只有 query/stream），
+        # 所以这里**不是**把 filters 当作"已生效"：命中会带
+        # `metadata["filters_ignored"]`，让调用方看得见"这次过滤没被服务端执行"。
+        #
+        # 为什么不再直接抛错：编排器的检索计划**每一条 query 都带**
+        # `filters={"status": "enabled"}`（私有域还带 user_id）。原先的"带 filters 就
+        # 抛错"会把关键词通道**整条打挂**，于是启用 PAMI 后真实对话里检索恒为 0
+        # ——错误信息还落在通道降级里，看起来像"平台坏了"。而 `status=enabled` 在
+        # PAMI 侧本来就成立（只有启用文档会被索引），所以忽略它比整条失败更合理；
+        # 关键是**忽略也要可见**（与 D12/D13 同一条原则）。
+        ignored_filters = dict(request.filters or {})
         body = await self._http.request(
             "POST",
             "/service/api/openapi/v1/rag/chat",
@@ -337,7 +362,20 @@ class PamiSearchGateway(SearchGateway):
             # 拼入自然语言后冒充服务端隔离。namespace 只作为命中来源标签返回。
             payload={"query": request.query, "stream": False},
         )
-        return _search_hits(body, request)[: request.top_k]
+        hits = _search_hits(body, request)[: request.top_k]
+        if ignored_filters:
+            hits = [
+                hit.model_copy(
+                    update={
+                        "metadata": {
+                            **hit.metadata,
+                            "filters_ignored": ignored_filters,
+                        }
+                    }
+                )
+                for hit in hits
+            ]
+        return hits
 
 
 def _request_headers(request: dict[str, Any]) -> dict[str, str]:
