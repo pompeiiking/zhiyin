@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { ProfilePanelView, StagePanelView } from '@/api/schema'
@@ -53,7 +53,10 @@ const loopStages = computed(() => {
   }))
 })
 
-// 轴 A 纠正入口（WB-009）
+// 轴 A 纠正入口（WB-009，P1）。
+// 阶段校准通道尚未接入：这里只做本地记录并上报一条 `wb_axis_correct` 埋点，
+// 不会写回 `axis_a_stage`。因此提示文案必须如实说明「本次未写回系统」，
+// 不能宣称「已纳入阶段校准」——那会让人以为纠正已生效。
 const correcting = ref(false)
 const correction = ref('')
 const correctionDone = ref(false)
@@ -166,7 +169,7 @@ onMounted(() => {
           <div v-if="correcting" class="correct-panel">
             <textarea v-model="correction" rows="2" placeholder="说说你现在的真实状态…"></textarea>
             <button type="button" @click="submitCorrection">提交纠正</button>
-            <p v-if="correctionDone" class="correct-done">已记录，会纳入阶段校准。</p>
+            <p v-if="correctionDone" class="correct-done">已记下你的说明；阶段校准通道尚未接入，本次未写回系统。</p>
           </div>
         </div>
 
