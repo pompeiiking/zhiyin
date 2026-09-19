@@ -34,6 +34,19 @@ OpenAI 兼容模式同样没有 `/rerank`）。结论写在文档里会过期，
 （ES 没有对外端口）：查 `rag_es_text_1`（文本）与 `rag_new_vector_dev_1`（向量，
 `kb_name` 指向我们的知识库 id）两个索引的 `docs.count` 与真实命中。
 本次实测：22/22 份内容的块都在两个索引里，真实问题能命中对应理论卡。
+
+⚠️ 切换开关前必须看的一件事（溯源）
+-----------------------------------
+平台检索响应的条目形状是 `OpenAIChatSearch{kb_name, title, snippet}`
+（平台 `internal/bff-service/model/response/openapi.go`）——**没有文档 id、没有
+score**。而职引的引用溯源（D7⑥ 的"来源 + 版本"）依赖 `source_id`；因此一旦把
+`ZHIYIN_USE_PAMI_SEARCH` 打开，关键词通道的命中会缺少可溯源的文档 id（版本只能
+记 1）。本探针在检索可用时会**打印条目的原始字段名**，让这件事第一眼可见，
+而不是等到报告里出现一堆 `theory:<hash>` 才发现。
+
+已知可用的替代线索：我们导入平台的文档在 ES 里 `title` 就是**文件名**
+（如 `theory_card_clover.txt`），与职引语料的 id 有对应关系，可作为回填来源 id 的
+依据——但那是需要拍板的口径，不在本探针里擅自实现。
 """
 
 from __future__ import annotations
@@ -134,6 +147,13 @@ def main() -> int:
         for item in search_list[:5]:
             title = str(item.get("title") or "")
             print(f"    - {title}")
+        if search_list:
+            # 通了之后要立刻看这里：平台 `OpenAIChatSearch` 的字段只有
+            # kb_name / title / snippet（见平台 `response/openapi.go`），**没有文档
+            # id、也没有 score**。而职引的引用溯源（D7⑥ 的来源+版本）依赖 source_id。
+            # 所以把原始字段名打出来，切换 PAMI 检索时第一眼就能看到"能不能溯源"。
+            print(f"  召回条目原始字段: {sorted(search_list[0].keys())}")
+            print(f"  首条原文: {json.dumps(search_list[0], ensure_ascii=False)[:300]}")
         hits_total += len(search_list)
         # 命中了期望关键词才算"真的检索到"
         expected_words = next(
