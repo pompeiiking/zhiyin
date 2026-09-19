@@ -42,6 +42,7 @@
     { "port": "facade", "owner": "接口/前端联调负责人", "scope": "BFF 门面装配" },
     { "port": "impact", "owner": "业务编排负责人", "scope": "影响面传播 Worker" },
     { "port": "active_event", "owner": "业务编排负责人", "scope": "停滞干预 Worker" },
-    { "port": "vector_sync", "owner": "基础设施负责人", "scope": "向量同步 / 嵌入补偿 Worker（纯数据管道）" }
+    { "port": "vector_sync", "owner": "基础设施负责人", "scope": "向量同步 / 嵌入补偿 Worker（纯数据管道）" },
+    { "port": "document_expiry", "owner": "基础设施负责人", "scope": "检索文档过期下架 Worker（纯数据管道；高时效内容到期落 expired）" }
   ]
 }

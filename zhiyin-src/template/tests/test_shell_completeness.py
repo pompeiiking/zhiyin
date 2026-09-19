@@ -48,6 +48,10 @@ WORKER_SHELL: dict[str, tuple[str, str]] = {
     "impact": ("zhiyin_business.workers.impact", "ImpactPropagationWorker"),
     "active_event": ("zhiyin_business.workers.active_event", "ActiveEventWorker"),
     "vector_sync": ("zhiyin_infrastructure.workers.vector_sync", "VectorSyncWorker"),
+    "document_expiry": (
+        "zhiyin_infrastructure.workers.document_expiry",
+        "DocumentExpiryWorker",
+    ),
 }
 
 # 骨架类必须实现的 Port。键是骨架类名，值是 Port 的 (模块, 类名)。
@@ -70,6 +74,7 @@ SKELETON_PORTS: dict[str, tuple[str, str]] = {
     "ImpactPropagationWorker": ("zhiyin_kernel.worker", "Worker"),
     "ActiveEventWorker": ("zhiyin_kernel.worker", "Worker"),
     "VectorSyncWorker": ("zhiyin_kernel.worker", "Worker"),
+    "DocumentExpiryWorker": ("zhiyin_kernel.worker", "Worker"),
 }
 
 

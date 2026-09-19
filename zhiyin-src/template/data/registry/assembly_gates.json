@@ -149,7 +149,7 @@
           "registry_service",
           "facade"
         ],
-        "workers": ["impact", "active_event", "vector_sync"]
+        "workers": ["impact", "active_event", "vector_sync", "document_expiry"]
       },
       "manual": [
         "同一套 Port 契约测试对 MySQL / Redis / pgvector 实现同样通过",
@@ -209,7 +209,7 @@
           "registry_service",
           "facade"
         ],
-        "workers": ["impact", "active_event", "vector_sync"]
+        "workers": ["impact", "active_event", "vector_sync", "document_expiry"]
       },
       "manual": [
         "事件可靠性：至少一次投递 + 重试 + 死信",

@@ -159,6 +159,102 @@ async def test_authority_backfill_filters_status_expiry_and_private_scope(tmp_pa
     engine.dispose()
 
 
+@pytest.mark.asyncio
+async def test_expire_due_marks_past_deadline_documents_as_expired(tmp_path: Path) -> None:
+    """已过截止时间的高时效文档必须**落状态**，而不是只在查询时被过滤（D7）。
+
+    二者不是一回事：`_visible()` 让过期文档检不出来，但记录仍是 `enabled`——
+    于是"过期内容不能进入生产索引"在索引侧不成立（向量库仍留着它），
+    报表与审计也看不出它已过期。设计口径见第三期设计 §4.3。
+    """
+    database = tmp_path / "expire.sqlite3"
+    url = f"sqlite:///{database.as_posix()}"
+    engine = create_engine(url)
+    RetrievalDocumentRow.__table__.create(engine)
+    store = RetrievalDocumentStore(url)
+    now = datetime.now(timezone.utc)
+    store.upsert(
+        document_id="jd:due", namespace=RetrievalNamespace.JD, source_id="jd-due",
+        content="已截止的 JD", expire_at=now - timedelta(days=1),
+    )
+    store.upsert(
+        document_id="jd:alive", namespace=RetrievalNamespace.JD, source_id="jd-alive",
+        content="仍在招的 JD", expire_at=now + timedelta(days=30),
+    )
+    store.upsert(
+        document_id="jd:no-deadline", namespace=RetrievalNamespace.JD, source_id="jd-no-deadline",
+        content="长期内容，无截止时间",
+    )
+
+    assert store.expire_due(now=now) == ["jd:due"]
+    # 幂等：再扫一轮没有可标记的
+    assert store.expire_due(now=now) == []
+
+    with store._sessions() as session:  # noqa: SLF001 — 直接核对落库结果
+        due = session.get(RetrievalDocumentRow, "jd:due")
+        alive = session.get(RetrievalDocumentRow, "jd:alive")
+        no_deadline = session.get(RetrievalDocumentRow, "jd:no-deadline")
+    assert due.status == "expired"
+    assert due.metadata_json["expired_reason"] == "past_deadline"
+    # 历史样本标记：可保留用于要求分析，但永不作为"现在可以申请"的证据
+    assert due.metadata_json["historical_sample"] is True
+    assert alive.status == "enabled"
+    assert no_deadline.status == "enabled"
+    store.close()
+    engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_expire_by_source_takes_down_a_removed_source(tmp_path: Path) -> None:
+    """来源下架：该来源的文档整体过期，别处的文档不受影响（D7）。"""
+    database = tmp_path / "takedown.sqlite3"
+    url = f"sqlite:///{database.as_posix()}"
+    engine = create_engine(url)
+    RetrievalDocumentRow.__table__.create(engine)
+    store = RetrievalDocumentStore(url)
+    store.upsert(
+        document_id="jd:a", namespace=RetrievalNamespace.JD, source_id="job-board-a",
+        content="A 站岗位",
+    )
+    store.upsert(
+        document_id="jd:b", namespace=RetrievalNamespace.JD, source_id="job-board-b",
+        content="B 站岗位",
+    )
+
+    assert store.expire_by_source("job-board-a") == ["jd:a"]
+    with store._sessions() as session:  # noqa: SLF001
+        taken = session.get(RetrievalDocumentRow, "jd:a")
+        other = session.get(RetrievalDocumentRow, "jd:b")
+    assert taken.status == "expired"
+    assert taken.metadata_json["expired_reason"] == "source_removed"
+    assert other.status == "enabled"
+    store.close()
+    engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_document_expiry_worker_reports_how_many_it_expired(tmp_path: Path) -> None:
+    """Worker 的 `run_once()` 返回本轮标记数，供调度与观测使用（D7）。"""
+    from zhiyin_infrastructure.workers.document_expiry import DocumentExpiryWorker
+
+    database = tmp_path / "worker.sqlite3"
+    url = f"sqlite:///{database.as_posix()}"
+    engine = create_engine(url)
+    RetrievalDocumentRow.__table__.create(engine)
+    store = RetrievalDocumentStore(url)
+    store.upsert(
+        document_id="jd:stale", namespace=RetrievalNamespace.JD, source_id="s",
+        content="过期", expire_at=datetime.now(timezone.utc) - timedelta(hours=1),
+    )
+
+    worker = DocumentExpiryWorker(store)
+    assert worker.name == "document_expiry"
+    assert await worker.run_once() == 1
+    assert await worker.run_once() == 0
+    store.close()
+    engine.dispose()
+
+
 def test_fixed_evaluation_set_has_100_nonempty_cases_and_full_coverage() -> None:
     payload = json.loads(
         (ROOT / "data/evaluation/retrieval_cases.json").read_text(encoding="utf-8")

@@ -191,6 +191,7 @@ PORT_NOT_A_CONTAINER_FIELD: dict[str, str] = {
     "impact": "container.workers 列表（Worker 按自身的 name 寻址）",
     "active_event": "container.workers 列表（Worker 按自身的 name 寻址）",
     "vector_sync": "container.workers 列表（Worker 按自身的 name 寻址）",
+    "document_expiry": "container.workers 列表（Worker 按自身的 name 寻址）",
 }
 
 

@@ -113,6 +113,86 @@ class RetrievalDocumentStore:
             )
         return hydrated
 
+    def expire_due(self, *, now: datetime | None = None) -> list[str]:
+        """把**已过截止时间**的文档落成 `expired`，并标记为历史样本。
+
+        为什么必须落状态，而不只是靠 `_visible()` 在查询时过滤：
+        `_visible()` 确实已经让过期文档检不出来，但记录本身仍是 `enabled`——
+        于是"待审 / 禁用 / 过期内容不能进入生产索引"这条**在索引侧不成立**
+        （向量库仍会保留它），报表与审计也看不出它已过期，只剩"查不到"这一个现象。
+
+        口径见《第三期 RAG 检索内容与检索流程设计》§4.3：
+        「JD 默认是高时效内容。已过截止时间…必须标记 `expired`，不得作为"现在可以申请"
+        的证据；历史 JD 可保留用于要求分析，但要明确标记为历史样本。」
+        所以这里同时写 `historical_sample=True`——**保留可分析，但永不作为在招证据**。
+
+        只处理 `status == "enabled"` 的行：`disabled` / `pending_review` 本就不该在索引里，
+        `expired` 重复扫也无意义（幂等：第二次调用返回空列表）。
+        时间比较在 Python 侧做，与 `_visible()` 用同一套时区归一化，避免驱动差异。
+        """
+        moment = now or datetime.now(timezone.utc)
+        expired: list[str] = []
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(RetrievalDocumentRow).where(
+                    RetrievalDocumentRow.status == "enabled",
+                    RetrievalDocumentRow.expire_at.is_not(None),
+                )
+            ).all()
+            for row in rows:
+                expires = row.expire_at
+                if expires is None:
+                    continue
+                if expires.replace(tzinfo=expires.tzinfo or timezone.utc) > moment:
+                    continue
+                self._mark_expired(row, moment, reason="past_deadline")
+                expired.append(row.id)
+            session.commit()
+        return expired
+
+    def expire_by_source(
+        self,
+        source_id: str,
+        *,
+        reason: str = "source_removed",
+        now: datetime | None = None,
+    ) -> list[str]:
+        """**来源下架**：把该来源仍在用的文档整体标记为 `expired`。
+
+        与"到点过期"分开是因为触发方不同——这一条由采集/治理流程在**来源下架**时调用
+        （来源台账里的 `removal_method` 就是按 `source_id` 下架），而不是等时间到期。
+        """
+        moment = now or datetime.now(timezone.utc)
+        expired: list[str] = []
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(RetrievalDocumentRow).where(
+                    RetrievalDocumentRow.status == "enabled",
+                    RetrievalDocumentRow.source_id == source_id,
+                )
+            ).all()
+            for row in rows:
+                self._mark_expired(row, moment, reason=reason)
+                expired.append(row.id)
+            session.commit()
+        return expired
+
+    @staticmethod
+    def _mark_expired(row: RetrievalDocumentRow, moment: datetime, *, reason: str) -> None:
+        """统一的过期落状态：状态 + 原因 + 历史样本标记。
+
+        原因写进 `metadata_json` 而不是新开一列：过期原因是**审计线索**，
+        不是检索维度，不值得为它改表结构（也就不会牵动迁移）。
+        """
+        row.status = "expired"
+        row.metadata_json = {
+            **(row.metadata_json or {}),
+            "expired_reason": reason,
+            "expired_at": moment.isoformat(),
+            "historical_sample": True,
+        }
+        row.updated_at = moment
+
     @staticmethod
     def _visible(row: RetrievalDocumentRow, request: RetrievalQuery, now: datetime) -> bool:
         if row.status != "enabled":

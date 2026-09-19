@@ -215,5 +215,13 @@ def build_workers(container: "Container") -> None:
             VectorSyncWorker(task_store, container.embedding, container.vector)
         )
 
+    # 文档过期下架：只要权威文档存储装了就能跑（它只读自己的表，不依赖向量链路）。
+    # 与 vector_sync 分开装配是刻意的——过期治理不该因为向量链路没开而停摆。
+    authority = container.extra.get("retrieval_authority")
+    if authority is not None:
+        from zhiyin_infrastructure.workers.document_expiry import DocumentExpiryWorker
+
+        container.workers.append(DocumentExpiryWorker(authority))
+
 
 __all__ = ["build_orchestration", "build_services", "build_workers"]
