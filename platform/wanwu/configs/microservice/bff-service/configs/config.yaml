@@ -5,7 +5,12 @@ server:
   external_port: 6668
   web_base_url: http://localhost:8081
   api_base_url: http://localhost:6668
-  callback_url: http://172.17.0.1:6668
+  # 本地补丁（2026-09-19，经用户授权）：原值为 http://172.17.0.1:6668（Docker 宿主网关），
+  # 但本工程部署在 compose 网络内，RAG 取 embedding 时连不上该地址（Connection refused），
+  # 导致知识库文档解析全部失败（know_doc_parsing_service_error）。同文件其余服务引用
+  # （iam/app/model/mcp/rag/assistant/knowledge/workflow）一律用 compose 服务名，
+  # 这里改回服务名与之一致。上游同步时注意保留本行改动（见 UPSTREAM.md）。
+  callback_url: http://bff-service:6668
 
 log:
   std: true
