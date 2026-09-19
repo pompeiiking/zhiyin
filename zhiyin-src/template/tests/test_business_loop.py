@@ -12,7 +12,12 @@ from pathlib import Path
 
 import pytest
 
-from zhiyin_orchestration import ContractAgentEngine
+from zhiyin_orchestration import (
+    AgentEngine,
+    AgentRequest,
+    AgentResult,
+    ContractAgentEngine,
+)
 from zhiyin_kernel.enums import LoopStage
 from zhiyin_data_sdk.gateways.ai import LLMGateway, LLMMessage, LLMResult
 
@@ -384,6 +389,20 @@ def test_non_collect_instruction_has_no_profile_field_block() -> None:
     assert "remaining_gaps" not in text
 
 
+def test_stage_instruction_forbids_null_placeholders() -> None:
+    """集合字段没有内容时必须给 []，不能给 null。
+
+    实测缺陷：模型对 ⑤ 复盘的可选 `guide.options` 返回 `null`，而契约声明的是
+    array，`validate_schema` 判 `期望 array，实际 NoneType`，该轮产出整体作废并
+    降级——用户拿不到 `minimal_action`（违反 FR-REVIEW-003），只看到兜底引导。
+    环节指令是业务层唯一能约束模型 JSON 形状的地方，必须写明这条口径。
+    """
+    for stage in LoopStage:
+        text = build_stage_instruction(stage, agent_name="主理")
+        assert "null" in text, f"{stage} 的指令必须说明不要用 null 占位"
+        assert "[]" in text, f"{stage} 的指令必须说明空集合给 []"
+
+
 def test_key_fields_from_params_requires_confirmed_params() -> None:
     from zhiyin_business.policies.profile import (
         PROFILE_COLLECTION_POLICY,
@@ -407,4 +426,94 @@ def test_key_fields_from_params_requires_confirmed_params() -> None:
     ):
         with pytest.raises(ValueError):
             key_fields_from_params(bad)
+
+
+# --------------------------------------------------------------------------
+# ① 采集的交接口径（FR-COLLECT-007）
+# --------------------------------------------------------------------------
+
+
+class _FixedEngine(AgentEngine):
+    """返回一份固定产出的假引擎，用来单独检验交接口径。"""
+
+    def __init__(self, payload: dict) -> None:
+        self._payload = payload
+
+    async def invoke(self, request: AgentRequest) -> AgentResult:
+        return AgentResult(agent_id=request.agent_id, structured=self._payload, valid=True)
+
+
+def _collect_payload(keys, *, confidence: float, ready: bool = False) -> dict:
+    return {
+        "field_updates": [
+            {
+                "key": key,
+                "value": f"{key}-value",
+                "confidence": confidence,
+                "source": "conversation",
+                "evidence": [],
+            }
+            for key in keys
+        ],
+        "remaining_gaps": [],
+        "confidence_overall": confidence,
+        "ready_to_handoff": ready,
+        "theory_refs": [],
+        "guide": {"kind": "question", "text": "请补一个最关键的信息。"},
+        "disclosure": None,
+    }
+
+
+async def test_collect_hands_off_on_thresholds_even_when_model_says_false(
+    sessions, registry
+) -> None:
+    """模型自述 ready_to_handoff=false，但覆盖率与整体置信度已达标 → 必须交接。
+
+    实测缺陷：模型把「remaining_gaps 里有缺口」误当成「未完成」，覆盖率 0.833、
+    整体置信度 0.89（阈值 0.8 / 0.7）时连续 8 轮不置 true，用户永远停在 ① 且每轮
+    被追问同一句，违反 FR-COLLECT-007「结束条件是达到目标环节所需最低置信度」。
+    达标判定必须由 `policies/profile.py` 的唯一口径算，模型的 true 只作补充。
+    """
+    params = await registry.get_policy_params("profile_collection")
+    keys = params.value["key_fields"]
+    coordinator = AgentDrivenLoopCoordinator(
+        _FixedEngine(_collect_payload(keys, confidence=0.9, ready=False)),
+        sessions,
+        registry,
+    )
+    context = await coordinator.start(_entry(LoopStage.COLLECT, "profile_analyst"))
+    result = await coordinator.run_stage(context, "我是数据科学专业大三的学生，方向还不太清楚")
+
+    assert result.next_stage is LoopStage.DIAGNOSE
+    assert result.next_stage_reason
+
+
+async def test_collect_stays_when_thresholds_not_met(sessions, registry) -> None:
+    """覆盖率与整体置信度都没达标时不得交接，仍留在 ① 继续追问。"""
+    params = await registry.get_policy_params("profile_collection")
+    keys = params.value["key_fields"]
+    coordinator = AgentDrivenLoopCoordinator(
+        _FixedEngine(_collect_payload(keys[:2], confidence=0.9, ready=False)),
+        sessions,
+        registry,
+    )
+    context = await coordinator.start(_entry(LoopStage.COLLECT, "profile_analyst"))
+    result = await coordinator.run_stage(context, "我还没想好")
+
+    assert result.next_stage is None
+
+
+async def test_collect_model_self_report_can_only_help_not_block(sessions, registry) -> None:
+    """模型说 true 时同样交接：规则达标是必要条件，模型 true 是补充信号。"""
+    params = await registry.get_policy_params("profile_collection")
+    keys = params.value["key_fields"]
+    coordinator = AgentDrivenLoopCoordinator(
+        _FixedEngine(_collect_payload(keys[:2], confidence=0.9, ready=True)),
+        sessions,
+        registry,
+    )
+    context = await coordinator.start(_entry(LoopStage.COLLECT, "profile_analyst"))
+    result = await coordinator.run_stage(context, "我想先聊聊")
+
+    assert result.next_stage is LoopStage.DIAGNOSE
 

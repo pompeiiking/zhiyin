@@ -51,6 +51,8 @@ from zhiyin_business.contracts.common import (
 from zhiyin_business.ports.blackboard import BlackboardView
 from zhiyin_business.policies.profile import (
     PROFILE_COLLECTION_POLICY,
+    calculate_coverage,
+    calculate_overall_confidence,
     key_fields_from_params,
 )
 from zhiyin_business.ports.loop import (
@@ -60,7 +62,7 @@ from zhiyin_business.ports.loop import (
     LoopEntry,
     LoopResult,
 )
-from zhiyin_kernel.blackboard import TaskSession
+from zhiyin_kernel.blackboard import ProfileField, TaskSession
 from zhiyin_kernel.enums import LoopStage, TaskStatus
 from zhiyin_data_sdk.repositories import RegistryRepository, TaskSessionRepository
 
@@ -116,7 +118,7 @@ def next_stage_after(stage: LoopStage) -> Optional[LoopStage]:
     """默认下一环节；⑤ 复盘回到环首由业务规则决定，这里返回 None。
 
     注意：**这不是交接口径**。是否交接由 `AgentDrivenLoopCoordinator._next_handoff`
-    按环节产出判定（①只有 `ready_to_handoff=True` 才交接），本函数只表达"顺序上下一环
+    按环节产出判定（①只有覆盖率与整体置信度双阈值达标才交接），本函数只表达"顺序上下一环
     是谁"，供展示与测试使用。
     """
     try:
@@ -250,6 +252,10 @@ def build_stage_instruction(
             lines.append(
                 f"置信度低于 {gap_confidence_floor} 的关键字段视为缺口，应出现在 remaining_gaps 中。"
             )
+        lines.append(
+            "注意：remaining_gaps 里有缺口**不等于**未完成——完成判定只看上面两个阈值。"
+            "不要因为仍有缺口就把 ready_to_handoff 一直置为 false；条件满足时必须置为 true。"
+        )
         lines.append("confidence_overall 反映当前整体画像置信度，必须如实填写。")
 
     lines.append("")
@@ -257,6 +263,14 @@ def build_stage_instruction(
         "【输出要求】只输出一个符合给定 JSON Schema 的 JSON 对象；"
         "不要输出 Markdown 代码块、解释或多余文字。"
         "所有文本使用简体中文。没有依据的内容不要编造。"
+    )
+    # 模型会对"无内容"的可选集合字段填 null，而契约声明的是 array，
+    # 校验器判 `期望 array，实际 NoneType` 直接作废整轮产出（实测 ⑤ 复盘的
+    # `guide.options: null`）。这里把 JSON 形状讲清楚，避免整轮降级。
+    lines.append(
+        "Schema 里类型为 array 的字段，没有内容时给 []；类型为 object 的可选字段，"
+        "没有内容时省略该字段。不要用 null 占位：null 既不是数组也不是对象，"
+        "会判为不符合 Schema。"
     )
     return "\n".join(lines)
 
@@ -527,7 +541,7 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
                 )
             )
 
-        next_stage, next_reason = self._next_handoff(context.stage, output)
+        next_stage, next_reason = await self._next_handoff(context, output)
 
         return LoopResult(
             stage=context.stage,
@@ -541,9 +555,8 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
             model_degraded=model_degraded,
         )
 
-    @staticmethod
-    def _next_handoff(
-        stage: LoopStage, output: BaseModel
+    async def _next_handoff(
+        self, context: LoopContext, output: BaseModel
     ) -> tuple[Optional[LoopStage], str]:
         """本轮结束时是否需要交接，以及为什么。
 
@@ -551,19 +564,79 @@ class AgentDrivenLoopCoordinator(LoopCoordinator):
         等用户表达意图（决策 4=A 的意图→环节口径），否则就会在用户还没确认时
         一路自动跳到④。
 
-        - ① 采集：产出 `ready_to_handoff=True` 时交接到②（FR-COLLECT-007：
-          结束条件是「达到目标环节所需最低置信度」，不是固定题数）；
+        - ① 采集：达标即交接到②（FR-COLLECT-007：结束条件是「达到目标环节所需
+          最低置信度」，不是固定题数）；
         - ⑤ 复盘：产出显式给出 `next_handoff_stage`（再入环回到指定环节）。
+
+        ① 的达标**不由模型自述单独决定**：`CollectOutput.ready_to_handoff` 是模型
+        自报，实测模型把「remaining_gaps 里有缺口」误当成「未完成」——覆盖率
+        0.833、整体置信度 0.89（阈值 0.8 / 0.7）时仍连续 8 轮不置 true，用户永远
+        停在 ① 且每轮被追问同一句。覆盖率与整体置信度在 `policies/profile.py`
+        有唯一实现，这里直接用它算；模型的 true 只作为**补充**信号（或运算），
+        因此不会反过来阻塞交接。
         """
-        if stage is LoopStage.COLLECT and bool(
-            getattr(output, "ready_to_handoff", False)
-        ):
-            return LoopStage.DIAGNOSE, "画像已达解析门槛，① 采集交接给 ② 诊断"
-        if stage is LoopStage.REVIEW:
+        if context.stage is LoopStage.COLLECT:
+            ready = bool(getattr(output, "ready_to_handoff", False))
+            if not ready:
+                ready = await self._collection_thresholds_met(context, output)
+            if ready:
+                return LoopStage.DIAGNOSE, "画像已达解析门槛，① 采集交接给 ② 诊断"
+        if context.stage is LoopStage.REVIEW:
             target = getattr(output, "next_handoff_stage", None)
             if target is not None:
                 return target, "⑤ 复盘判定需要再入环"
         return None, ""
+
+    async def _collection_thresholds_met(
+        self, context: LoopContext, output: BaseModel
+    ) -> bool:
+        """按决策 5 口径判定 ① 采集是否完成（覆盖率与整体置信度双阈值）。
+
+        阈值与关键字段一律取自动态资源 `policy_params.profile_collection`，
+        本类不内建任何数字或字段名。
+        """
+        params = await self._registry.get_policy_params(PROFILE_COLLECTION_POLICY)
+        if params is None:
+            raise RuntimeError("缺少动态规则参数：profile_collection")
+        coverage_threshold = _optional_float(params.value.get("coverage_threshold"))
+        confidence_threshold = _optional_float(
+            params.value.get("overall_confidence_threshold")
+        )
+        if coverage_threshold is None or confidence_threshold is None:
+            raise RuntimeError(
+                "profile_collection 缺少 coverage_threshold 或 overall_confidence_threshold"
+            )
+        fields = self._fields_after_turn(context, output)
+        return (
+            calculate_coverage(fields, params) >= coverage_threshold
+            and calculate_overall_confidence(fields, params) >= confidence_threshold
+        )
+
+    @staticmethod
+    def _fields_after_turn(
+        context: LoopContext, output: BaseModel
+    ) -> list[ProfileField]:
+        """本轮结束后的画像字段 = 黑板快照 + 本轮 field_updates。
+
+        黑板是**本轮开始前**的读快照（画像落库由编排器在 `run_stage` 之后统一
+        完成），因此必须叠加本轮的 `field_updates` 才是真实结果，否则达标判定会
+        永远慢一轮，"最后一问答完仍不交接"。
+        """
+        profile = context.blackboard.profile
+        merged: dict[str, ProfileField] = {
+            field.key: field for field in (profile.fields if profile is not None else [])
+        }
+        now = _utcnow()
+        for update in getattr(output, "field_updates", None) or []:
+            merged[update.key] = ProfileField(
+                key=update.key,
+                value=update.value,
+                confidence=update.confidence,
+                source=update.source,
+                updated_at=now,
+                evidence=list(update.evidence or []),
+            )
+        return list(merged.values())
 
     async def _degraded_result(
         self, context: LoopContext, errors: list[str], degraded: bool

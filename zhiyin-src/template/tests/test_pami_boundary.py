@@ -55,15 +55,30 @@ def test_default_gateway_wiring_remains_local(monkeypatch: pytest.MonkeyPatch) -
 
 @pytest.mark.asyncio
 async def test_pami_agent_adapter_maps_conversation_and_structured_result() -> None:
+    """PAMI Agent 必须走 SSE 流式，并把 ``response`` 增量拼成完整结构化产出。
+
+    回归点：非流式调用会被 nginx 默认 60s ``proxy_read_timeout`` 掐成 504
+    （诊断环节实测 60.1s 必失败）。所以这里同时断言请求体里 ``stream`` 为真、
+    以及多帧增量能被正确拼接。
+    """
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
         if request.url.path.endswith("/conversation"):
             return httpx.Response(200, json={"data": {"conversationId": "conv-1"}})
+        frames = "\n\n".join(
+            [
+                'data: {"code":0,"response":"{\\"answer\\":"}',
+                'data: {"code":0,"response":"\\"ok\\"}"}',
+                'data: {"code":0,"response":"","usage":{"total_tokens":9},"finish":1}',
+                "data: [DONE]",
+            ]
+        )
         return httpx.Response(
             200,
-            json={"response": '{"answer":"ok"}', "usage": {"total_tokens": 9}},
+            content=frames.encode("utf-8"),
+            headers={"content-type": "text/event-stream; charset=utf-8"},
         )
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
@@ -74,9 +89,32 @@ async def test_pami_agent_adapter_maps_conversation_and_structured_result() -> N
         )
 
     assert result.structured == {"answer": "ok"}
+    assert result.usage == {"total_tokens": 9}
     assert len(requests) == 2
     assert requests[0].headers["authorization"] == "Bearer api-key"
-    assert json.loads(requests[1].content)["conversation_id"] == "conv-1"
+    chat_body = json.loads(requests[1].content)
+    assert chat_body["conversation_id"] == "conv-1"
+    assert chat_body["stream"] is True, "必须走流式，否则 60s 网关超时会退化成 504"
+
+
+@pytest.mark.asyncio
+async def test_pami_agent_stream_surfaces_business_error_frame() -> None:
+    """流式帧里的业务错误（``code`` 非成功值）必须显式抛出，不能当成正常全文。"""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/conversation"):
+            return httpx.Response(200, json={"data": {"conversationId": "conv-1"}})
+        body = 'data: {"code": "-1", "msg": "模型过载"}\n\ndata: [DONE]\n\n'
+        return httpx.Response(
+            200,
+            content=body.encode("utf-8"),
+            headers={"content-type": "text/event-stream; charset=utf-8"},
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        gateway = PamiLLMGateway("http://nginx:8081", "api-key", client=client)
+        with pytest.raises(UnavailableError, match="业务错误"):
+            await gateway.chat([LLMMessage(role="user", content="测试")])
 
 
 @pytest.mark.asyncio

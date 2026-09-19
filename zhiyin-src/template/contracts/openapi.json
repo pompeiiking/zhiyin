@@ -111,6 +111,37 @@
         "title": "ApiResponse[BootstrapView]",
         "type": "object"
       },
+      "ApiResponse_CalendarNodeView_": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CalendarNodeView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[CalendarNodeView]",
+        "type": "object"
+      },
       "ApiResponse_ConversationHistoryView_": {
         "additionalProperties": false,
         "properties": {
@@ -173,6 +204,37 @@
         "title": "ApiResponse[ConversationTurnView]",
         "type": "object"
       },
+      "ApiResponse_DecisionSelectionView_": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecisionSelectionView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[DecisionSelectionView]",
+        "type": "object"
+      },
       "ApiResponse_ExportResultView_": {
         "additionalProperties": false,
         "properties": {
@@ -202,6 +264,37 @@
           }
         },
         "title": "ApiResponse[ExportResultView]",
+        "type": "object"
+      },
+      "ApiResponse_GapClaimView_": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GapClaimView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[GapClaimView]",
         "type": "object"
       },
       "ApiResponse_ReportFullTextView_": {
@@ -264,6 +357,37 @@
           }
         },
         "title": "ApiResponse[SessionListView]",
+        "type": "object"
+      },
+      "ApiResponse_TaskDoneView_": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "default": 0
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskDoneView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "default": "ok",
+            "title": "Message",
+            "type": "string"
+          },
+          "trace_id": {
+            "description": "链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用",
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "title": "ApiResponse[TaskDoneView]",
         "type": "object"
       },
       "ApiResponse_TaskSessionView_": {
@@ -578,6 +702,90 @@
         "title": "BootstrapView",
         "type": "object"
       },
+      "CalendarNodeRequest": {
+        "additionalProperties": false,
+        "description": "把一个关键节点写进日历。",
+        "properties": {
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "related_task_text": {
+            "default": "",
+            "title": "Related Task Text",
+            "type": "string"
+          },
+          "source": {
+            "default": "manual",
+            "enum": [
+              "planner",
+              "coach",
+              "manual"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "CalendarNodeRequest",
+        "type": "object"
+      },
+      "CalendarNodeView": {
+        "additionalProperties": false,
+        "description": "日历节点视图。",
+        "properties": {
+          "due_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "node_id": {
+            "title": "Node Id",
+            "type": "string"
+          },
+          "related_task_text": {
+            "default": "",
+            "title": "Related Task Text",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node_id",
+          "title",
+          "source"
+        ],
+        "title": "CalendarNodeView",
+        "type": "object"
+      },
       "ConversationHistoryView": {
         "additionalProperties": false,
         "description": "某任务会话的既成事实：按时间正序的全部消息 + 所处环节 + 管线卡。\n\n与 `ConversationTurnView` 的分工：一轮回复回答\"刚刚发生了什么\"，\n历史回答\"这个会话到现在为止是什么样\"。前端刷新或切换会话时据此恢复\n对话流与环节进度，而不是把气泡清空后显示空态。",
@@ -758,6 +966,62 @@
         "title": "ConversationTurnView",
         "type": "object"
       },
+      "DecisionSelectionRequest": {
+        "additionalProperties": false,
+        "description": "选择一套方向方案（可撤回，重选同样走本接口）。",
+        "properties": {
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id"
+        ],
+        "title": "DecisionSelectionRequest",
+        "type": "object"
+      },
+      "DecisionSelectionView": {
+        "additionalProperties": false,
+        "description": "选择结果：选中的方案及其角色，前端据此高亮并允许撤回。",
+        "properties": {
+          "match_score": {
+            "title": "Match Score",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/PlanRole"
+          },
+          "selected_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected At"
+          }
+        },
+        "required": [
+          "plan_id",
+          "role",
+          "name",
+          "match_score"
+        ],
+        "title": "DecisionSelectionView",
+        "type": "object"
+      },
       "DependencyEdgeView": {
         "additionalProperties": false,
         "description": "依赖可视化（FR-WB-005 简版）。",
@@ -876,6 +1140,49 @@
           "answer"
         ],
         "title": "FaqView",
+        "type": "object"
+      },
+      "GapClaimRequest": {
+        "additionalProperties": false,
+        "description": "认领一条差距。gap_id 取自报告全文的差距区块。",
+        "properties": {
+          "gap_id": {
+            "title": "Gap Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gap_id"
+        ],
+        "title": "GapClaimRequest",
+        "type": "object"
+      },
+      "GapClaimView": {
+        "additionalProperties": false,
+        "description": "认领结果。带全量已认领 id，前端可直接刷新认领清单，无需再拉一次报告。",
+        "properties": {
+          "claimed_at": {
+            "format": "date-time",
+            "title": "Claimed At",
+            "type": "string"
+          },
+          "claimed_gap_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Claimed Gap Ids",
+            "type": "array"
+          },
+          "gap_id": {
+            "title": "Gap Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "gap_id",
+          "claimed_at"
+        ],
+        "title": "GapClaimView",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1039,6 +1346,16 @@
         ],
         "title": "PipelineCardView",
         "type": "object"
+      },
+      "PlanRole": {
+        "description": "方向方案角色。",
+        "enum": [
+          "main",
+          "parallel",
+          "fallback"
+        ],
+        "title": "PlanRole",
+        "type": "string"
       },
       "ProfilePanelView": {
         "additionalProperties": false,
@@ -1259,6 +1576,80 @@
           "title"
         ],
         "title": "StagePanelView",
+        "type": "object"
+      },
+      "TaskDoneRequest": {
+        "additionalProperties": false,
+        "description": "勾掉一条行动任务。task_id 取自行动计划的 `阶段名:任务文本`（或任务文本）。",
+        "properties": {
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "title": "TaskDoneRequest",
+        "type": "object"
+      },
+      "TaskDoneView": {
+        "additionalProperties": false,
+        "description": "勾选结果：命中的那条任务及其所属阶段。",
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "done_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Done At"
+          },
+          "done_total": {
+            "default": 0,
+            "description": "当前已完成任务数",
+            "title": "Done Total",
+            "type": "integer"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "string"
+          },
+          "task_total": {
+            "default": 0,
+            "description": "当前任务总数",
+            "title": "Task Total",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_id",
+          "task_id",
+          "phase",
+          "text",
+          "done"
+        ],
+        "title": "TaskDoneView",
         "type": "object"
       },
       "TaskEnterRequest": {
@@ -1551,6 +1942,15 @@
             "title": "Blocks",
             "type": "object"
           },
+          "calendar_nodes": {
+            "description": "④ 关键节点日历（FR-BLOCK-002）：节点 id / 标题 / 截止时间 / 来源 / 关联任务。此前工作台只有写端点、没有读路径，报告页写入后工作台永远空态。",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Calendar Nodes",
+            "type": "array"
+          },
           "coach_messages": {
             "description": "教练消息汇总（FR-WB-006）",
             "items": {
@@ -1615,6 +2015,48 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/app/assets/decision-selection": {
+      "post": {
+        "description": "选定方向方案（FR-DECIDE-003）。重选走同一端点，旧方案自动取消选中。",
+        "operationId": "select_direction_plan_api_v1_app_assets_decision_selection_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionSelectionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_DecisionSelectionView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Select Direction Plan",
+        "tags": [
+          "asset"
+        ]
+      }
+    },
     "/api/v1/app/assets/export": {
       "post": {
         "description": "导出资产。第一期仅预留入口，available 恒 False。",
@@ -1652,6 +2094,48 @@
           }
         },
         "summary": "Export Asset",
+        "tags": [
+          "asset"
+        ]
+      }
+    },
+    "/api/v1/app/assets/gap-claims": {
+      "post": {
+        "description": "认领报告中的一条差距（FR-DIAG-004）。幂等，不产生新版本。",
+        "operationId": "claim_gap_api_v1_app_assets_gap_claims_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GapClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_GapClaimView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Claim Gap",
         "tags": [
           "asset"
         ]
@@ -1718,6 +2202,48 @@
         "summary": "Bootstrap",
         "tags": [
           "app"
+        ]
+      }
+    },
+    "/api/v1/app/calendar/nodes": {
+      "post": {
+        "description": "把关键节点写入日历（FR-BLOCK-002）。规划师写入、教练读取。",
+        "operationId": "write_calendar_node_api_v1_app_calendar_nodes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalendarNodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CalendarNodeView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Write Calendar Node",
+        "tags": [
+          "asset"
         ]
       }
     },
@@ -1917,6 +2443,48 @@
         "summary": "Enter Task",
         "tags": [
           "conversation"
+        ]
+      }
+    },
+    "/api/v1/app/tasks/done": {
+      "post": {
+        "description": "勾掉一条行动任务（FR-ACT-004）。幂等。",
+        "operationId": "mark_task_done_api_v1_app_tasks_done_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskDoneRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_TaskDoneView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mark Task Done",
+        "tags": [
+          "asset"
         ]
       }
     },

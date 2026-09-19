@@ -209,3 +209,41 @@ async def test_explicit_advance_request_reaches_diagnose(message: str) -> None:
     )
     assert decision.stage is LoopStage.DIAGNOSE
     assert decision.need_clarify is False
+
+
+async def _shipped_intent(message: str) -> IntentType:
+    import json
+    from pathlib import Path
+
+    data_dir = Path(__file__).resolve().parents[1] / "data" / "registry"
+    raw = json.loads((data_dir / "policy_params.json").read_text(encoding="utf-8"))
+    routing = next(item for item in raw["items"] if item["code"] == "routing")["value"]
+
+    async def loader() -> PolicyParamSet:
+        return _routing_params(routing)
+
+    return await KeywordIntentPolicy(params_loader=loader).classify(
+        message=message, blackboard=_blackboard(LoopStage.COLLECT)
+    )
+
+
+@pytest.mark.asyncio
+async def test_narrative_mentioning_review_word_does_not_enter_review() -> None:
+    """回归：叙述里出现「复盘 / 回顾」不能被当成"该复盘了"。
+
+    实测缺陷：用户在 ① 采集被追问时回答「帮社团做过活动数据复盘」，
+    旧关键词表里的裸词「复盘」命中 → 环节被判成 ⑤ 复盘，会话被从 ① 拽走；
+    ⑤ 产出又判定"需要再入环"，于是二次交接到 ②。用户看到的告知是
+    「接下来进入② 诊断匹配环节…：⑤ 复盘判定需要再入环」——`stage` 与告知
+    自相矛盾。匹配是整句子串包含，裸名词必然误伤，故关键词只能是**意图短语**。
+    """
+    for narrative in (
+        "我平时喜欢整理数据、做表格分析，帮社团做过活动数据复盘，觉得挺有成就感。",
+        "这段实习让我学会了怎么系统地回顾一次项目的问题。",
+    ):
+        assert (
+            await _shipped_intent(narrative) is IntentType.FREE_CHAT
+        ), f"叙述被误判：{narrative}"
+
+    # 反过来，"表达复盘意图"的说法仍然必须进 ⑤。
+    assert await _shipped_intent("我这周的进展该复盘了") is IntentType.REVIEW_DUE

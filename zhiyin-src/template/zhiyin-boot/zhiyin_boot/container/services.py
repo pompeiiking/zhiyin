@@ -112,6 +112,13 @@ def build_services(container: "Container") -> None:
     container.registry_service = DefaultRegistryService(
         container.registry, container.feature_flags
     )
+    # 功能块服务先建：工作台的「关键节点日历」读路径要经它取日历节点，
+    # 所以这里必须在 `workspace_service` 之前完成装配（原先顺序相反）。
+    container.function_service = DefaultFunctionService(
+        assets=container.asset_service,
+        behaviors=container.behavior_service,
+        object_store=container.object_store,
+    )
     container.workspace_service = DefaultWorkspaceService(
         profiles=container.profile_service,
         assets=container.asset_service,
@@ -121,11 +128,8 @@ def build_services(container: "Container") -> None:
         features=container.feature_flags,
         # 左栏会话列表要取会话的 `task_name`（任务名），不能拿环节名顶替
         sessions=container.sessions,
-    )
-    container.function_service = DefaultFunctionService(
-        assets=container.asset_service,
-        behaviors=container.behavior_service,
-        object_store=container.object_store,
+        # 日历节点是功能块服务登记的数据，工作台只读转出（FR-BLOCK-002）
+        functions=container.function_service,
     )
     # 五环节状态机先建：编排器的 `handle_message` 通过它执行环节并拿交接信号，
     # 而它读黑板又要回调编排器，构成一个环。用惰性 lambda 打破——

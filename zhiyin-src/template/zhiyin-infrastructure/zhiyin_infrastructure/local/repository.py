@@ -25,7 +25,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Sequence
 from uuid import uuid4
 
-from zhiyin_kernel.assets import ActionPlan, DirectionPlan, Report
+from zhiyin_kernel.assets import ActionPlan, DirectionPlan, GapClaim, Report
 from zhiyin_kernel.blackboard import (
     AssetVersion,
     BehaviorLog,
@@ -408,6 +408,19 @@ class InMemoryAssetRepository(AssetRepository):
             stored.version = max(stored.version, history[-1].version + 1)
         history.append(stored)
         return _snapshot(stored)
+
+    async def claim_gap(self, user_id: str, gap_id: str) -> Report:
+        reports = self._reports.get(user_id) or []
+        if not reports:
+            raise LookupError(f"诊断报告不存在：{user_id}")
+        # 认领只给最新一版加标注：不重算正文、不追加历史版本，否则报告页会出现
+        # 内容完全相同的新版本，"版本 +1" 也会被这种无内容变化的动作污染。
+        latest = reports[-1]
+        if all(claim.gap_id != gap_id for claim in latest.gap_claims):
+            if all(gap.gap_id != gap_id for gap in latest.gaps):
+                raise LookupError(f"报告差距不存在：{gap_id}")
+            latest.gap_claims.append(GapClaim(gap_id=gap_id, claimed_at=_now()))
+        return _snapshot(latest)
 
     # ---------- 方向方案 ----------
 

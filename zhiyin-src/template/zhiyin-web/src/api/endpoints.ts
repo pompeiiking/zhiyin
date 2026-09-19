@@ -3,13 +3,21 @@ import type {
   AssetTypeValue,
   AssetVersionView,
   BootstrapView,
+  CalendarNodeRequest,
+  CalendarNodeView,
   ConversationHistoryView,
   ConversationTurnView,
+  DecisionSelectionRequest,
+  DecisionSelectionView,
   ExportRequest,
   ExportResultView,
+  GapClaimRequest,
+  GapClaimView,
   MessageRequest,
   ReportFullTextView,
   SessionListView,
+  TaskDoneRequest,
+  TaskDoneView,
   TaskEnterRequest,
   TaskSessionView,
   TrackEventAck,
@@ -89,6 +97,44 @@ export const exportAsset = (assetType: AssetTypeValue, format: 'pdf' | 'docx' = 
     url: '/app/assets/export',
     method: 'POST',
     data: { asset_type: assetType, format } satisfies ExportRequest,
+  })
+
+// ---------- 闭环写操作（asset_controller） ----------
+//
+// 报告页读到产出之后，用户真正要做的是这四件事。它们各自独立成一个函数，与后端
+// 四个写端点一一对应：认领差距、选定方向、勾掉任务、写入日历。前端调用它们成功
+// 才算"报告页被用起来了"——只渲染不算。
+
+/** POST /app/assets/gap-claims —— 认领报告中的一条差距（FR-DIAG-004） */
+export const claimGap = (gapId: string) =>
+  request<GapClaimView>({
+    url: '/app/assets/gap-claims',
+    method: 'POST',
+    data: { gap_id: gapId } satisfies GapClaimRequest,
+  })
+
+/** POST /app/assets/decision-selection —— 选定方向方案（FR-DECIDE-003），重选走同一端点 */
+export const selectDirectionPlan = (planId: string) =>
+  request<DecisionSelectionView>({
+    url: '/app/assets/decision-selection',
+    method: 'POST',
+    data: { plan_id: planId } satisfies DecisionSelectionRequest,
+  })
+
+/** POST /app/tasks/done —— 勾掉一条行动任务（FR-ACT-004），task_id 为 `阶段名:任务文本` */
+export const markTaskDone = (taskId: string) =>
+  request<TaskDoneView>({
+    url: '/app/tasks/done',
+    method: 'POST',
+    data: { task_id: taskId } satisfies TaskDoneRequest,
+  })
+
+/** POST /app/calendar/nodes —— 把关键节点写入日历（FR-BLOCK-002） */
+export const writeCalendarNode = (body: CalendarNodeRequest) =>
+  request<CalendarNodeView>({
+    url: '/app/calendar/nodes',
+    method: 'POST',
+    data: body satisfies CalendarNodeRequest,
   })
 
 // ---------- 埋点（track_controller） ----------

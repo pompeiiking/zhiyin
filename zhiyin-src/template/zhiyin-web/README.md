@@ -22,7 +22,7 @@
 
 | 页面 | 锚点 | 页面文件 | 主要组件 | 数据来源 |
 | --- | --- | --- | --- | --- |
-| 首页 | `#screen-home` | `pages/HomePage.vue` | `home/TaskCardGroup`、`home/ShowcaseStage`、`home/AgentsShowcase`、`common/TopBar` | `bootstrap`（任务入口 / 信任块 / 文案包 / 横幅 / FAQ） |
+| 首页 | `#screen-home` | `pages/HomePage.vue` | `home/TaskCardGroup`、`home/TrustSection`、`home/ShowcaseStage`、`home/AgentsShowcase`、`common/TopBar` | `bootstrap`（任务入口 / 信任块 / 文案包 / 横幅 / FAQ） |
 | 登录 / 注册 | `#screen-auth` | `pages/AuthPage.vue` | `common/LoginModal` | `bootstrap`（身份区）+ 登录接口（第一期默认演示用户） |
 | 核心对话页 | `#screen-conv` | `pages/ConversationPage.vue` | `conversation/{SessionList,ChatStream,PipelinePanel,AnalysisHandoff,ProfileFields}`、`MessageBubble`、`DisclosureRow`、`AgentBadge`、`TheoryTag`、`PipelineCard`、`BehaviorGuide`、`QuickActions` | `sessions` / `task/enter` / `conversation/message` |
 | 智能体小队 | `#screen-agents` | `pages/AgentsPage.vue` | `agents/AgentTeamGrid` | `workspace` 聚合（画像覆盖 / 置信度）+ 能力池（`stores/agents.ts`） |

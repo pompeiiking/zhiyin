@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 
 import { useAgentById } from '@/stores/agents'
 import { useConversationStore } from '@/stores/conversation'
+import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 
 // 单智能体页主栏（#screen-subagent）：把这一位「是谁 / 管哪一段 / 产出什么 / 如何接手」摊开。
@@ -16,6 +17,21 @@ const conversation = useConversationStore()
 const workspace = useWorkspaceStore()
 
 const agent = computed(() => agentById(props.agentId))
+const session = useSessionStore()
+
+/**
+ * 版本行只呈现后端真实下发的 `version` / `updated_at`。
+ *
+ * 此前写作 `v${panel?.version ?? 1}`：这一环根本没有产出时也会显示「v1」，
+ * 等于在界面上伪造了一条并不存在的资产版本。未生成时如实说明。
+ */
+function versionText(panel: Record<string, unknown> | null): string {
+  const version = panel?.version
+  if (typeof version !== 'number') return '尚未生成'
+  const updatedAt = panel?.updated_at
+  const stamp = typeof updatedAt === 'string' && updatedAt ? ` · ${updatedAt}` : ''
+  return `v${version}${stamp}`
+}
 
 /** 全环节按需调用（如信息侦查员）：不在某一段主理。 */
 const onDemand = computed(() => (agent.value?.stageCodes ?? []).length === 0)
@@ -53,11 +69,21 @@ const producedAssets = computed(() => {
 
   if (codes.includes('collect')) {
     const p = workspace.profilePanel as Record<string, unknown> | null
+    const fieldCount = ((p?.fields ?? []) as unknown[]).length
+    const gaps = ((p?.gaps ?? []) as Array<{ key?: string }>)
+      .map((gap) => String(gap.key ?? ''))
+      .filter(Boolean)
+      .map((key) => session.copyBundle[`profile.field.${key}`] ?? key)
     assets.push({
       key: 'profile',
       label: '个人画像',
       version: `覆盖 ${Math.round(Number(p?.coverage ?? 0) * 100)}% · 置信 ${Math.round(Number(p?.overall_confidence ?? 0) * 100)}%`,
-      summary: '学业、技能维度已沉淀；兴趣、价值观待补全',
+      summary:
+        fieldCount === 0
+          ? '尚未沉淀画像字段。'
+          : gaps.length
+            ? `已沉淀 ${fieldCount} 个字段；待补：${gaps.join('、')}`
+            : `已沉淀 ${fieldCount} 个字段，关键字段无缺口。`,
       detail: null,
     })
   }
@@ -66,7 +92,7 @@ const producedAssets = computed(() => {
     assets.push({
       key: 'report',
       label: '诊断报告',
-      version: `v${r?.version ?? 1} · ${String(r?.updated_at ?? '')}`,
+      version: versionText(r),
       summary: String(r?.evaluation ?? ''),
       detail: r?.diff ? String(r.diff) : null,
     })
@@ -76,7 +102,7 @@ const producedAssets = computed(() => {
     assets.push({
       key: 'plan',
       label: '方向方案',
-      version: `v${d?.version ?? 1} · ${String(d?.updated_at ?? '')}`,
+      version: versionText(d),
       summary: String(d?.evaluation ?? ''),
       detail: null,
     })
@@ -86,7 +112,7 @@ const producedAssets = computed(() => {
     assets.push({
       key: 'action',
       label: '行动计划',
-      version: `v${a?.version ?? 1} · ${String(a?.updated_at ?? '')}`,
+      version: versionText(a),
       summary: String(a?.evaluation ?? ''),
       detail: null,
     })
@@ -96,7 +122,7 @@ const producedAssets = computed(() => {
     assets.push({
       key: 'review',
       label: '行为日志 · 复盘',
-      version: `v${rv?.version ?? 1} · ${String(rv?.updated_at ?? '')}`,
+      version: versionText(rv),
       summary: String(rv?.evaluation ?? ''),
       detail: null,
     })

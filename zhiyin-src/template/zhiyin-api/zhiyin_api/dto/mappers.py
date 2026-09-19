@@ -41,8 +41,12 @@ from typing import Optional, Sequence
 
 from zhiyin_api.dto.asset import (
     AssetVersionView,
+    CalendarNodeView,
+    DecisionSelectionView,
     ExportResultView,
+    GapClaimView,
     ReportFullTextView,
+    TaskDoneView,
 )
 from zhiyin_api.dto.bootstrap import (
     AgentTheoryView,
@@ -74,7 +78,7 @@ from zhiyin_business.ports.loop import LoopResult
 from zhiyin_business.ports.orchestrator import ConversationHistory, TurnResult
 from zhiyin_business.ports.workspace import StagePanel, WorkspaceView
 from zhiyin_business.services.loop import STAGE_LABELS
-from zhiyin_kernel.assets import ActionPlan, DirectionPlan, Report
+from zhiyin_kernel.assets import ActionPlan, CalendarNode, DirectionPlan, Report
 from zhiyin_kernel.blackboard import AssetVersion, TaskSession
 from zhiyin_kernel.dynamic_content import (
     BannerSpec,
@@ -378,6 +382,7 @@ def workspace_page_view(view: WorkspaceView) -> WorkspacePageView:
         report_panel=by_stage.get(LoopStage.DIAGNOSE),
         plan_panel=by_stage.get(LoopStage.DECIDE),
         action_panel=by_stage.get(LoopStage.ACT),
+        calendar_nodes=[item.model_dump(mode="json") for item in view.calendar_nodes],
         review_panel=by_stage.get(LoopStage.REVIEW),
         coach_messages=[
             item.model_dump(mode="json")
@@ -433,6 +438,8 @@ def report_full_text_view(
     旧报告没有快照（字段为空）→ 不生成该章节。
 
     没有数据的区块**不生成**：目录与正文保持一致，不在报告里放空章节。
+    差距清单（`report.gaps`）同样只在有明细时生成，并把 `gap_claims` 折叠成
+    `claimed` 布尔，让前端能直接渲染"已认领"状态（FR-DIAG-003/004）。
     """
     toc = [
         {"id": "verdict", "title": "综合结论"},
@@ -455,6 +462,24 @@ def report_full_text_view(
         ],
     ]
 
+    if report.gaps:
+        # 差距清单是②诊断的产出，也是「认领差距」的唯一依据：前端在这里渲染每条
+        # 差距的要求/现状/建议，并用 `claimed` 决定按钮是"认领"还是"已认领"。
+        # 旧报告没有 gaps → 不生成该区块（目录与正文保持一致）。
+        claimed = {claim.gap_id for claim in report.gap_claims}
+        toc.append({"id": "gaps", "title": "差距清单"})
+        sections.append(
+            {
+                "id": "gaps",
+                "title": "差距清单",
+                "content": {
+                    "items": [
+                        {**gap.model_dump(mode="json"), "claimed": gap.gap_id in claimed}
+                        for gap in report.gaps
+                    ],
+                },
+            }
+        )
     if direction_plans:
         toc.append({"id": "directions", "title": "方向方案"})
         sections.append(
@@ -510,6 +535,71 @@ def export_result_view(result: ExportResult) -> ExportResultView:
     )
 
 
+def gap_claim_view(report: Report, gap_id: str) -> GapClaimView:
+    """认领结果。`claimed_gap_ids` 是全量清单，前端无需再拉一次报告。"""
+    claim = next((item for item in report.gap_claims if item.gap_id == gap_id), None)
+    if claim is None:
+        raise LookupError(f"报告未记录该差距的认领：{gap_id}")
+    return GapClaimView(
+        gap_id=gap_id,
+        claimed_at=claim.claimed_at,
+        claimed_gap_ids=[item.gap_id for item in report.gap_claims],
+    )
+
+
+def decision_selection_view(plan: DirectionPlan) -> DecisionSelectionView:
+    """选择结果：前端据此高亮选中的方案并允许撤回。"""
+    return DecisionSelectionView(
+        plan_id=plan.id,
+        role=plan.role,
+        name=plan.name,
+        match_score=plan.match_score,
+        selected_at=plan.selected_at,
+    )
+
+
+def task_done_view(plan: ActionPlan, task_id: str) -> TaskDoneView:
+    """勾选结果：定位命中的那条任务，并带上整体完成进度。"""
+    tasks = [task for phase in plan.phases for task in phase.tasks]
+    for phase in plan.phases:
+        for task in phase.tasks:
+            if _task_identity(phase.name, task.text) == task_id or task.text == task_id:
+                return TaskDoneView(
+                    plan_id=plan.id,
+                    task_id=task_id,
+                    phase=phase.name,
+                    text=task.text,
+                    done=task.done,
+                    done_at=task.done_at,
+                    done_total=sum(1 for item in tasks if item.done),
+                    task_total=len(tasks),
+                )
+    # Repository 已在 `mark_task_done` 命中后才返回，走不到这里；真走到说明两边
+    # 的任务标识口径已经不一致，显式失败好过返回一条对不上的"成功"。
+    raise LookupError(f"行动任务不存在：{task_id}")
+
+
+def calendar_node_view(node: CalendarNode) -> CalendarNodeView:
+    """日历节点视图。"""
+    return CalendarNodeView(
+        node_id=node.node_id,
+        title=node.title,
+        due_at=node.due_at,
+        source=node.source,
+        related_task_text=node.related_task_text,
+    )
+
+
+def _task_identity(phase_name: str, text: str) -> str:
+    """行动任务的复合标识 `阶段名:任务文本`。
+
+    本函数是**只读定位**用的，口径必须与 Repository 的 `mark_task_done`
+    （`InMemory` / `SqlAlchemy` 两处）保持一致；三处任一处改了任务标识规则，
+    勾选结果的阶段与文本就会错位。
+    """
+    return f"{phase_name}:{text}"
+
+
 def _stage_panel_view(panel: StagePanel) -> StagePanelView:
     return StagePanelView(
         stage=panel.stage,
@@ -525,13 +615,17 @@ def _stage_panel_view(panel: StagePanel) -> StagePanelView:
 __all__ = [
     "asset_version_view",
     "bootstrap_view",
+    "calendar_node_view",
     "conversation_turn_view",
+    "decision_selection_view",
     "export_result_view",
+    "gap_claim_view",
     "loop_stage_view",
     "pipeline_cards",
     "report_full_text_view",
     "session_list_view",
     "session_summary_view",
+    "task_done_view",
     "task_session_view",
     "workspace_page_view",
 ]

@@ -9,6 +9,7 @@ import { useGuestGuard } from '@/composables'
 import ShowcaseStage from '@/components/home/ShowcaseStage.vue'
 import AgentsShowcase from '@/components/home/AgentsShowcase.vue'
 import TaskCardGroup from '@/components/home/TaskCardGroup.vue'
+import TrustSection from '@/components/home/TrustSection.vue'
 
 const session = useSessionStore()
 const conversation = useConversationStore()
@@ -160,6 +161,9 @@ async function selectTask(code: string) {
 
     <!-- 任务卡组（§4.1 页面结构：主区 → 任务卡组 → 信任区 → 页脚）：7 条入口全部来自 bootstrap -->
     <TaskCardGroup :selected="selected" :busy="busy" :message="message" @select="selectTask" />
+
+    <!-- 信任区：横幅 / 信任背书 / FAQ，三块内容全部来自 bootstrap，前端不写死文案 -->
+    <TrustSection />
 
     <ShowcaseStage @start="startChat" />
 

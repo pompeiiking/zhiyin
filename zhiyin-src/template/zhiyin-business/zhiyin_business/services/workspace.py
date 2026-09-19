@@ -23,6 +23,7 @@ from zhiyin_business.ports.blackboard import (
     ConversationMemoryService,
     ProfileService,
 )
+from zhiyin_business.ports.function import FunctionService
 from zhiyin_business.ports.workspace import (
     DependencyEdge,
     StagePanel,
@@ -53,6 +54,7 @@ class DefaultWorkspaceService(WorkspaceService):
         registry: RegistryRepository,
         features: FeatureFlagGateway,
         sessions: TaskSessionRepository,
+        functions: FunctionService,
     ) -> None:
         self._profiles = profiles
         self._assets = assets
@@ -64,6 +66,8 @@ class DefaultWorkspaceService(WorkspaceService):
         self._registry = registry
         # 「可用功能块」= 功能开关里 enabled 的那些，见 `_available_blocks`。
         self._features = features
+        # 关键节点日历（FR-BLOCK-002）的读路径：节点由功能块服务登记，工作台只读转出。
+        self._functions = functions
 
     async def _available_blocks(self) -> list[str]:
         """可用功能块 = `feature_flags` 里 enabled 的条目。
@@ -87,6 +91,7 @@ class DefaultWorkspaceService(WorkspaceService):
             plans,
             action_plan,
             behaviors,
+            calendar_nodes,
         ) = await asyncio.gather(
             _safe(self._profiles.get(user_id), None),
             _safe(self._assets.get_report(user_id), None),
@@ -96,6 +101,9 @@ class DefaultWorkspaceService(WorkspaceService):
             _safe(self._assets.list_direction_plans(user_id), []),
             _safe(self._assets.get_action_plan(user_id), None),
             _safe(self._behaviors.recent(user_id, limit=200), []),
+            # 日历读不出来不影响其余四层：与上面各读侧一样降级为空列表，
+            # 不因为对象存储抖一下就把整个工作台打成错误页。
+            _safe(self._functions.list_calendar_nodes(user_id), []),
         )
 
         versions = [*report_versions, *direction_versions, *action_versions]
@@ -161,6 +169,7 @@ class DefaultWorkspaceService(WorkspaceService):
             report_versions=report_versions,
             direction_plans=plans,
             action_plan=action_plan,
+            calendar_nodes=calendar_nodes,
             track_events=track_events,
             panels=panels,
             dependencies=dependencies,

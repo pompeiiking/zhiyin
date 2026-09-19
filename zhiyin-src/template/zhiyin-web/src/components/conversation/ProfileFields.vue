@@ -29,6 +29,16 @@ const groups = computed(() => {
 const coverage = computed(() => Math.round((props.profile?.coverage ?? 0) * 100))
 const confidence = computed(() => Math.round((props.profile?.overall_confidence ?? 0) * 100))
 
+// FR-COLLECT-004：① 卡除了覆盖度/置信度，还要让用户看见「哪些还不够」。
+// 缺口清单由后端按决策 5 口径算好经 `profile_panel.gaps` 下发，前端只把 key
+// 翻成文案包里的字段名，不自行推断缺口。
+const gaps = computed(() =>
+  ((props.profile?.gaps ?? []) as Field[])
+    .map((gap) => String(gap.key ?? ''))
+    .filter(Boolean)
+    .map((key) => session.copyBundle[`profile.field.${key}`] ?? key),
+)
+
 function fieldName(f: Field) {
   const key = String(f.key ?? '')
   if (!key) return String(f.name ?? f.label ?? '字段')
@@ -75,6 +85,10 @@ function statusClass(f: Field) {
       </div>
     </div>
     <p v-else class="pf-empty">完成对话后，这里会沉淀你的画像字段。</p>
+
+    <p v-if="gaps.length" class="pf-gaps">
+      <span class="pf-gaps-label">待补</span>{{ gaps.join('、') }}
+    </p>
   </section>
 </template>
 
@@ -198,5 +212,25 @@ function statusClass(f: Field) {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
   text-align: center;
+}
+
+/* 缺口行：只在下发缺口时出现，颜色区分于已沉淀字段（提醒"还不够"而非报错） */
+.pf-gaps {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-warning-soft, var(--color-bg));
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.7;
+}
+
+.pf-gaps-label {
+  flex: none;
+  color: var(--color-warning, var(--color-text-muted));
+  font-weight: 800;
 }
 </style>

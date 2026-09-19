@@ -420,7 +420,7 @@ async def test_agent_capability_pool_is_resolved_server_side() -> None:
     assert all(card.name and card.name != card.id for card in analyst.theories)
 
 
-async def test_workspace_available_blocks_is_derived_from_feature_flags() -> None:
+async def test_workspace_available_blocks_is_derived_from_feature_flags(tmp_path: Path) -> None:
     """可用功能块必须由功能开关派生，不得在 Python 里再抄一份清单（D8）。
 
     此前 `available_blocks` 是写死的字面量，把 `export` / `mentor`（注册表里
@@ -436,16 +436,23 @@ async def test_workspace_available_blocks_is_derived_from_feature_flags() -> Non
     }
     expected = sorted(code for code, enabled in declared.items() if enabled)
 
+    assets = DefaultAssetService(
+        InMemoryAssetRepository(), _event_bus(), DependencyImpactPolicy()
+    )
+    behaviors = _Behaviors()
     workspace = DefaultWorkspaceService(
         profiles=_EmptyProfiles(),
-        assets=DefaultAssetService(
-            InMemoryAssetRepository(), _event_bus(), DependencyImpactPolicy()
-        ),
+        assets=assets,
         memories=DefaultConversationMemoryService(InMemoryConversationMemoryRepository()),
-        behaviors=_Behaviors(),
+        behaviors=behaviors,
         registry=LocalJsonRegistryRepository(str(DATA_DIR / "registry")),
         features=LocalFeatureFlagStore(str(DATA_DIR / "registry")),
         sessions=InMemoryTaskSessionRepository(),
+        functions=DefaultFunctionService(
+            assets=assets,
+            behaviors=behaviors,
+            object_store=LocalFileStore(str(tmp_path / "objects")),
+        ),
     )
 
     view = await workspace.build_view("u1")
@@ -456,17 +463,24 @@ async def test_workspace_available_blocks_is_derived_from_feature_flags() -> Non
     assert "demo" not in view.available_blocks
 
 
-async def test_workspace_partial_failure_still_returns_five_panels() -> None:
+async def test_workspace_partial_failure_still_returns_five_panels(tmp_path: Path) -> None:
     memories = DefaultConversationMemoryService(InMemoryConversationMemoryRepository())
     assets = DefaultAssetService(InMemoryAssetRepository(), _event_bus(), DependencyImpactPolicy())
+    behaviors = _Behaviors()
+    functions = DefaultFunctionService(
+        assets=assets,
+        behaviors=behaviors,
+        object_store=LocalFileStore(str(tmp_path / "objects")),
+    )
     workspace = DefaultWorkspaceService(
         profiles=_EmptyProfiles(),
         assets=assets,
         memories=memories,
-        behaviors=_Behaviors(),
+        behaviors=behaviors,
         registry=LocalJsonRegistryRepository(str(DATA_DIR / "registry")),
         features=LocalFeatureFlagStore(str(DATA_DIR / "registry")),
         sessions=InMemoryTaskSessionRepository(),
+        functions=functions,
     )
 
     view = await workspace.build_view("u1")
@@ -476,6 +490,15 @@ async def test_workspace_partial_failure_still_returns_five_panels() -> None:
     assert view.profile_overall_confidence == 0.0
     assert [panel.stage for panel in view.panels] == list(LoopStage)
     assert "尚未建立画像" in view.panels[0].evaluation
+
+    # 日历读路径：报告页写入的节点必须能出现在工作台视图里。此前只有写端点、
+    # 没有读路径，"加入日历"落了库但工作台永远空态——有结果、没有业务结果。
+    assert view.calendar_nodes == []
+    await functions.write_calendar_node(
+        "u1", CalendarNode(node_id="n1", title="投递截止", source="planner")
+    )
+    rebuilt = await workspace.build_view("u1")
+    assert [node.node_id for node in rebuilt.calendar_nodes] == ["n1"]
 
 
 async def test_function_calendar_achievement_track_and_export(tmp_path: Path) -> None:

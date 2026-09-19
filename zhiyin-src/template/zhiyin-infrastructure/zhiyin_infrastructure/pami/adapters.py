@@ -118,6 +118,80 @@ class _PamiHttp:
             )
         return body
 
+    async def stream_text(
+        self,
+        path: str,
+        *,
+        payload: dict[str, Any] | None = None,
+        timeout_s: float | None = None,
+    ) -> tuple[str, dict[str, Any]]:
+        """读取 PAMI 的 SSE 流，按 ``response`` 增量拼接全文。
+
+        为什么必须走流式：nginx 对 ``/service/api/`` 未显式配置
+        ``proxy_read_timeout``，落默认 60s。Agent 环节在收完提示词前不会写任何
+        响应体，非流式调用因此必然在 60s 处被网关掐成 504。流式的读超时是**相邻
+        两个数据块之间**的间隔（实测最大 0.2s），只要模型持续出字就不会触发。
+
+        返回 ``(全文, 最后一帧)``；最后一帧用于取 ``usage``/``finish`` 等元信息。
+        """
+        headers = {"Accept": "text/event-stream"}
+        if self.credential:
+            headers["Authorization"] = f"Bearer {self.credential}"
+        if self.org_id:
+            headers["X-Org-Id"] = self.org_id
+        request_timeout = timeout_s or self.timeout_s
+        owns_client = self.client is None
+        client = self.client or httpx.AsyncClient(timeout=request_timeout)
+        parts: list[str] = []
+        meta: dict[str, Any] = {}
+        try:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}{path}",
+                headers=headers,
+                json=payload,
+                timeout=request_timeout,
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.startswith("data:"):
+                        continue
+                    raw = line[5:].strip()
+                    if not raw or raw == "[DONE]":
+                        continue
+                    try:
+                        frame = json.loads(raw)
+                    except json.JSONDecodeError:
+                        continue
+                    if not isinstance(frame, dict):
+                        continue
+                    code = frame.get("code")
+                    if code not in (None, 0, 200, "0", "200"):
+                        raise UnavailableError(
+                            "PAMI 返回业务错误",
+                            detail={
+                                "path": path,
+                                "code": code,
+                                "message": str(
+                                    frame.get("msg") or frame.get("message") or ""
+                                ),
+                            },
+                        )
+                    chunk = frame.get("response")
+                    if isinstance(chunk, str):
+                        parts.append(chunk)
+                    meta = frame
+        except (httpx.HTTPError, ValueError) as exc:
+            raise UnavailableError(
+                "PAMI 接口不可用",
+                detail={"method": "POST", "path": path},
+                cause=exc,
+            ) from exc
+        finally:
+            if owns_client:
+                await client.aclose()
+        return "".join(parts), meta
+
 
 def _message_query(messages: list[LLMMessage], json_schema: dict[str, Any] | None) -> str:
     lines = [f"[{message.role}] {message.content}" for message in messages]
@@ -160,7 +234,12 @@ def _parse_structured(text: str) -> dict[str, Any] | None:
 
 
 class PamiLLMGateway(LLMGateway):
-    """通过已发布 PAMI Agent 的 OpenAPI 完成非流式模型调用。"""
+    """通过已发布 PAMI Agent 的 OpenAPI 完成模型调用（SSE 流式累积）。
+
+    对外仍是"一问一答"的非流式语义：内部用 ``stream: True`` 收 SSE 增量再拼成
+    完整文本。非流式调用会被 nginx 默认 60s ``proxy_read_timeout`` 掐断（详见
+    :meth:`_PamiHttp.stream_text`），因此这里固定走流式。
+    """
 
     IMPLEMENTATION_STATUS = "wired"
 
@@ -194,21 +273,19 @@ class PamiLLMGateway(LLMGateway):
             timeout_s=timeout_s,
         )
         conversation_id = _extract_conversation_id(conversation)
-        body = await self._http.request(
-            "POST",
+        text, meta = await self._http.stream_text(
             "/service/api/openapi/v1/agent/chat",
             payload={
                 "conversation_id": conversation_id,
                 "query": _message_query(messages, json_schema),
-                "stream": False,
+                "stream": True,
             },
             timeout_s=timeout_s,
         )
-        text = str(body.get("response") or body.get("message") or "")
         structured = _parse_structured(text) if json_schema is not None else None
         if json_schema is not None and structured is None:
             raise ValidationError("PAMI Agent 未返回合法的结构化 JSON")
-        usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
+        usage = meta.get("usage") if isinstance(meta.get("usage"), dict) else {}
         return LLMResult(
             text=text,
             structured=structured,

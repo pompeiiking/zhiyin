@@ -67,6 +67,18 @@ class AssetRepository(ABC):
     async def save_report(self, report: Report) -> Report:
         """保存报告。"""
 
+    @abstractmethod
+    async def claim_gap(self, user_id: str, gap_id: str) -> Report:
+        """认领最新一版报告里的一条差距（FR-DIAG-004），返回更新后的报告。
+
+        认领只是给**已存在的**报告加一条认领记录，不重算正文、不产生新版本：
+        报告是版本化只读资产，认领属于用户对某一版报告标注的动作。故实现必须
+        改最新一版而**不是**追加历史版本，否则报告页会出现内容完全相同的新版本。
+
+        幂等：同一 ``gap_id`` 重复认领不报错、不重复追加。
+        ``gap_id`` 不在报告 ``gaps`` 中，或用户尚无报告时抛 ``LookupError``。
+        """
+
     # ---------- 方向方案 ----------
 
     @abstractmethod

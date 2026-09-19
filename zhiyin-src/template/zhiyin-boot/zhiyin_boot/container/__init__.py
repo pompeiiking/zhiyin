@@ -160,6 +160,7 @@ def build_container(settings: Optional[Settings] = None) -> Container:
         workspace=container.workspace_service,
         assets=container.asset_service,
         functions=container.function_service,
+        behaviors=container.behavior_service,
         memories=container.memory_service,
     )
 

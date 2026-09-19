@@ -74,6 +74,29 @@ class GapClaim(BaseModel):
     claimed_at: datetime
 
 
+class ReportGap(BaseModel):
+    """报告内的差距清单条目（FR-DIAG-003）。
+
+    为什么差距明细要冻结进报告：报告是**版本化只读资产**，而"认领差距"是针对
+    某一版报告里的某一条差距做的动作。`gap_claims` 只记 `gap_id`，若报告不再存
+    明细，就没有任何地方能回答"这个 gap_id 对应什么要求、什么现状、什么建议"，
+    认领清单与报告正文都会是空壳，`FR-DIAG-003/004` 断根。
+
+    `theory_refs` 存方法论标识（id 或名称）而不是 `TheoryRef` 对象：内核零依赖，
+    不能反向引用业务层契约。旧报告无该字段 → 空列表，报告页不生成差距区块。
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    gap_id: str
+    requirement: str
+    current_state: str
+    suggestion: str
+    theory_refs: list[str] = Field(
+        default_factory=list, description="支撑该差距的方法论标识（id 或名称）"
+    )
+
+
 class Report(BaseModel):
     """15 维诊断报告。
 
@@ -93,6 +116,10 @@ class Report(BaseModel):
     verdict: Verdict
     swot: Swot
     dimensions: list[ReportDimensionGroup] = Field(default_factory=list)
+    gaps: list[ReportGap] = Field(
+        default_factory=list,
+        description="诊断产出的差距清单（FR-DIAG-003）；认领记录见 gap_claims",
+    )
     gap_claims: list[GapClaim] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list, description="事实来源，如学职平台/JD")
     methodologies: list[str] = Field(default_factory=list, description="本次使用的理论模型")

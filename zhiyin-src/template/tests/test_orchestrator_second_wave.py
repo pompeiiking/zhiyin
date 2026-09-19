@@ -348,6 +348,39 @@ async def test_invalid_agent_output_does_not_persist_asset_but_records_turn() ->
     assert len(logs) == 1
 
 
+@pytest.mark.asyncio
+async def test_degraded_turn_carries_a_non_empty_guide_from_dynamic_copy() -> None:
+    """降级轮次必须留下一句可识别的引导，不能是空气泡（FR-ORCH-007）。
+
+    此前 `AgentDrivenLoopCoordinator.degraded_guide_text` 默认空串且装配层没传值，
+    于是降级时 `guide.text` 为空、`messages` 为空，用户只看到一句演示语料免责
+    声明——既不知道发生了什么，也没有任何可执行的下一步。兜底文案必须来自
+    动态资源（AGENTS.md §8），不在业务代码里硬编码。
+    """
+    from zhiyin_api.dto.conversation import MessageRequest, TaskEnterRequest
+
+    container = _container()
+    container.loop._agent = _InvalidEngine()
+    user_id = "degraded-guide-user"
+    session = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code="verify_direction")
+    )
+    turn = await container.facade.send_message(
+        user_id,
+        MessageRequest(
+            task_id=session.task_id,
+            message="我想验证这个方向适不适合我",
+        ),
+    )
+
+    bundle = await container.registry.get_copy_bundle()
+    expected = str(bundle.get("guide.stage_degraded", "")).strip()
+    assert expected, "动态资源必须提供 guide.stage_degraded"
+    assert turn.guide["text"] == expected
+    assert turn.messages, "降级轮次也必须留下一条可见消息"
+    assert turn.messages[-1].text.startswith(expected)
+
+
 class _EmptySearch:
     async def search(self, request):
         return []

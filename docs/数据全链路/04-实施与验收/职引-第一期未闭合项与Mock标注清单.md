@@ -83,7 +83,13 @@
 | 闭合情况 | 已在 `business-tao@dfd7f34` 闭合：空转的守卫被换成对**全部** `SERVICE_SHELL` 参数化的 `test_service_declares_valid_status`，断言每个服务能力位如实声明 `skeleton` 或 `wired`；同时 `test_first_phase_is_wired_and_later_worker_stays_pending` 改为用 `WIRED_SERVICE_PORTS` / `WIRED_WORKER_PORTS` 常量断言装配结果。守卫恢复为非空集，原来的 `TODO(第一期未闭合)` 标记按其触发条件被删除 |
 | 遗留 | 该守卫断言的仍是"状态合法"，不是"状态与预期一致"；能力位增减时仍需人工同步 `WIRED_SERVICE_PORTS` |
 
-### OPEN-6 · 决策 5 的画像口径没有在工作台生效，且规则被重复实现 —— 未闭合
+### OPEN-6 · 决策 5 的画像口径没有在工作台生效，且规则被重复实现 —— 已闭合（2026-09-19 核实）
+
+**闭合说明（2026-09-19 复核）**：`policies/profile.py` 已成为覆盖率与整体置信度的**唯一实现**；
+`services/workspace.py` 调用它算好后经视图字段 `profile_coverage` / `profile_overall_confidence`
+透传，`zhiyin-api/dto/mappers.py` 只做映射、不再内联任何公式（原内联代码已删除，见
+[mappers.py](../../../zhiyin-src/template/zhiyin-api/zhiyin_api/dto/mappers.py#L363-L374)）。
+守卫 `tests/test_workspace_profile_metrics.py` 4 passed。本节以下保留原始复核证据。
 
 | 项 | 内容 |
 | --- | --- |

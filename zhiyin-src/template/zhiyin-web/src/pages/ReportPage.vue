@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import type { ReportFullTextView } from '@/api/schema'
-import { exportAsset, getReportFullText, trackEvent } from '@/api/endpoints'
+import {
+  claimGap,
+  exportAsset,
+  getReportFullText,
+  markTaskDone,
+  selectDirectionPlan,
+  trackEvent,
+  writeCalendarNode,
+} from '@/api/endpoints'
 import { useSessionStore } from '@/stores/session'
 import ReportToc from '@/components/report/ReportToc.vue'
 
@@ -9,6 +17,11 @@ import ReportToc from '@/components/report/ReportToc.vue'
 //
 // 口径（前端设计文档 §4.4）：左侧目录导航 + 全文区块 + 导出操作。
 // 报告内容来自 `GET /app/report/full-text`（只读资产版本，不重新生成）。
+//
+// 本页不只是"读"：报告之后产品要继续往前走，用户必须能在这里完成四个动作——
+// 认领差距（FR-DIAG-004）、选定方向（FR-DECIDE-003）、勾掉任务（FR-ACT-004）、
+// 把节点放进日历（FR-BLOCK-002）。四者各调一个独立写端点，成功后由后端写行为
+// 日志，成就与工作台时间线随之变化。只把报告渲染出来、按钮点了没反应，不算实现。
 //
 // ⚠️ 本页曾内联了一整份演示报告（含编造的方向方案、行动计划、画像条目、报告编号与
 //    本地导出实现），以及一份前端合成的 15 维分数。这些都不是后端产出，已全部删除：
@@ -21,6 +34,20 @@ const error = ref('')
 const activeId = ref('')
 const exportNotice = ref('')
 const exporting = ref(false)
+
+// 写操作的即时反馈与乐观状态。
+//
+// 为什么不在这四个动作后重新拉一次报告：`load()` 会把整页切成"正在加载报告…"，
+// 用户刚点一下就看到整页闪一次。这里按各端点返回的**真实结果**就地更新（认领全量
+// 清单、选中的方案 id、命中任务的完成数），后端仍是唯一事实来源，刷新后一致。
+const actionNotice = ref('')
+const claimingGapId = ref('')
+const claimedGapIds = ref<string[]>([])
+const selectingPlanId = ref('')
+const chosenPlanId = ref('')
+const busyTaskKey = ref('')
+const doneTaskKeys = ref<string[]>([])
+const calendaredTaskKeys = ref<string[]>([])
 
 // 导出入口的可见性由动态资源的功能开关决定（`feature_flags.export`），
 // 与「前端按开关决定功能块可见性」的口径一致。开关关闭时**不给按钮**，
@@ -163,6 +190,40 @@ interface PlanGap {
   current_state: string
   suggestion: string
 }
+interface ReportGapItem {
+  gap_id: string
+  requirement: string
+  current_state: string
+  suggestion: string
+  theory_refs: string[]
+  claimed: boolean
+}
+
+/**
+ * ② 诊断产出的差距清单（FR-DIAG-003）。
+ *
+ * `claimed` 是后端把 `report.gap_claims` 折叠出来的布尔值，前端据此决定这一条显示
+ * 「认领」按钮还是「已认领」——认领是针对某一版报告里的某一条差距做的动作，
+ * 前端不做任何本地推断。旧报告没有 `gaps` 区块 → 这里为空 → 不渲染该章节。
+ */
+const reportGaps = computed<ReportGapItem[]>(() => {
+  const content = (sectionById('gaps')?.content ?? {}) as Record<string, unknown>
+  const raw = Array.isArray(content.items) ? (content.items as Array<Record<string, unknown>>) : []
+  return raw.map((gap) => ({
+    gap_id: String(gap.gap_id ?? ''),
+    requirement: String(gap.requirement ?? ''),
+    current_state: String(gap.current_state ?? ''),
+    suggestion: String(gap.suggestion ?? ''),
+    theory_refs: Array.isArray(gap.theory_refs) ? (gap.theory_refs as unknown[]).map(String) : [],
+    claimed: Boolean(gap.claimed),
+  }))
+})
+
+/** 本次会话内刚认领的差距，与报告里的 `claimed` 合并，避免重复认领时按钮状态回退。 */
+function isGapClaimed(gap: ReportGapItem): boolean {
+  return gap.claimed || claimedGapIds.value.includes(gap.gap_id)
+}
+
 interface DirectionPlan {
   id: string
   role: string
@@ -242,6 +303,101 @@ function matchPercent(score: number): string {
   return `${Math.round(score * 100)}%`
 }
 
+/** 当前选中的方向方案。刚选定的优先，其次才是报告里的选中标记。 */
+const activePlanId = computed(
+  () => chosenPlanId.value || directions.value.find((plan) => plan.selected)?.id || '',
+)
+
+/**
+ * 行动任务的复合标识 `阶段名:任务文本`。
+ *
+ * 这个口径由后端冻结：`InMemory` / `SqlAlchemy` 两个仓储与 DTO Mapper 三处必须一致
+ * （见 `zhiyin_business` 的任务标识约定）。前端只做同样的拼接，不做模糊匹配，
+ * 否则勾选会写错任务。
+ */
+function taskKey(phase: ActionPhase, task: ActionTask): string {
+  return `${phase.name}:${task.text}`
+}
+
+function isTaskDone(phase: ActionPhase, task: ActionTask): boolean {
+  return task.done || doneTaskKeys.value.includes(taskKey(phase, task))
+}
+
+function isTaskInCalendar(phase: ActionPhase, task: ActionTask): boolean {
+  return calendaredTaskKeys.value.includes(taskKey(phase, task))
+}
+
+/** 认领一条差距（FR-DIAG-004）。幂等：重复点同一条不会重复写行为日志。 */
+async function onClaimGap(gap: ReportGapItem) {
+  if (claimingGapId.value) return
+  claimingGapId.value = gap.gap_id
+  actionNotice.value = ''
+  try {
+    const result = await claimGap(gap.gap_id)
+    claimedGapIds.value = result.claimed_gap_ids ?? [gap.gap_id]
+    actionNotice.value = `已认领差距：${gap.requirement}`
+  } catch (err) {
+    actionNotice.value = `认领失败：${err instanceof Error ? err.message : '未知错误'}`
+  } finally {
+    claimingGapId.value = ''
+  }
+}
+
+/** 选定方向方案（FR-DECIDE-003）。再选另一套走同一端点，后端自动取消旧方案。 */
+async function onSelectPlan(plan: DirectionPlan) {
+  if (selectingPlanId.value) return
+  selectingPlanId.value = plan.id
+  actionNotice.value = ''
+  try {
+    const result = await selectDirectionPlan(plan.id)
+    chosenPlanId.value = result.plan_id
+    actionNotice.value = `已选定方向：${result.name}`
+  } catch (err) {
+    actionNotice.value = `选定失败：${err instanceof Error ? err.message : '未知错误'}`
+  } finally {
+    selectingPlanId.value = ''
+  }
+}
+
+/** 勾掉一条行动任务（FR-ACT-004）。成功后该任务的完成数会体现在工作台进度上。 */
+async function onMarkTaskDone(phase: ActionPhase, task: ActionTask) {
+  const key = taskKey(phase, task)
+  if (busyTaskKey.value) return
+  busyTaskKey.value = key
+  actionNotice.value = ''
+  try {
+    const result = await markTaskDone(key)
+    if (result.done) doneTaskKeys.value = [...new Set([...doneTaskKeys.value, key])]
+    actionNotice.value = `已完成任务：${result.text}（${result.done_total}/${result.task_total}）`
+  } catch (err) {
+    actionNotice.value = `勾选失败：${err instanceof Error ? err.message : '未知错误'}`
+  } finally {
+    busyTaskKey.value = ''
+  }
+}
+
+/** 把任务节点写进日历（FR-BLOCK-002）。规划师写入，教练在⑤复盘中读取。 */
+async function onAddToCalendar(phase: ActionPhase, task: ActionTask) {
+  const key = taskKey(phase, task)
+  if (busyTaskKey.value) return
+  busyTaskKey.value = key
+  actionNotice.value = ''
+  try {
+    const node = await writeCalendarNode({
+      title: task.text,
+      due_at: task.due_date,
+      source: 'planner',
+      related_task_text: task.text,
+    })
+    calendaredTaskKeys.value = [...new Set([...calendaredTaskKeys.value, key])]
+    actionNotice.value = `已加入日历：${node.title}`
+  } catch (err) {
+    actionNotice.value = `加入日历失败：${err instanceof Error ? err.message : '未知错误'}`
+  } finally {
+    busyTaskKey.value = ''
+  }
+}
+
 interface ProfileFieldItem {
   key: string
   value: unknown
@@ -296,7 +452,7 @@ function confidencePercent(field: ProfileFieldItem): string {
 }
 
 /** 已单独渲染的章节，其余章节走通用列表渲染。 */
-const RENDERED_IDS = new Set(['verdict', 'swot', 'directions', 'action', 'profile'])
+const RENDERED_IDS = new Set(['verdict', 'swot', 'gaps', 'directions', 'action', 'profile'])
 const otherSections = computed(() =>
   sections.value.filter(
     (item) => !RENDERED_IDS.has(String(item.id)) && !String(item.id).startsWith('dimension-'),
@@ -309,6 +465,13 @@ async function load() {
     const data = await getReportFullText()
     report.value = data?.report_id ? data : null
     error.value = ''
+    // 重新取到报告后，以报告为准清掉本地乐观状态：那是上一份数据的即时反馈，
+    // 留着会让"另一版报告"显示成本版已认领/已勾选。
+    claimedGapIds.value = []
+    chosenPlanId.value = ''
+    doneTaskKeys.value = []
+    calendaredTaskKeys.value = []
+    actionNotice.value = ''
     if (report.value && toc.value.length) activeId.value = String(toc.value[0].id ?? '')
   } catch (err) {
     report.value = null
@@ -375,6 +538,7 @@ onMounted(() => {
       </header>
 
       <p v-if="exportNotice" class="rp-notice" role="status">{{ exportNotice }}</p>
+      <p v-if="actionNotice" class="rp-notice" role="status">{{ actionNotice }}</p>
 
       <p v-if="loading" class="rp-empty">正在加载报告…</p>
 
@@ -472,6 +636,41 @@ onMounted(() => {
             </ul>
           </section>
 
+          <!-- 差距清单（FR-DIAG-003/004）：诊断 → 决策的衔接点。
+               每条差距都能被"认领"，认领记录写进报告资产，并触发行为日志 → 成就
+               `first_gap_claimed` 与工作台时间线。没有认领入口，报告就只是一张图。 -->
+          <section v-if="reportGaps.length" id="gaps" class="rp-block">
+            <div class="rp-block-head">
+              <h2 class="rp-block-title">差距清单</h2>
+              <span class="rp-block-method">
+                共 {{ reportGaps.length }} 条 · 已认领
+                {{ reportGaps.filter((gap) => isGapClaimed(gap)).length }} 条
+              </span>
+            </div>
+            <ul class="rp-items">
+              <li v-for="gap in reportGaps" :key="gap.gap_id" class="rp-item">
+                <div class="rp-item-head">
+                  <b class="rp-item-name">{{ gap.requirement }}</b>
+                  <span v-if="isGapClaimed(gap)" class="rp-item-chosen">已认领</span>
+                  <button
+                    v-else
+                    class="rp-act"
+                    type="button"
+                    :disabled="claimingGapId === gap.gap_id"
+                    @click="onClaimGap(gap)"
+                  >
+                    {{ claimingGapId === gap.gap_id ? '认领中…' : '认领这条差距' }}
+                  </button>
+                </div>
+                <p class="rp-item-text">现状：{{ gap.current_state || '报告未提供现状描述' }}</p>
+                <p class="rp-item-evidence">建议：{{ gap.suggestion }}</p>
+                <p v-if="gap.theory_refs.length" class="rp-item-evidence">
+                  方法论：{{ gap.theory_refs.join(' / ') }}
+                </p>
+              </li>
+            </ul>
+          </section>
+
           <section v-if="directions.length" id="directions" class="rp-block">
             <h2 class="rp-block-title">方向方案</h2>
             <ul class="rp-items">
@@ -480,7 +679,16 @@ onMounted(() => {
                   <span class="rp-item-tag">{{ roleLabel(plan.role) }}</span>
                   <b class="rp-item-name">{{ plan.name }}</b>
                   <span class="rp-item-score">{{ matchPercent(plan.match_score) }} 匹配</span>
-                  <span v-if="plan.selected" class="rp-item-chosen">已选定</span>
+                  <span v-if="activePlanId === plan.id" class="rp-item-chosen">已选定</span>
+                  <button
+                    v-else
+                    class="rp-act"
+                    type="button"
+                    :disabled="selectingPlanId === plan.id"
+                    @click="onSelectPlan(plan)"
+                  >
+                    {{ selectingPlanId === plan.id ? '选定中…' : '选定这个方向' }}
+                  </button>
                 </div>
                 <p class="rp-item-text">{{ plan.target_desc }}</p>
                 <p class="rp-item-evidence">契合依据：{{ plan.fit_reason }}</p>
@@ -504,10 +712,34 @@ onMounted(() => {
                   <span v-if="phase.tag" class="rp-item-tag">{{ phase.tag }}</span>
                 </div>
                 <ul class="rp-tasks">
-                  <li v-for="(task, taskIndex) in phase.tasks" :key="taskIndex" :class="{ done: task.done }">
-                    <span class="rp-task-mark">{{ task.done ? '✓' : '○' }}</span>
+                  <li
+                    v-for="(task, taskIndex) in phase.tasks"
+                    :key="taskIndex"
+                    :class="{ done: isTaskDone(phase, task) }"
+                  >
+                    <button
+                      class="rp-task-mark"
+                      type="button"
+                      :disabled="busyTaskKey === taskKey(phase, task)"
+                      :title="isTaskDone(phase, task) ? '已完成' : '标记为已完成'"
+                      @click="onMarkTaskDone(phase, task)"
+                    >
+                      {{ isTaskDone(phase, task) ? '✓' : '○' }}
+                    </button>
                     <span>{{ task.text }}</span>
                     <span v-if="task.due_date" class="rp-task-due">{{ task.due_date.slice(0, 10) }}</span>
+                    <button
+                      v-if="!isTaskDone(phase, task) && !isTaskInCalendar(phase, task)"
+                      class="rp-act rp-act--mini"
+                      type="button"
+                      :disabled="busyTaskKey === taskKey(phase, task)"
+                      @click="onAddToCalendar(phase, task)"
+                    >
+                      加入日历
+                    </button>
+                    <span v-else-if="isTaskInCalendar(phase, task)" class="rp-item-chosen">
+                      已入日历
+                    </span>
                   </li>
                 </ul>
               </li>
@@ -739,8 +971,33 @@ onMounted(() => {
 .rp-tasks { display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
 .rp-tasks li { display: flex; align-items: baseline; gap: 8px; font-size: var(--font-size-xs); line-height: 1.6; }
 .rp-tasks li.done { color: var(--muted); text-decoration: line-through; }
-.rp-task-mark { flex: none; color: var(--greenD); font-weight: 800; }
+.rp-task-mark {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--greenD);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.rp-task-mark:disabled { cursor: progress; opacity: 0.5; }
 .rp-task-due { margin-left: auto; color: var(--muted); white-space: nowrap; }
+
+/* 写操作按钮：认领差距 / 选定方向 / 加入日历。统一样式，避免各处各写一套。 */
+.rp-act {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--color-brand-border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-link);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+.rp-act:disabled { cursor: progress; opacity: 0.5; }
+.rp-act--mini { margin-left: 0; flex: none; }
 
 /* 15 维证据覆盖热力图。色阶按内核枚举 DimensionEvidenceLevel 的四档，
    从"证据充分"到"无依据"逐级变浅/转红，不表达能力好坏。 */

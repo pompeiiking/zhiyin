@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from zhiyin_kernel.assets import (
     ActionPlan,
+    CalendarNode,
     DirectionPlan,
     Report,
     TrackEvent,
@@ -64,6 +65,14 @@ class WorkspaceView(BaseModel):
     report_versions: list[AssetVersion] = Field(default_factory=list)
     direction_plans: list[DirectionPlan] = Field(default_factory=list, description="③ 方案")
     action_plan: Optional[ActionPlan] = Field(default=None, description="④ 计划与日历")
+    calendar_nodes: list[CalendarNode] = Field(
+        default_factory=list,
+        description=(
+            "④ 关键节点日历条目（FR-BLOCK-002）。由规划师/教练写入，工作台只读展示。"
+            "此前只有写端点没有读路径：报告页点「加入日历」确实落了库，但工作台"
+            "永远显示空态，用户看不到自己写过的东西——有结果、没有业务结果。"
+        ),
+    )
     track_events: list[TrackEvent] = Field(
         default_factory=list, description="⑤ 跟踪与预警 / 教练消息汇总"
     )

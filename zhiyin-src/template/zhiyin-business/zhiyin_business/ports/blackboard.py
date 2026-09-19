@@ -218,6 +218,13 @@ class AssetService(ABC):
         """读取诊断报告全文。"""
 
     @abstractmethod
+    async def claim_gap(self, user_id: str, gap_id: str) -> Report:
+        """认领最新一版报告中的一条差距（FR-DIAG-004）。
+
+        幂等；认领只追加认领记录，不重算正文、不产生新版本。
+        """
+
+    @abstractmethod
     async def list_direction_plans(self, user_id: str) -> list[DirectionPlan]:
         """读取主攻/平行/保底方案。"""
 

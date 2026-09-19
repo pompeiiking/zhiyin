@@ -55,6 +55,13 @@ class WorkspacePageView(BaseModel):
     report_panel: Optional[StagePanelView] = Field(default=None, description="② 诊断与报告")
     plan_panel: Optional[StagePanelView] = Field(default=None, description="③ 方案")
     action_panel: Optional[StagePanelView] = Field(default=None, description="④ 计划与日历")
+    calendar_nodes: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description=(
+            "④ 关键节点日历（FR-BLOCK-002）：节点 id / 标题 / 截止时间 / 来源 / 关联任务。"
+            "此前工作台只有写端点、没有读路径，报告页写入后工作台永远空态。"
+        ),
+    )
     review_panel: Optional[StagePanelView] = Field(default=None, description="⑤ 跟踪与预警")
     coach_messages: list[dict[str, Any]] = Field(
         default_factory=list, description="教练消息汇总（FR-WB-006）"

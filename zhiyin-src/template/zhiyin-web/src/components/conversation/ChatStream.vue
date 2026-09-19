@@ -33,15 +33,14 @@ const stageProgress = computed(() =>
 const messages = computed(() => conversation.turns
   .map((item) => {
     const rawRole = String(item.role ?? 'agent')
-    const role = rawRole === 'user' ? 'user' as const : rawRole === 'coach' ? 'coach' as const : 'agent' as const
+    // 取值与冻结契约 ConversationMessageView.role 严格一致（agent / user / system）。
+    const role = rawRole === 'user' ? 'user' as const : rawRole === 'system' ? 'system' as const : 'agent' as const
     return {
       role,
       content: String(item.content ?? item.text ?? ''),
       // 主理名来自后端（实时轮次与历史查询同一口径）；缺失时留空，由气泡回落中性称呼。
       author: item.author as string | undefined,
       theory: item.theory as Record<string, unknown> | undefined,
-      action: item.action as string | undefined,
-      long: Boolean(item.long),
     }
   })
   .filter((item) => item.content))
@@ -77,7 +76,7 @@ function send() {
     .send(text)
     .catch((err: unknown) => {
       conversation.turns.push({
-        role: 'coach',
+        role: 'system',
         content: `这轮消息没有发送成功：${err instanceof Error ? err.message : '未知错误'}。请稍后重试。`,
       })
     })
@@ -114,7 +113,7 @@ function send() {
     <AnalysisHandoff />
 
     <div class="chat-scroll">
-      <div v-if="messages.length" class="message-list"><MessageBubble v-for="(item, index) in messages" :key="index" :role="item.role" :content="item.content" :author="item.author" :theory="item.theory" :action="item.action" :long="item.long" /></div>
+      <div v-if="messages.length" class="message-list"><MessageBubble v-for="(item, index) in messages" :key="index" :role="item.role" :content="item.content" :author="item.author" :theory="item.theory" /></div>
       <div v-else class="empty-chat">
         <p>在下方写下你现在最想解决的困惑，开始和 AI 聊职业。</p>
       </div>

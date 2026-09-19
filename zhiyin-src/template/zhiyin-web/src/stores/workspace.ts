@@ -20,6 +20,8 @@ export const useWorkspaceStore = defineStore('workspace', {
     planPanel: null as Record<string, unknown> | null,
     actionPanel: null as Record<string, unknown> | null,
     reviewPanel: null as Record<string, unknown> | null,
+    /** ④ 关键节点日历（FR-BLOCK-002）：报告页写入的节点在这里读回来展示 */
+    calendarNodes: [] as Array<Record<string, unknown>>,
     coachMessages: [] as Array<Record<string, unknown>>,
     dependencies: [] as Array<Record<string, unknown>>,
     /** 功能块入口与静态数据：报告全文 / 导出 / 日历 / 成就 / 导师 */
@@ -41,6 +43,8 @@ export const useWorkspaceStore = defineStore('workspace', {
         this.planPanel = (data.plan_panel as unknown as Record<string, unknown>) ?? null
         this.actionPanel = (data.action_panel as unknown as Record<string, unknown>) ?? null
         this.reviewPanel = (data.review_panel as unknown as Record<string, unknown>) ?? null
+        this.calendarNodes =
+          (data.calendar_nodes as unknown as Array<Record<string, unknown>>) ?? []
         this.coachMessages = (data.coach_messages as unknown as Array<Record<string, unknown>>) ?? []
         this.dependencies = (data.dependencies as unknown as Array<Record<string, unknown>>) ?? []
         this.blocks = (data.blocks as unknown as Record<string, unknown>) ?? {}

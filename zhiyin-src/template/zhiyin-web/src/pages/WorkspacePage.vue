@@ -113,8 +113,41 @@ function toggleNode(no: number) {
   openNode.value = openNode.value === no ? null : no
 }
 
-// 关键节点日历：接口目前没有提供日历数据源，显示空态而不是预置若干节点。
-const calendar = computed<Array<Record<string, unknown>>>(() => [])
+// 关键节点日历（FR-BLOCK-002）：节点由报告页「加入日历」与规划师写入落库，
+// 工作台这里只读展示。此前这里是 `computed(() => [])` 写死的空数组，于是
+// 「加入日历」确实写了库、界面却永远显示"暂无关键节点"——有结果，没有业务结果。
+interface CalendarItem {
+  nodeId: string
+  date: string
+  title: string
+  source: string
+  countdown: string
+  passed: boolean
+}
+const CALENDAR_SOURCE_LABELS: Record<string, string> = {
+  planner: '规划师',
+  coach: '教练',
+  manual: '手动登记',
+}
+const calendar = computed<CalendarItem[]>(() =>
+  store.calendarNodes.map((raw) => {
+    const rawDue = typeof raw.due_at === 'string' ? raw.due_at : ''
+    const due = rawDue ? new Date(rawDue) : null
+    const valid = due !== null && !Number.isNaN(due.getTime())
+    // 剩余天数只是日期差值，不是业务阈值；「已逾期」= 已过截止时刻，语义边界，
+    // 不在前端自造一条"几天内算紧急"的规则（那属于动态参数，见《AGENTS.md》§8）。
+    const days = valid ? Math.ceil((due.getTime() - Date.now()) / 86_400_000) : null
+    const source = String(raw.source ?? '')
+    return {
+      nodeId: String(raw.node_id ?? ''),
+      date: valid ? rawDue.slice(5, 10) : '—',
+      title: String(raw.title ?? ''),
+      source: CALENDAR_SOURCE_LABELS[source] ?? source,
+      countdown: days === null ? '未设截止' : days > 0 ? `还有 ${days} 天` : days === 0 ? '今天到期' : `已逾期 ${-days} 天`,
+      passed: days !== null && days <= 0,
+    }
+  }),
+)
 
 // 成长与成就：只渲染后端按真实行为日志算出的成就键，不预置任何已解锁项。
 const achievementKeys = computed<string[]>(() => {
@@ -277,13 +310,17 @@ onMounted(() => {
               <div><h2>关键节点</h2></div>
             </header>
             <ul v-if="calendar.length" class="cal-list">
-              <li v-for="item in calendar" :key="String(item.date)" :class="{ urgent: item.urgent }">
+              <li v-for="item in calendar" :key="item.nodeId" :class="{ urgent: item.passed }">
                 <span class="cal-date">{{ item.date }}</span>
-                <span class="cal-title">{{ item.title }}</span>
+                <span class="cal-title">
+                  {{ item.title }}<em class="cal-source">{{ item.source }}</em>
+                </span>
                 <span class="cal-count">{{ item.countdown }}</span>
               </li>
             </ul>
-            <p v-else class="tl-empty">暂无关键节点。节点来自行动计划与导师登记，尚未产生。</p>
+            <p v-else class="tl-empty">
+              暂无关键节点。在报告页把行动任务「加入日历」，节点会出现在这里。
+            </p>
           </section>
 
           <section class="wb-badges" aria-label="成长与成就">
@@ -817,6 +854,16 @@ onMounted(() => {
 
 .cal-list li.urgent .cal-date { background: var(--redSoft); color: var(--red); }
 .cal-title { color: var(--color-text-primary); line-height: 1.5; }
+/* 节点来源（规划师 / 教练 / 手动登记）：同一日历里区分"谁登记的"。 */
+.cal-source {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-style: normal;
+}
 .cal-count { color: var(--color-text-muted); white-space: nowrap; }
 .cal-list li.urgent .cal-count { color: var(--red); font-weight: 700; }
 

@@ -37,6 +37,7 @@ from zhiyin_business.contracts.common import (
 )
 from zhiyin_business.contracts.decide import DecideOutput
 from zhiyin_business.contracts.diagnose import DiagnoseOutput
+from zhiyin_business.contracts.review import ReviewOutput
 from zhiyin_business.events import LOOP_STAGE_CHANGED, LoopStageChangedPayload
 from zhiyin_business.policies.axis_a import AxisAInferencePolicy
 from zhiyin_business.policies.handoff import HandoffPolicy
@@ -68,7 +69,7 @@ from zhiyin_data_sdk.repositories import (
     RegistryRepository,
     TaskSessionRepository,
 )
-from zhiyin_kernel.assets import ActionPlan, DirectionPlan, PlanGap, Report
+from zhiyin_kernel.assets import ActionPlan, DirectionPlan, PlanGap, Report, ReportGap
 from zhiyin_kernel.blackboard import AssetVersion, TaskSession
 from zhiyin_kernel.enums import (
     AssetType,
@@ -449,6 +450,20 @@ class DefaultOrchestrator(Orchestrator):
             return ""
         return str(bundle.get("notice.demo_evidence", "")).strip()
 
+    async def _stage_degraded_notice(self) -> str:
+        """环节产出不合法 / 模型不可用时的兜底行为引导文案（动态资源）。
+
+        生产装配没有给 LoopCoordinator 传 `degraded_guide_text`，默认是空串，
+        于是降级轮次返回一个 `text` 为空的行为引导：用户既不知道发生了什么，
+        也没有任何可执行的下一步（违反 FR-ORCH-007「结尾必须四选一」）。
+        这里补一句明确降级文案，保证"降级可识别"，而不是静默返回空转。
+        """
+        try:
+            bundle = await self._registry.get_copy_bundle()
+        except NotImplementedError:
+            return ""
+        return str(bundle.get("guide.stage_degraded", "")).strip()
+
     async def handle_message(self, request: TurnRequest) -> TurnResult:
         existing = await self._sessions.get(request.task_id)
         if existing is None:
@@ -550,11 +565,19 @@ class DefaultOrchestrator(Orchestrator):
 
         if "degraded" in loop_result.output:
             # 环节产出不合法或模型不可用：不落库、不发资产事件，只回一句兜底引导。
+            # 注意：兜底文案不能是空的。`AgentDrivenLoopCoordinator` 的
+            # `degraded_guide_text` 默认空串，装配层也没有传值，所以它给回来的
+            # `guide.text` 恒为空——直接透传用户只会看到一个空气泡，既不知道
+            # 发生了什么也没有下一步（违反 FR-ORCH-007）。这里用动态资源补齐。
             output = None
             guide = loop_result.guide
+            if not (guide.text or "").strip():
+                notice = await self._stage_degraded_notice()
+                if notice:
+                    guide = guide.model_copy(update={"text": notice, "question": notice})
             messages = (
-                [ConversationMessage(role="agent", text=loop_result.guide.text, agent_id=session.lead_agent)]
-                if loop_result.guide.text
+                [ConversationMessage(role="agent", text=guide.text, agent_id=session.lead_agent)]
+                if guide.text
                 else []
             )
             theory_refs = []
@@ -854,6 +877,20 @@ class DefaultOrchestrator(Orchestrator):
                 verdict=output.verdict,
                 swot=output.swot,
                 dimensions=output.dimensions,
+                # 差距明细必须冻结进这一版报告：认领差距是针对报告里的具体条目做的动作，
+                # 只存 gap_id 的话认领清单和报告正文都无从显示（FR-DIAG-003/004）。
+                gaps=[
+                    ReportGap(
+                        gap_id=item.gap_id,
+                        requirement=item.requirement,
+                        current_state=item.current_state,
+                        suggestion=item.suggestion,
+                        theory_refs=[
+                            ref.name or ref.theory_id for ref in item.theory_refs
+                        ],
+                    )
+                    for item in output.gaps
+                ],
                 gap_claims=[],
                 sources=self._report_sources(output, evidence_packet.evidences),
                 source_versions=self._report_source_versions(evidence_packet.evidences),
@@ -930,6 +967,26 @@ class DefaultOrchestrator(Orchestrator):
                     reason=f"{stage.value} 环节产生新资产",
                 )
             ]
+
+        if stage is LoopStage.REVIEW:
+            if not isinstance(output, ReviewOutput):
+                raise TypeError("复盘环节产出类型不正确")
+            # ⑤ 校准的是"接下来怎么走"，产出不是版本化资产，没有可落库的资产形状。
+            # 按拍板口径：**复盘有真实产出时**写一条行为日志——它是
+            # `first_review_completed` 成就与工作台跟踪时间线的唯一来源；此前
+            # `REVIEW` 事件在生产代码里没有任何写入点，成就与时间线永远为空。
+            await self._behaviors.log(
+                user_id,
+                BehaviorEventDraft(
+                    event_type=BehaviorEventType.REVIEW,
+                    payload={
+                        "stage": stage.value,
+                        "attribution": output.attribution.value,
+                        "detail": output.minimal_action.text,
+                    },
+                ),
+            )
+            return []
         return []
 
     @staticmethod

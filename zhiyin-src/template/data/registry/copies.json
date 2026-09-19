@@ -90,6 +90,46 @@
       "note": "同上"
     },
     {
+      "code": "stage.collect.pending_hint",
+      "text": "待进入 · 这一步会建立你的职业画像",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 15,
+      "note": "管线卡待进入空态说明：该环节尚无产出时，说明这一步会做什么。前端不得硬编码，读不到就不渲染"
+    },
+    {
+      "code": "stage.diagnose.pending_hint",
+      "text": "待进入 · 这一步会把画像与目标做逐维比对",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 16,
+      "note": "同上"
+    },
+    {
+      "code": "stage.decide.pending_hint",
+      "text": "待进入 · 这一步会确定主攻方向与备选",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 17,
+      "note": "同上"
+    },
+    {
+      "code": "stage.act.pending_hint",
+      "text": "待进入 · 这一步会拆解成可执行的关键节点",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 18,
+      "note": "同上"
+    },
+    {
+      "code": "stage.review.pending_hint",
+      "text": "待进入 · 这一步会跟踪变化并校准方向",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 19,
+      "note": "同上"
+    },
+    {
       "code": "wb.achievement.first_gap_claimed",
       "text": "认领第一个差距",
       "bundle": "zh-CN",
@@ -200,6 +240,14 @@
       "status": "enabled",
       "sort_order": 38,
       "note": "演示语料提示（待决问题 D12）。当本轮证据包里出现标记为 demo 的命中时，由编排器追加到应答末尾；同时 `_report_sources` / `_report_source_versions` 已把演示证据挡在报告引用之外。文案属动态资源，改本文件不需要发版。"
+    },
+    {
+      "code": "guide.stage_degraded",
+      "text": "本轮没能生成可用的结论。请把刚才想说的内容再补充一句、或换个说法再发一次，我接着往下走。",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 39,
+      "note": "环节产出不合法或模型不可用时的兜底行为引导。此前 `AgentDrivenLoopCoordinator` 的 `degraded_guide_text` 默认空串且装配层没传值，降级轮次会返回空文案引导，用户只看到一个空气泡、没有任何下一步（违反 FR-ORCH-007）。文案属动态资源，改本文件不需要发版。"
     }
   ]
 }

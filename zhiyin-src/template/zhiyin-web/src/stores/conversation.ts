@@ -119,7 +119,7 @@ export const useConversationStore = defineStore('conversation', {
         if (taskId !== this.currentTaskId) return
         this.clearTurnState()
         this.turns.push({
-          role: 'coach',
+          role: 'system',
           content: `这段会话的历史没有读到：${error instanceof Error ? error.message : '未知错误'}。请稍后重试。`,
         })
       }

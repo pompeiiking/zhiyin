@@ -30,9 +30,17 @@ from fastapi import Request
 from zhiyin_kernel.enums import AssetType
 from zhiyin_api.dto.asset import (
     AssetVersionView,
+    CalendarNodeRequest,
+    CalendarNodeView,
+    DecisionSelectionRequest,
+    DecisionSelectionView,
     ExportRequest,
     ExportResultView,
+    GapClaimRequest,
+    GapClaimView,
     ReportFullTextView,
+    TaskDoneRequest,
+    TaskDoneView,
 )
 from zhiyin_api.dto.bootstrap import BootstrapView
 from zhiyin_api.dto.conversation import (
@@ -117,6 +125,28 @@ class ApplicationFacade(ABC):
     @abstractmethod
     async def export_asset(self, user_id: str, body: ExportRequest) -> ExportResultView:
         """导出资产（第一期占位）。"""
+
+    # ---------- 闭环写操作 ----------
+
+    @abstractmethod
+    async def claim_gap(self, user_id: str, body: GapClaimRequest) -> GapClaimView:
+        """认领报告中的一条差距（FR-DIAG-004）。"""
+
+    @abstractmethod
+    async def select_direction_plan(
+        self, user_id: str, body: DecisionSelectionRequest
+    ) -> DecisionSelectionView:
+        """选择或重选一套方向方案（FR-DECIDE-003）。"""
+
+    @abstractmethod
+    async def mark_task_done(self, user_id: str, body: TaskDoneRequest) -> TaskDoneView:
+        """勾掉一条行动任务（FR-ACT-004）。"""
+
+    @abstractmethod
+    async def write_calendar_node(
+        self, user_id: str, body: CalendarNodeRequest
+    ) -> CalendarNodeView:
+        """把关键节点写入日历（FR-BLOCK-002）。"""
 
     # ---------- 埋点 ----------
 

@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/api/v1/app/assets/decision-selection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Select Direction Plan
+         * @description 选定方向方案（FR-DECIDE-003）。重选走同一端点，旧方案自动取消选中。
+         */
+        post: operations["select_direction_plan_api_v1_app_assets_decision_selection_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/assets/export": {
         parameters: {
             query?: never;
@@ -18,6 +38,26 @@ export interface paths {
          * @description 导出资产。第一期仅预留入口，available 恒 False。
          */
         post: operations["export_asset_api_v1_app_assets_export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/assets/gap-claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim Gap
+         * @description 认领报告中的一条差距（FR-DIAG-004）。幂等，不产生新版本。
+         */
+        post: operations["claim_gap_api_v1_app_assets_gap_claims_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -60,6 +100,26 @@ export interface paths {
         get: operations["bootstrap_api_v1_app_bootstrap_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/calendar/nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Write Calendar Node
+         * @description 把关键节点写入日历（FR-BLOCK-002）。规划师写入、教练读取。
+         */
+        post: operations["write_calendar_node_api_v1_app_calendar_nodes_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -165,6 +225,26 @@ export interface paths {
          *     编排器判定目标环节与主理；已存在进行中的同一任务时执行"续接"而非重建。
          */
         post: operations["enter_task_api_v1_app_task_enter_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app/tasks/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark Task Done
+         * @description 勾掉一条行动任务（FR-ACT-004）。幂等。
+         */
+        post: operations["mark_task_done_api_v1_app_tasks_done_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -309,6 +389,22 @@ export interface components {
              */
             trace_id?: string;
         };
+        /** ApiResponse[CalendarNodeView] */
+        ApiResponse_CalendarNodeView_: {
+            /** @default 0 */
+            code: components["schemas"]["ErrorCode"];
+            data?: components["schemas"]["CalendarNodeView"] | null;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            /**
+             * Trace Id
+             * @description 链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用
+             */
+            trace_id?: string;
+        };
         /** ApiResponse[ConversationHistoryView] */
         ApiResponse_ConversationHistoryView_: {
             /** @default 0 */
@@ -341,11 +437,43 @@ export interface components {
              */
             trace_id?: string;
         };
+        /** ApiResponse[DecisionSelectionView] */
+        ApiResponse_DecisionSelectionView_: {
+            /** @default 0 */
+            code: components["schemas"]["ErrorCode"];
+            data?: components["schemas"]["DecisionSelectionView"] | null;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            /**
+             * Trace Id
+             * @description 链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用
+             */
+            trace_id?: string;
+        };
         /** ApiResponse[ExportResultView] */
         ApiResponse_ExportResultView_: {
             /** @default 0 */
             code: components["schemas"]["ErrorCode"];
             data?: components["schemas"]["ExportResultView"] | null;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            /**
+             * Trace Id
+             * @description 链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用
+             */
+            trace_id?: string;
+        };
+        /** ApiResponse[GapClaimView] */
+        ApiResponse_GapClaimView_: {
+            /** @default 0 */
+            code: components["schemas"]["ErrorCode"];
+            data?: components["schemas"]["GapClaimView"] | null;
             /**
              * Message
              * @default ok
@@ -378,6 +506,22 @@ export interface components {
             /** @default 0 */
             code: components["schemas"]["ErrorCode"];
             data?: components["schemas"]["SessionListView"] | null;
+            /**
+             * Message
+             * @default ok
+             */
+            message: string;
+            /**
+             * Trace Id
+             * @description 链路追踪 id，由 BFF 生成并回写 X-Trace-Id 响应头；日志排查用
+             */
+            trace_id?: string;
+        };
+        /** ApiResponse[TaskDoneView] */
+        ApiResponse_TaskDoneView_: {
+            /** @default 0 */
+            code: components["schemas"]["ErrorCode"];
+            data?: components["schemas"]["TaskDoneView"] | null;
             /**
              * Message
              * @default ok
@@ -565,6 +709,46 @@ export interface components {
             trust_blocks?: components["schemas"]["TrustBlockView"][];
         };
         /**
+         * CalendarNodeRequest
+         * @description 把一个关键节点写进日历。
+         */
+        CalendarNodeRequest: {
+            /** Due At */
+            due_at?: string | null;
+            /**
+             * Related Task Text
+             * @default
+             */
+            related_task_text: string;
+            /**
+             * Source
+             * @default manual
+             * @enum {string}
+             */
+            source: "planner" | "coach" | "manual";
+            /** Title */
+            title: string;
+        };
+        /**
+         * CalendarNodeView
+         * @description 日历节点视图。
+         */
+        CalendarNodeView: {
+            /** Due At */
+            due_at?: string | null;
+            /** Node Id */
+            node_id: string;
+            /**
+             * Related Task Text
+             * @default
+             */
+            related_task_text: string;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
+        };
+        /**
          * ConversationHistoryView
          * @description 某任务会话的既成事实：按时间正序的全部消息 + 所处环节 + 管线卡。
          *
@@ -663,6 +847,29 @@ export interface components {
             task_id: string;
         };
         /**
+         * DecisionSelectionRequest
+         * @description 选择一套方向方案（可撤回，重选同样走本接口）。
+         */
+        DecisionSelectionRequest: {
+            /** Plan Id */
+            plan_id: string;
+        };
+        /**
+         * DecisionSelectionView
+         * @description 选择结果：选中的方案及其角色，前端据此高亮并允许撤回。
+         */
+        DecisionSelectionView: {
+            /** Match Score */
+            match_score: number;
+            /** Name */
+            name: string;
+            /** Plan Id */
+            plan_id: string;
+            role: components["schemas"]["PlanRole"];
+            /** Selected At */
+            selected_at?: string | null;
+        };
+        /**
          * DependencyEdgeView
          * @description 依赖可视化（FR-WB-005 简版）。
          */
@@ -722,6 +929,29 @@ export interface components {
             code: string;
             /** Question */
             question: string;
+        };
+        /**
+         * GapClaimRequest
+         * @description 认领一条差距。gap_id 取自报告全文的差距区块。
+         */
+        GapClaimRequest: {
+            /** Gap Id */
+            gap_id: string;
+        };
+        /**
+         * GapClaimView
+         * @description 认领结果。带全量已认领 id，前端可直接刷新认领清单，无需再拉一次报告。
+         */
+        GapClaimView: {
+            /**
+             * Claimed At
+             * Format: date-time
+             */
+            claimed_at: string;
+            /** Claimed Gap Ids */
+            claimed_gap_ids?: string[];
+            /** Gap Id */
+            gap_id: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -815,6 +1045,12 @@ export interface components {
             /** Title */
             title: string;
         };
+        /**
+         * PlanRole
+         * @description 方向方案角色。
+         * @enum {string}
+         */
+        PlanRole: "main" | "parallel" | "fallback";
         /**
          * ProfilePanelView
          * @description ① 画像状态：字段覆盖度 / 置信度 / 缺口 / 更新时间。
@@ -930,6 +1166,44 @@ export interface components {
             updated_at?: string | null;
             /** Version */
             version?: number | null;
+        };
+        /**
+         * TaskDoneRequest
+         * @description 勾掉一条行动任务。task_id 取自行动计划的 `阶段名:任务文本`（或任务文本）。
+         */
+        TaskDoneRequest: {
+            /** Task Id */
+            task_id: string;
+        };
+        /**
+         * TaskDoneView
+         * @description 勾选结果：命中的那条任务及其所属阶段。
+         */
+        TaskDoneView: {
+            /** Done */
+            done: boolean;
+            /** Done At */
+            done_at?: string | null;
+            /**
+             * Done Total
+             * @description 当前已完成任务数
+             * @default 0
+             */
+            done_total: number;
+            /** Phase */
+            phase: string;
+            /** Plan Id */
+            plan_id: string;
+            /** Task Id */
+            task_id: string;
+            /**
+             * Task Total
+             * @description 当前任务总数
+             * @default 0
+             */
+            task_total: number;
+            /** Text */
+            text: string;
         };
         /**
          * TaskEnterRequest
@@ -1088,6 +1362,13 @@ export interface components {
                 [key: string]: unknown;
             };
             /**
+             * Calendar Nodes
+             * @description ④ 关键节点日历（FR-BLOCK-002）：节点 id / 标题 / 截止时间 / 来源 / 关联任务。此前工作台只有写端点、没有读路径，报告页写入后工作台永远空态。
+             */
+            calendar_nodes?: {
+                [key: string]: unknown;
+            }[];
+            /**
              * Coach Messages
              * @description 教练消息汇总（FR-WB-006）
              */
@@ -1113,6 +1394,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    select_direction_plan_api_v1_app_assets_decision_selection_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionSelectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_DecisionSelectionView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     export_asset_api_v1_app_assets_export_post: {
         parameters: {
             query?: never;
@@ -1133,6 +1447,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiResponse_ExportResultView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    claim_gap_api_v1_app_assets_gap_claims_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GapClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_GapClaimView_"];
                 };
             };
             /** @description Validation Error */
@@ -1193,6 +1540,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiResponse_BootstrapView_"];
+                };
+            };
+        };
+    };
+    write_calendar_node_api_v1_app_calendar_nodes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarNodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_CalendarNodeView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1332,6 +1712,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiResponse_TaskSessionView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mark_task_done_api_v1_app_tasks_done_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskDoneRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiResponse_TaskDoneView_"];
                 };
             };
             /** @description Validation Error */

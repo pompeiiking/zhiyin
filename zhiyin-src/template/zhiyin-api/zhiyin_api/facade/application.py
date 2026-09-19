@@ -32,14 +32,23 @@ from __future__ import annotations
 
 import asyncio
 from typing import Optional
+from uuid import uuid4
 
 from fastapi import Request
 
 from zhiyin_api.dto.asset import (
     AssetVersionView,
+    CalendarNodeRequest,
+    CalendarNodeView,
+    DecisionSelectionRequest,
+    DecisionSelectionView,
     ExportRequest,
     ExportResultView,
+    GapClaimRequest,
+    GapClaimView,
     ReportFullTextView,
+    TaskDoneRequest,
+    TaskDoneView,
 )
 from zhiyin_api.dto.bootstrap import BootstrapView
 from zhiyin_api.dto.conversation import (
@@ -54,8 +63,10 @@ from zhiyin_api.dto.workspace import WorkspacePageView
 from zhiyin_api.dto.track import TrackEventAck, TrackEventRequest
 from zhiyin_api.facade.facade import ApplicationFacade
 from zhiyin_api.dto import mappers
+from zhiyin_business.contracts.common import BehaviorEventDraft
 from zhiyin_business.ports.blackboard import (
     AssetService,
+    BehaviorService,
     ConversationMemoryService,
 )
 from zhiyin_business.ports.function import FunctionService
@@ -64,7 +75,8 @@ from zhiyin_business.ports.loop import EntrySource, LoopCoordinator, LoopEntry
 from zhiyin_business.ports.orchestrator import Orchestrator, TurnRequest
 from zhiyin_business.ports.registry import RegistryService
 from zhiyin_business.ports.workspace import WorkspaceService
-from zhiyin_kernel.enums import AssetType, LoopStage
+from zhiyin_kernel.assets import CalendarNode
+from zhiyin_kernel.enums import AssetType, BehaviorEventType, LoopStage
 
 
 class DefaultApplicationFacade(ApplicationFacade):
@@ -82,6 +94,7 @@ class DefaultApplicationFacade(ApplicationFacade):
         workspace: WorkspaceService,
         assets: AssetService,
         functions: FunctionService,
+        behaviors: BehaviorService,
         memories: ConversationMemoryService,
     ) -> None:
         """构造依赖由 boot 注入。
@@ -95,6 +108,10 @@ class DefaultApplicationFacade(ApplicationFacade):
 
         `resolve_user_id` 的职责边界：**只做 HTTP → 业务形状的翻译**
         （从请求里取 token），用户记录的补齐、游客会话、登录合并都在业务侧。
+
+        `BehaviorService` 用于把用户的写操作记成行为日志：成就与跟踪时间线都是
+        行为日志的只读投影，缺了它，"认领差距 / 选方案 / 勾任务"就只是改了几个
+        字段，界面上的成就与时间线永远不动（B-2 断链）。
         """
         self._identity = identity
         self._registry = registry
@@ -103,6 +120,7 @@ class DefaultApplicationFacade(ApplicationFacade):
         self._workspace = workspace
         self._assets = assets
         self._functions = functions
+        self._behaviors = behaviors
         self._memories = memories
 
     # ---------- 身份 ----------
@@ -293,6 +311,110 @@ class DefaultApplicationFacade(ApplicationFacade):
             user_id, body.asset_type.value, body.format
         )
         return mappers.export_result_view(result)
+
+    # ---------- 闭环写操作 ----------
+
+    async def claim_gap(self, user_id: str, body: GapClaimRequest) -> GapClaimView:
+        # 先读一次最新报告，才能区分"这次真的认领了"和"重复点同一条"：
+        # 重复点击不该在行为时间线上留下第二条记录（成就按首次解锁，不会被污染，
+        # 但跟踪时间线会出现一模一样的重复条目）。
+        before = await self._assets.get_report(user_id)
+        already = before is not None and any(
+            claim.gap_id == body.gap_id for claim in before.gap_claims
+        )
+        report = await self._assets.claim_gap(user_id, body.gap_id)
+        if not already:
+            await self._log_behavior(
+                user_id,
+                BehaviorEventType.GAP_CLAIM,
+                {
+                    "gap_id": body.gap_id,
+                    "detail": f"认领差距：{body.gap_id}",
+                },
+                related_asset_ids=[report.id],
+            )
+        return mappers.gap_claim_view(report, body.gap_id)
+
+    async def select_direction_plan(
+        self, user_id: str, body: DecisionSelectionRequest
+    ) -> DecisionSelectionView:
+        # 选 vs 重选要分开记：成就里有 `direction_selected` 与 `direction_reselected`
+        # 两个独立徽章。同一套方案再点一次不算重选，不写日志。
+        plans = await self._assets.list_direction_plans(user_id)
+        current = next((plan.id for plan in plans if plan.selected), None)
+        plan = await self._assets.select_direction_plan(user_id, body.plan_id)
+        if current != body.plan_id:
+            await self._log_behavior(
+                user_id,
+                BehaviorEventType.DECISION_RESELECT
+                if current is not None
+                else BehaviorEventType.DECISION_SELECT,
+                {
+                    "plan_id": plan.id,
+                    "previous_plan_id": current or "",
+                    "detail": f"选定方向：{plan.name}",
+                },
+            )
+        return mappers.decision_selection_view(plan)
+
+    async def mark_task_done(self, user_id: str, body: TaskDoneRequest) -> TaskDoneView:
+        # 任务标识的口径（`阶段名:任务文本`）只存在于仓储层，这里不做重复匹配，
+        # 改用"已完成数是否增加"判断这次是否真的发生了状态跃迁。
+        before = await self._assets.get_action_plan(user_id)
+        before_done = (
+            sum(1 for phase in before.phases for task in phase.tasks if task.done)
+            if before is not None
+            else 0
+        )
+        plan = await self._assets.mark_task_done(user_id, body.task_id)
+        view = mappers.task_done_view(plan, body.task_id)
+        if view.done_total > before_done:
+            await self._log_behavior(
+                user_id,
+                BehaviorEventType.TASK_DONE,
+                {
+                    "task_id": body.task_id,
+                    "detail": f"完成任务：{view.text}",
+                },
+                related_asset_ids=[plan.id],
+            )
+        return view
+
+    async def write_calendar_node(
+        self, user_id: str, body: CalendarNodeRequest
+    ) -> CalendarNodeView:
+        node = CalendarNode(
+            node_id=f"cal_{uuid4().hex[:12]}",
+            user_id=user_id,
+            title=body.title,
+            due_at=body.due_at,
+            source=body.source,
+            related_task_text=body.related_task_text,
+        )
+        saved = await self._functions.write_calendar_node(user_id, node)
+        return mappers.calendar_node_view(saved)
+
+    async def _log_behavior(
+        self,
+        user_id: str,
+        event_type: BehaviorEventType,
+        payload: dict,
+        *,
+        related_asset_ids: Optional[list[str]] = None,
+    ) -> None:
+        """把一次真实用户动作追加进行为日志。
+
+        只做写入，不改动任何业务状态：成就（`first_gap_claimed` 等）与工作台跟踪
+        时间线都在读取时从这份日志投影出来。
+        """
+        await self._behaviors.log(
+            user_id,
+            BehaviorEventDraft(
+                event_type=event_type,
+                payload=payload,
+                related_asset_ids=related_asset_ids or [],
+            ),
+        )
 
     # ---------- 埋点 ----------
 

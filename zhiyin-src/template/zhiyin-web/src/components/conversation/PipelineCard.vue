@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import type { PipelineCardView } from '@/api/schema'
+import { useSessionStore } from '@/stores/session'
 import TheoryTag from './TheoryTag.vue'
 
 const props = defineProps<{ card: PipelineCardView; index: number; leadName?: string }>()
 
-type Mode = 'output' | 'theory' | 'eval' | 'handoff'
+const router = useRouter()
+const session = useSessionStore()
+
+type Mode = 'output' | 'theory' | 'eval'
 const open = ref<Mode | null>(null)
 
 function toggle(mode: Mode) {
@@ -28,10 +33,18 @@ const isEmpty = computed(
   () => !props.card.current_output && !props.card.theory_models?.length && !props.card.evaluation,
 )
 
-const stageHints = ['建立你的职业画像', '把画像与目标做逐维比对', '确定主攻方向与备选', '拆解成可执行的关键节点', '跟踪变化并校准']
+/**
+ * 「待进入」说明取自动态文案包（AGENTS.md §8：文案不得硬编码在前端）。
+ * 读不到就整条不渲染，而不是回落成前台自造的默认句。
+ */
+const pendingHint = computed(() => session.copyBundle[`stage.${props.card.stage}.pending_hint`] ?? '')
 
-function hint(index: number) {
-  return stageHints[index] ?? '继续推进当前环节'
+/**
+ * 「查看明细 →」的去处：② 诊断的明细是报告全文，其余环节的明细在工作台分层资产里。
+ * 两个页面都读真实资产；此前这个按钮没有 @click，点了没有任何反应。
+ */
+function openDetail() {
+  void router.push({ name: props.card.stage === 'diagnose' ? 'report' : 'workspace' })
 }
 </script>
 
@@ -50,14 +63,8 @@ function hint(index: number) {
       <span>当前主理</span>
       <strong>{{ leadName || '待分配' }}</strong>
     </div>
-    <div class="mode handoff">
-      <button type="button" class="mode-head" :aria-expanded="open === 'handoff'" @click="toggle('handoff')">
-        交接记录 <span aria-hidden="true">{{ open === 'handoff' ? '−' : '＋' }}</span>
-      </button>
-      <p v-if="open === 'handoff'" class="handoff-empty">当前暂无交接记录</p>
-    </div>
 
-    <p v-if="isEmpty" class="empty-note">待进入 · 这一步会{{ hint(index) }}</p>
+    <p v-if="isEmpty && pendingHint" class="empty-note">{{ pendingHint }}</p>
 
     <template v-else>
       <!-- L2 分组：无描边，靠底色区分；三态互斥展开 -->
@@ -71,7 +78,9 @@ function hint(index: number) {
             <dd>{{ display(item[1]) }}</dd>
           </template>
         </dl>
-        <button v-if="open === 'output'" type="button" class="detail-link">查看明细 →</button>
+        <button v-if="open === 'output'" type="button" class="detail-link" @click="openDetail">
+          查看明细 →
+        </button>
       </div>
 
       <div v-if="card.theory_models?.length" class="mode">
@@ -160,13 +169,6 @@ function hint(index: number) {
 }
 
 .lead-row strong { color: var(--color-role); }
-
-.handoff-empty {
-  margin: 0;
-  padding: 0 var(--space-3) var(--space-3);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-}
 
 @media (prefers-reduced-motion: reduce) {
   .pipeline-card.active { animation: none; }

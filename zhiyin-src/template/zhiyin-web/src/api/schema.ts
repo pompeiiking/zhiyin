@@ -59,6 +59,17 @@ export type ReportFullTextView = Schemas['ReportFullTextView']
 export type ExportRequest = Schemas['ExportRequest']
 export type ExportResultView = Schemas['ExportResultView']
 
+// ---------- 闭环写操作（asset_controller） ----------
+
+export type GapClaimRequest = Schemas['GapClaimRequest']
+export type GapClaimView = Schemas['GapClaimView']
+export type DecisionSelectionRequest = Schemas['DecisionSelectionRequest']
+export type DecisionSelectionView = Schemas['DecisionSelectionView']
+export type TaskDoneRequest = Schemas['TaskDoneRequest']
+export type TaskDoneView = Schemas['TaskDoneView']
+export type CalendarNodeRequest = Schemas['CalendarNodeRequest']
+export type CalendarNodeView = Schemas['CalendarNodeView']
+
 // ---------- 埋点（track_controller） ----------
 
 export type TrackEventRequest = Schemas['TrackEventRequest']

@@ -143,6 +143,7 @@ __all__ = [
     "Report",
     "ReportDimensionGroup",
     "ReportDimensionItem",
+    "ReportGap",
     "Swot",
     "TrackEvent",
     "Verdict",

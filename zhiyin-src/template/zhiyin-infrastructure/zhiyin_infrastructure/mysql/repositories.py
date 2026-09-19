@@ -39,7 +39,7 @@ from zhiyin_infrastructure.persistence.models import (
     TaskSessionRow,
     UserAccountRow,
 )
-from zhiyin_kernel.assets import ActionPlan, DirectionPlan, Report
+from zhiyin_kernel.assets import ActionPlan, DirectionPlan, GapClaim, Report
 from zhiyin_kernel.blackboard import (
     AssetVersion,
     BehaviorLog,
@@ -626,6 +626,38 @@ class SqlAlchemyAssetRepository(_Repository, AssetRepository):
                 )
             )
         return stored
+
+    async def claim_gap(self, user_id: str, gap_id: str) -> Report:
+        """认领差距：原地更新最新一版的 payload，不新增报告历史行。
+
+        报告历史行以 ``(user_id, version)`` 为主键，认领没有重算正文，因此不能走
+        ``save_report`` 的版本自增路径——那会造出一份内容完全相同的新版本。
+        """
+        await self._ready()
+        async with self._db.sessions.begin() as session:
+            row = await session.scalar(
+                select(ReportHistoryRow)
+                .where(ReportHistoryRow.user_id == user_id)
+                .order_by(ReportHistoryRow.version.desc())
+                .with_for_update()
+                .limit(1)
+            )
+            if row is None:
+                raise LookupError(f"诊断报告不存在：{user_id}")
+            report = Report.model_validate(row.payload)
+            if all(claim.gap_id != gap_id for claim in report.gap_claims):
+                if all(gap.gap_id != gap_id for gap in report.gaps):
+                    raise LookupError(f"报告差距不存在：{gap_id}")
+                report = report.model_copy(
+                    update={
+                        "gap_claims": [
+                            *report.gap_claims,
+                            GapClaim(gap_id=gap_id, claimed_at=_now()),
+                        ]
+                    }
+                )
+                row.payload = _payload(report)
+        return report
 
     async def _get_content(self, user_id: str, kind: str) -> Any | None:
         await self._ready()

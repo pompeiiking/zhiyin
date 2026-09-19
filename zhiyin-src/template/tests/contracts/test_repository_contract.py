@@ -24,6 +24,7 @@ from zhiyin_kernel.assets import (
     ActionTask,
     DirectionPlan,
     Report,
+    ReportGap,
     Swot,
     Verdict,
 )
@@ -158,6 +159,38 @@ async def test_asset_contract(repositories) -> None:
     assert second_snapshot.version == 2
     assert (await repo.get_report("u2")).version == 2
     assert (await repo.get_report("u2", 1)).verdict.title == "诊断"
+
+    # 认领差距（FR-DIAG-004）：只给最新一版追加认领记录，不重算正文、不产生新版本
+    await repo.save_snapshot(
+        _asset("u3", AssetType.REPORT, ["major"]),
+        report=Report(
+            id="report-u3",
+            user_id="u3",
+            version=1,
+            generated_at=_now(),
+            verdict=Verdict(title="诊断", summary=""),
+            swot=Swot(),
+            gaps=[
+                ReportGap(
+                    gap_id="gap-1",
+                    requirement="目标岗位要求 SQL",
+                    current_state="只会 Excel",
+                    suggestion="完成一门 SQL 入门课",
+                )
+            ],
+        ),
+    )
+    claimed = await repo.claim_gap("u3", "gap-1")
+    assert [item.gap_id for item in claimed.gap_claims] == ["gap-1"]
+    assert (await repo.get_report("u3")).version == 1, "认领不得造出新版本"
+    assert [item.gap_id for item in (await repo.get_report("u3")).gap_claims] == ["gap-1"]
+    again = await repo.claim_gap("u3", "gap-1")
+    assert len(again.gap_claims) == 1, "重复认领必须幂等"
+    assert [item.gap_id for item in (await repo.get_report("u3")).gaps] == ["gap-1"]
+    with pytest.raises(LookupError):
+        await repo.claim_gap("u3", "不存在的差距")
+    with pytest.raises(LookupError):
+        await repo.claim_gap("没有报告的用户", "gap-1")
 
     await repo.save_version(_asset("u1", AssetType.ACTION_PLAN, ["target_city"]))
     hit = await repo.list_affected_assets("u1", ["major"])

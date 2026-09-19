@@ -195,6 +195,9 @@ class DefaultAssetService(AssetService):
     async def get_report(self, user_id: str, version: Optional[int] = None) -> Optional[Report]:
         return await self._assets.get_report(user_id, version)
 
+    async def claim_gap(self, user_id: str, gap_id: str) -> Report:
+        return await self._assets.claim_gap(user_id, gap_id)
+
     async def list_direction_plans(self, user_id: str) -> list[DirectionPlan]:
         return await self._assets.list_direction_plans(user_id)
 
