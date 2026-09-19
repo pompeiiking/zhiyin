@@ -19,7 +19,6 @@ function openDetail(id: string) {
         <span class="swatch" aria-hidden="true"></span>
         <span class="card-top">
           <span class="no" aria-hidden="true">{{ agent.no }}</span>
-          <span class="status" :class="`is-${agent.statusTone}`">{{ agent.status }}</span>
         </span>
         <span class="name">{{ agent.name }}</span>
         <span class="stage">{{ agent.stages }}</span>
@@ -90,19 +89,6 @@ function openDetail(id: string) {
 }
 
 .no { color: var(--c); font-size: var(--font-size-sm); font-weight: 800; letter-spacing: 0.08em; }
-
-.status {
-  padding: 3px 10px;
-  border-radius: var(--radius-pill);
-  font-size: var(--font-size-xs);
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.status.is-done { color: var(--greenD); background: var(--greenSoft); }
-.status.is-active { color: var(--amber); background: var(--amberSoft); }
-.status.is-sync { color: var(--color-text-secondary); background: var(--color-bg); }
-.status.is-ondemand { color: var(--blueD); background: var(--blueSoft); }
 
 .name { font-size: var(--font-size-lg); font-weight: 800; line-height: 1.3; }
 

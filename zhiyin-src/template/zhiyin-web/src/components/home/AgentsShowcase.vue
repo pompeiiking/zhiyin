@@ -46,7 +46,11 @@ function openTeam() {
         </li>
       </ul>
 
-      <p class="agents-note">能力池来自动态资源；对话与结论产出只在核心对话页发生。</p>
+      <p class="agents-note">
+        能力池当前由前端静态配置，与 <code>data/registry/agents.json</code> 同值；
+        bootstrap 尚未下发该能力池，改由后端下发前两处需手工保持同步。
+        对话与结论产出只在核心对话页发生。
+      </p>
     </div>
   </section>
 </template>
@@ -155,21 +159,6 @@ function openTeam() {
 
 .agents-note { margin: 20px 0 0; text-align: center; color: var(--color-text-muted); font-size: 12.5px; }
 
-/* 首页内嵌大对话框（点击卡片后原地切换） */
-.chat-panel {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  min-height: 400px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-}
-
 .chat-head {
   flex: none;
   display: flex;
@@ -179,138 +168,10 @@ function openTeam() {
   border-bottom: 1px solid var(--color-border);
   background: var(--cSoft);
 }
-
-.chat-ico {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  flex: none;
-  place-items: center;
-  border-radius: var(--radius-sm);
-  background: var(--c);
-  color: #fff;
-  font-weight: 800;
-}
-
-.chat-meta { display: grid; gap: 1px; }
-.chat-meta b { font-size: 14px; }
-.chat-meta span { font-size: 12px; color: var(--color-text-secondary); }
-
-.chat-stage {
-  margin-left: auto;
-  padding: 3px 10px;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--c);
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.chat-back {
-  flex: none;
-  padding: 5px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.chat-back:hover { color: var(--c); border-color: var(--c); }
-
-.chat-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
-  padding: 16px;
-}
-
-.chat-row { display: flex; align-items: flex-start; gap: 8px; }
 .chat-row.user { justify-content: flex-end; }
-
-.chat-avatar {
-  flex: none;
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--c);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.chat-msg { max-width: 78%; }
-.chat-msg p {
-  margin: 0;
-  padding: 9px 13px;
-  border-radius: 14px;
-  font-size: 13px;
-  line-height: 1.6;
-}
 
 .chat-msg.agent p { background: var(--cSoft); border: 1px solid var(--color-border); border-top-left-radius: 4px; }
 .chat-msg.user p { background: var(--c); color: #fff; border-top-right-radius: 4px; }
-
-.chat-input {
-  flex: none;
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--color-border);
-}
-
-.chat-input input {
-  flex: 1;
-  min-width: 0;
-  padding: 9px 12px;
-  border: 1px solid var(--c);
-  border-radius: var(--radius-pill);
-  background: #fff;
-  font-size: 13px;
-}
-
-.chat-input button {
-  padding: 9px 18px;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: var(--c);
-  color: #fff;
-  font-weight: 700;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.chat-input button:disabled { opacity: 0.5; cursor: default; }
-
-.chat-prompts {
-  flex: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 16px 12px;
-}
-
-.prompt-chip {
-  padding: 6px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--c);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.prompt-chip:hover { border-color: var(--c); background: var(--cSoft); }
-
-.chat-note { flex: none; margin: 0; padding: 0 16px 12px; font-size: 12px; color: var(--color-text-muted); }
 
 /* 每个智能体一个主题色（与智能体小队、对话页主理徽章同一套令牌） */
 .a-blue { --c: var(--blue); --cSoft: var(--blueSoft); }

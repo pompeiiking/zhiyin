@@ -17,9 +17,6 @@ import { defineStore } from 'pinia'
  *    合成出来的分数会与真实报告互相矛盾。解析结论一律读报告正文。
  */
 
-/** 智能体在页面上的状态口径（与轴 B 五环节的进度一致，不做「能力展示」用途） */
-export type AgentStatusTone = 'done' | 'active' | 'sync' | 'ondemand'
-
 export interface AgentDefinition {
   /** 与 data/registry/agents.json 的 id 一致 */
   id: string
@@ -39,8 +36,6 @@ export interface AgentDefinition {
   tools: string[]
   /** 不做什么（agents.json not_to_do） */
   boundary: string
-  status: string
-  statusTone: AgentStatusTone
   /** 主题色类：每个智能体一个，用于卡片与详情页区分 */
   theme: string
 }
@@ -57,8 +52,6 @@ export const agentCatalog: AgentDefinition[] = [
     theories: ['帕森斯 · 了解自我', '霍兰德 RIASEC', '能力三核', '舒伯 · 阶段角色', '职业锚 · 价值取向'],
     tools: ['访谈话术', '画像字段 schema', '测评解释'],
     boundary: '不替用户下判断',
-    status: '已完成',
-    statusTone: 'done',
     theme: 'a-blue',
   },
   {
@@ -72,8 +65,6 @@ export const agentCatalog: AgentDefinition[] = [
     theories: ['帕森斯 · 匹配', 'CD · 发展状态', '三叶草', 'CASVE 决策循环', '决策平衡单'],
     tools: ['职业库', '岗位要求', '差距算法', '方案生成'],
     boundary: '不替用户执行',
-    status: '解析已完成',
-    statusTone: 'done',
     theme: 'a-green',
   },
   {
@@ -87,8 +78,6 @@ export const agentCatalog: AgentDefinition[] = [
     theories: ['SMART 目标', '执行意图 if-then', '计划性偶发'],
     tools: ['节点日历', '窗口模板', '任务拆解'],
     boundary: '不评判方向对错',
-    status: '进行中',
-    statusTone: 'active',
     theme: 'a-amber',
   },
   {
@@ -102,8 +91,6 @@ export const agentCatalog: AgentDefinition[] = [
     theories: ['舒伯 · 发展观', '班杜拉 · 自我效能', '计划性偶发'],
     tools: ['行为日志', '节律', '提醒通道', '成就体系'],
     boundary: '不越界代产出诊断或方案',
-    status: '持续运行',
-    statusTone: 'sync',
     theme: 'a-violet',
   },
   {
@@ -117,8 +104,6 @@ export const agentCatalog: AgentDefinition[] = [
     theories: [],
     tools: ['学职平台库', '岗位 JD', '行情', '时间窗口'],
     boundary: '不与用户闲聊、不给建议',
-    status: '同步中',
-    statusTone: 'sync',
     theme: 'a-slate',
   },
 ]

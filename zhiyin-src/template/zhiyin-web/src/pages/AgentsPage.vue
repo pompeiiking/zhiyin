@@ -65,7 +65,7 @@ onMounted(() => {
       <AgentTeamGrid />
 
       <footer class="hub-foot">
-        <p>能力池来自动态资源 · 对话与结论产出只在核心对话页发生 · 五位共用同一份画像与资产，换主理不换结论。</p>
+        <p>能力池由前端静态配置（与 <code>data/registry/agents.json</code> 同值，尚未由 bootstrap 下发）· 对话与结论产出只在核心对话页发生 · 五位共用同一份画像与资产，换主理不换结论。</p>
       </footer>
     </div>
   </main>
@@ -101,10 +101,6 @@ onMounted(() => {
 .summary.empty { border-color: var(--blueLine); background: linear-gradient(135deg, var(--blueSoft), var(--card)); }
 .summary-main h2 { margin: var(--space-2) 0 0; font-size: var(--font-size-md); }
 .summary-main p { margin: var(--space-2) 0 0; color: var(--color-text-secondary); font-size: var(--font-size-xs); }
-
-.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-3) 0 0; padding: 0; list-style: none; }
-.chips li { display: inline-flex; align-items: baseline; gap: 5px; padding: 4px 11px; border: 1px solid var(--color-border); border-radius: var(--radius-pill); background: var(--card); font-size: var(--font-size-xs); color: var(--color-text-secondary); }
-.chips li b { color: var(--color-text-primary); font-size: var(--font-size-sm); }
 
 .act {
   flex: none;

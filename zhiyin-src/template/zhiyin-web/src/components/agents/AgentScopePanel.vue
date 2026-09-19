@@ -118,7 +118,6 @@ function summon() {
       <div class="hero-copy">
         <div class="hero-line">
           <h1>{{ agent.name }}</h1>
-          <span class="status" :class="`is-${agent.statusTone}`">{{ agent.stages }}</span>
         </div>
         <p class="hero-role">{{ agent.role }}</p>
         <div class="hero-foot">
@@ -177,7 +176,7 @@ function summon() {
     </section>
 
     <footer class="scope-foot">
-      <p>能力池来自动态资源；环节状态与产出取当前账号的真实资产，未产出即显示为空。</p>
+      <p>能力池由前端静态配置（与 <code>data/registry/agents.json</code> 同值，尚未由 bootstrap 下发）；环节状态与产出取当前账号的真实资产，未产出即显示为空。</p>
     </footer>
   </section>
   <p v-else class="fallback">没有找到这个智能体，正在返回智能体小队…</p>
@@ -254,12 +253,6 @@ function summon() {
 .stage-pill.is-ondemand { border-color: var(--c); color: var(--c); background: var(--cSoft); }
 
 .hero-progress { font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-muted); }
-
-.status { padding: 4px 11px; border-radius: var(--radius-pill); font-size: var(--font-size-xs); font-weight: 700; white-space: nowrap; }
-.status.is-done { color: var(--greenD); background: var(--greenSoft); }
-.status.is-active { color: var(--amber); background: var(--amberSoft); }
-.status.is-sync { color: var(--color-text-secondary); background: var(--color-bg); }
-.status.is-ondemand { color: var(--blueD); background: var(--blueSoft); }
 
 /* 产出 */
 .block {

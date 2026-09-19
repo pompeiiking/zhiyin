@@ -16,8 +16,9 @@ const store = useWorkspaceStore()
 const router = useRouter()
 const messages = computed(() => store.coachMessages)
 
-// 演示阶段：教练建议的响应在组件内闭环——主行动跳转对话页续接，
-// 「稍后 / 不再提醒」收起当前消息；全部收起后回到空状态。
+// 当前实现：教练建议的响应在组件内闭环——主行动跳转对话页续接，
+// 「稍后 / 不再提醒」收起当前消息并上报 review_warning_response；
+// 收起状态只存在于本次会话，不做后端持久化（接口未落地前不伪造已读状态）。
 const hidden = ref<Set<number>>(new Set())
 const items = computed(() =>
   messages.value.map((msg, index) => ({ msg, index })).filter((item) => !hidden.value.has(item.index)),

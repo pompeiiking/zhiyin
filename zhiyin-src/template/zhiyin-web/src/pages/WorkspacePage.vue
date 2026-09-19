@@ -195,7 +195,7 @@ onMounted(() => {
           <button v-for="agent in agentCatalog" :key="agent.id" type="button" class="agent-card" :class="agent.theme" @click="goAgent(agent.id)">
             <span class="ac-ico">{{ agent.shortName }}</span>
             <span class="ac-body">
-              <span class="ac-top"><b>{{ agent.name }}</b><em :class="agent.statusTone">负责 {{ agent.stages }}</em></span>
+              <span class="ac-top"><b>{{ agent.name }}</b><em>负责 {{ agent.stages }}</em></span>
               <span class="ac-role">{{ agent.role }}</span>
             </span>
           </button>
@@ -348,13 +348,6 @@ onMounted(() => {
 .hero-glow-a { top: -80px; right: 6%; width: 260px; height: 260px; background: #fff; }
 .hero-glow-b { bottom: -100px; left: 36%; width: 300px; height: 300px; background: var(--green); }
 
-.hero-badge {
-  position: absolute;
-  top: var(--space-5);
-  right: var(--space-6);
-  z-index: 2;
-}
-
 .hero-main { grid-area: main; position: relative; z-index: 1; }
 
 .hero-tag {
@@ -474,9 +467,6 @@ onMounted(() => {
 .hero-ring div { position: relative; z-index: 1; display: grid; text-align: center; }
 .hero-ring strong { font-size: 40px; line-height: 1; }
 .hero-ring span { margin-top: 6px; font-size: var(--font-size-xs); opacity: 0.9; }
-
-.hero-since { margin: 0; font-size: var(--font-size-xs); opacity: 0.88; }
-.hero-since b { font-weight: 800; }
 
 /* 五环节闭环（内嵌 hero，铺满整行） */
 .wb-loop {
@@ -636,8 +626,6 @@ onMounted(() => {
   min-height: calc(1.6em * 2);
 }
 
-.ac-time { color: var(--color-text-muted); font-size: var(--font-size-xs); }
-
 /* ============ 双列 ============ */
 .wb-grid {
   display: grid;
@@ -660,32 +648,11 @@ onMounted(() => {
   gap: var(--space-4);
 }
 
-.diag-score {
-  display: grid;
-  place-items: center;
-  flex: none;
-  min-width: 104px;
-  padding: var(--space-4);
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--blueD), var(--blue));
-  color: #fff;
-}
-
-.diag-score strong { font-size: 40px; line-height: 1; font-weight: 800; }
-.diag-score span { margin-top: 6px; font-size: var(--font-size-xs); opacity: 0.9; }
-
 .diag-conclusion {
   margin: 0;
   font-size: var(--font-size-sm);
   line-height: 1.7;
   color: var(--color-text-primary);
-}
-
-.diag-swot {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-3);
-  margin-top: var(--space-4);
 }
 
 .swot-cell {

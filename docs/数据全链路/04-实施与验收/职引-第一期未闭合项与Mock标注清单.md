@@ -105,6 +105,7 @@
 | 缺口 | 后端任何 DTO 都没有来源字段（`rg "is_mock\|source" zhiyin-api` 无结果），前端只能靠**字符串匹配占位文案**才能判断，这既脆弱又会随文案改动失效；而且 `MockBadge.vue` 自身仍是空骨架 |
 | 归属 | 后端接口契约 + 前端联调（需一次契约评审，会改动 `contracts/openapi.json` 与前端生成物 `types.ts`） |
 | 退出判据 | 响应中出现可机器判定的来源标记；`test_mock_content_carries_*` 由 xfail 变 XPASS 并删除标记 |
+| **2026-09-19 收尾** | 前端 `MockBadge.vue` 与文案键 `mock.source_notice` 已删除；对应的 `xfail(strict=True)` 用例与 `phase1_open` 标记**按本清单的清理约定一并删除**——Mock 产出已归零，该断言不再有可标记的对象，留着只是永久失效的守卫。证据见[修改日志](../00-索引与变更/职引-数据全链路修改日志.md)第十四节 |
 
 ### MOCK-2 · Mock 内容已经流到用户可见字段（现状存档，不是缺陷）
 
