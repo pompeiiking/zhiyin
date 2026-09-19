@@ -1,18 +1,25 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { ProfilePanelView } from '@/api/schema'
+import { useSessionStore } from '@/stores/session'
 
 // 画像字段卡（CONV-003）：右栏「详细属性」的层次化落点。
 // L1 容器卡（仅此层描边）→ L2 维度分组（无描边、浅底）→ L3 属性行（字段名/值/状态徽记）。
+//
+// 字段形状来自后端 `profile_panel.fields`：`{ key, value, confidence, source, updated_at, evidence }`。
+// 此前这里读 `f.group` / `f.name`——两个字段后端都不下发，于是所有字段都被归到"其他"、
+// 名字统一显示成"字段"。现在按真实形状渲染：名字取文案包的 `profile.field.<key>`；
+// 分组只在后端确实下发 `group` 时才分组，否则平铺。
 type Field = Record<string, unknown>
 
 const props = defineProps<{ profile?: ProfilePanelView | null }>()
+const session = useSessionStore()
 
 const groups = computed(() => {
   const fields = (props.profile?.fields ?? []) as Field[]
   const map = new Map<string, Field[]>()
   for (const f of fields) {
-    const g = String(f.group ?? '其他')
+    const g = String(f.group ?? '')
     if (!map.has(g)) map.set(g, [])
     map.get(g)!.push(f)
   }
@@ -23,16 +30,24 @@ const coverage = computed(() => Math.round((props.profile?.coverage ?? 0) * 100)
 const confidence = computed(() => Math.round((props.profile?.overall_confidence ?? 0) * 100))
 
 function fieldName(f: Field) {
-  return String(f.name ?? f.label ?? '字段')
+  const key = String(f.key ?? '')
+  if (!key) return String(f.name ?? f.label ?? '字段')
+  return session.copyBundle[`profile.field.${key}`] ?? key
 }
+/** 值可能是字符串、字符串数组或对象，统一成可读文本；空值如实显示"待采集"。 */
 function fieldValue(f: Field) {
-  return String(f.value ?? '—')
+  const value = f.value
+  if (value === null || value === undefined) return '待采集'
+  if (Array.isArray(value)) return value.map((item) => String(item)).join(' / ')
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
 }
-function statusClass(s: unknown) {
-  if (s === 'done') return 'ok'
-  if (s === 'low') return 'low'
-  if (s === 'risk') return 'risk'
-  return 'pending'
+function statusClass(f: Field) {
+  if (f.value === null || f.value === undefined) return 'pending'
+  const confidence = typeof f.confidence === 'number' ? f.confidence : 1
+  if (confidence < 0.6) return 'low'
+  if (f.status === 'risk') return 'risk'
+  return 'ok'
 }
 </script>
 
@@ -51,11 +66,11 @@ function statusClass(s: unknown) {
 
     <div v-if="groups.length" class="pf-groups">
       <div v-for="group in groups" :key="group.group" class="pf-group">
-        <p class="pf-group-title">{{ group.group }}</p>
-        <div v-for="field in group.items" :key="fieldName(field)" class="pf-row">
+        <p v-if="group.group" class="pf-group-title">{{ group.group }}</p>
+        <div v-for="field in group.items" :key="String(field.key)" class="pf-row">
           <span class="pf-name">{{ fieldName(field) }}</span>
           <span class="pf-value">{{ fieldValue(field) }}</span>
-          <span class="pf-dot" :class="statusClass(field.status)" :title="fieldValue(field) === '待采集' ? '待采集' : '已沉淀'"></span>
+          <span class="pf-dot" :class="statusClass(field)" :title="fieldValue(field) === '待采集' ? '待采集' : '已沉淀'"></span>
         </div>
       </div>
     </div>

@@ -1,19 +1,28 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import type { PipelineCardView, ProfilePanelView } from '@/api/schema'
 import { useConversationStore } from '@/stores/conversation'
 import { useSessionStore } from '@/stores/session'
+import { useWorkspaceStore } from '@/stores/workspace'
 import PipelineCard from './PipelineCard.vue'
 import ProfileFields from './ProfileFields.vue'
 
 const conversation = useConversationStore()
 const session = useSessionStore()
+const workspace = useWorkspaceStore()
 
 const pipeline = computed(() => conversation.pipeline as unknown as PipelineCardView[])
-const profile = computed(() => conversation.profile as unknown as ProfilePanelView | null)
+// 画像面板取真实来源：`GET /app/workspace` 的 profile_panel。
+// 对话回合的 DTO 不带画像面板，此前这里读的是 store 里一份从未被写入的状态，
+// 页面因此永远显示覆盖 0 / 置信度 0。
+const profile = computed(() => workspace.profilePanel as unknown as ProfilePanelView | null)
 
 const title = computed(() => String(session.copyBundle['conv.pipeline_title'] ?? '微循环管线'))
 const leadName = computed(() => String(conversation.badge?.name ?? '待分配'))
+
+onMounted(() => {
+  void workspace.load()
+})
 </script>
 
 <template>

@@ -21,8 +21,6 @@ export const useConversationStore = defineStore('conversation', {
     pipeline: [] as Array<Record<string, unknown>>,
     /** 顶部主理徽章：现在是谁在帮我、依据什么（只由真实一轮对话写入） */
     badge: null as Record<string, unknown> | null,
-    /** 右栏画像字段卡（ProfilePanelView），只由真实接口下发 */
-    profile: null as Record<string, unknown> | null,
     /** 换主理 / 换理论 / 结论变化时的显式告知行；无变化时必须保持 null */
     disclosure: null as Record<string, unknown> | null,
     /** 行为引导（四选一），必须渲染出对应可点元素；只由真实一轮对话写入 */
