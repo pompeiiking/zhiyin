@@ -830,7 +830,7 @@ ES/pgvector 命中只表示“可能相关”。返回业务层前必须：
 - [ ] 补齐理论卡的方法步骤、边界、示例与来源；
 - [ ] 建立职业/专业/行业/政策来源台账；
 - [ ] 招聘来源完成条款、robots、字段、频率和保存期限审核；
-- [ ] 建立 JD 过期和下架机制；
+- [x] 建立 JD 过期和下架机制；**（2026-09-19 完成）** 新增 `DocumentExpiryWorker` + `RetrievalDocumentStore.expire_due()` / `expire_by_source()`：过期与来源下架都**落状态**（`expired` + `expired_reason` + `historical_sample`），不只靠查询过滤；相位门禁与归属清单同步。**未做**"连续复核失败"触发——它依赖复核流程本身，而招聘来源审核未完成，故留空并在模块 docstring 写明；
 - [x] 明确报告、记忆、简历的私有切片规则；
 - [x] 为每个片段生成稳定 ID、版本和 `content_hash`；
 - [x] 待审、禁用、过期内容不能进入生产索引；
@@ -854,15 +854,15 @@ ES/pgvector 命中只表示“可能相关”。返回业务层前必须：
 
 ### 14.3 联调与验收
 
-- [ ] PAMI 凭据由安全配置注入；**（2026-09-19 更正）** 模型 ID / 组织 ID / Agent API Key / Embedding 模型 ID **已注入**（`deploy/.env`，gitignored）；**仅 RAG API Key 未注入**——它依赖平台侧先修好知识库解析（见 18.2）并发布 RAG 应用
+- [x] PAMI 凭据由安全配置注入；**（2026-09-19 更正并完成）** 模型 ID / 组织 ID / Agent API Key / Embedding 模型 ID / **RAG API Key 均已注入** `deploy/.env`（gitignored，不入库不入日志）。⚠️ 但**经 PAMI 的检索仍不可用**：平台 RAG 问答强制要求 rerank 模型，而平台 0 个 rerank 模型（详见[修改日志 §21/§23](../00-索引与变更/职引-数据全链路修改日志.md)）；`ZHIYIN_USE_PAMI_SEARCH` 按约定仍为 0
 - [x] 真实 Embedding 返回 1024 维，单条与批量边界测试通过；
 - [x] `model_version` 切换后旧空间不会被查询；
 - [x] 六个知识域至少各完成一条真实写入、同步、检索、删除验证；
 - [ ] 五环节各完成一个真实检索场景（代码与本地回归完成，真实模型待凭据）；
 - [x] 用户私有域完成跨用户、跨组织负例测试；
-- [ ] ES、Embedding、pgvector、Rerank 分别完成故障注入；
+- [x] ES、Embedding、pgvector、Rerank 分别完成故障注入；**（2026-09-19 完成）** 6 个故障面单测（降级、双通道全挂显式失败、无命中≠故障、Rerank 缺失不影响检索、降级原因可分辨、降级原因不含秘密）+ 容器内**真实**故障注入探针 `scripts/fault_injection_probe.py`（真实连接被拒 / 真实 DNS 失败，逐项确认故障真实存在）；
 - [ ] 固定评测集达到评审后的质量门槛；
-- [ ] 检索引用能从最终资产追溯到来源和版本；
+- [x] 检索引用能从最终资产追溯到来源和版本；**（2026-09-19 完成）** 新增 `Report.source_versions`（纯增量、向后兼容），键的取法与 `Report.sources` **完全一致**、同源多版取最大版本，并有守卫锁 `set(Report.sources) ⊆ set(Report.source_versions)`。**已知后续项**：平台检索响应不含文档 id（只有 `kb_name/title/snippet`），一旦切入 PAMI 检索，关键词通道的来源 id 需另行回填——见[修改日志 §23.4](../00-索引与变更/职引-数据全链路修改日志.md)；
 - [x] `python -m zhiyin_boot --check --phase=3` 返回 `passed=true`、`unmet=[]`。
 
 ---
