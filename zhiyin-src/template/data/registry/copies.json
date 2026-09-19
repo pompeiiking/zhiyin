@@ -1,29 +1,197 @@
 {
   "_note": "职引 · 文案（DEMO）。属动态资源：改本文件不需要发版。前端不得硬编码展示文案，BFF 把整包下发给前端按 key 取用。note 字段写清口径来源与定稿程度；文案本身是候选稿，需真实用户语言化测试后再定稿。",
   "items": [
-    { "code": "app.name", "text": "职引", "bundle": "zh-CN", "status": "enabled", "sort_order": 1, "note": "应用名" },
-    { "code": "home.tagline", "text": "用自己的话说清困惑，一步一步把方向走出来", "bundle": "zh-CN", "status": "enabled", "sort_order": 2, "note": "首页定位，用户视角，不列功能" },
-    { "code": "home.task_group_title", "text": "你现在最想解决的是哪件事？", "bundle": "zh-CN", "status": "enabled", "sort_order": 3, "note": "任务卡组标题" },
-    { "code": "conv.pipeline_title", "text": "微循环管线", "bundle": "zh-CN", "status": "enabled", "sort_order": 4, "note": "右栏管线卡标题" },
-    { "code": "wb.title", "text": "智能工作台", "bundle": "zh-CN", "status": "enabled", "sort_order": 5, "note": "工作台标题" },
-    { "code": "report.export_label", "text": "导出", "bundle": "zh-CN", "status": "enabled", "sort_order": 6, "note": "完整报告页导出按钮" },
-    { "code": "stage.collect.label", "text": "① 采集建模", "bundle": "zh-CN", "status": "enabled", "sort_order": 10, "note": "环节中文名：换环节告知行等后端文案用它，禁止把 LoopStage 枚举值写给用户" },
-    { "code": "stage.diagnose.label", "text": "② 诊断匹配", "bundle": "zh-CN", "status": "enabled", "sort_order": 11, "note": "同上" },
-    { "code": "stage.decide.label", "text": "③ 决策", "bundle": "zh-CN", "status": "enabled", "sort_order": 12, "note": "同上" },
-    { "code": "stage.act.label", "text": "④ 行动", "bundle": "zh-CN", "status": "enabled", "sort_order": 13, "note": "同上" },
-    { "code": "stage.review.label", "text": "⑤ 复盘校准", "bundle": "zh-CN", "status": "enabled", "sort_order": 14, "note": "同上" },
-    { "code": "wb.achievement.first_gap_claimed", "text": "认领第一个差距", "bundle": "zh-CN", "status": "enabled", "sort_order": 20, "note": "成就徽章文案：key 与后端 achievement_badge_keys 的取值一一对应" },
-    { "code": "wb.achievement.direction_selected", "text": "选定主攻方向", "bundle": "zh-CN", "status": "enabled", "sort_order": 21, "note": "同上" },
-    { "code": "wb.achievement.direction_reselected", "text": "重新校准方向", "bundle": "zh-CN", "status": "enabled", "sort_order": 22, "note": "同上" },
-    { "code": "wb.achievement.first_task_done", "text": "完成首个行动任务", "bundle": "zh-CN", "status": "enabled", "sort_order": 23, "note": "同上" },
-    { "code": "wb.achievement.first_review_completed", "text": "完成首次复盘", "bundle": "zh-CN", "status": "enabled", "sort_order": 24, "note": "同上" },
-    { "code": "profile.field.career_interest", "text": "职业兴趣", "bundle": "zh-CN", "status": "enabled", "sort_order": 30, "note": "画像关键字段中文名：key 与 policy_params.profile_collection.key_fields 一一对应" },
-    { "code": "profile.field.ability_strength", "text": "能力优势", "bundle": "zh-CN", "status": "enabled", "sort_order": 31, "note": "同上" },
-    { "code": "profile.field.value_anchor", "text": "价值锚点", "bundle": "zh-CN", "status": "enabled", "sort_order": 32, "note": "同上" },
-    { "code": "profile.field.target_direction", "text": "目标方向", "bundle": "zh-CN", "status": "enabled", "sort_order": 33, "note": "同上" },
-    { "code": "profile.field.decision_window", "text": "决策窗口", "bundle": "zh-CN", "status": "enabled", "sort_order": 34, "note": "同上" },
-    { "code": "profile.field.real_constraint", "text": "真实约束", "bundle": "zh-CN", "status": "enabled", "sort_order": 35, "note": "同上" },
-    { "code": "demo.data_notice", "text": "以下为演示数据，仅用于展示流程", "bundle": "zh-CN", "status": "enabled", "sort_order": 7, "note": "历史文案：演示数据已按「不允许保留 Mock」清除，本键保留仅为兼容旧引用" },
-    { "code": "mock.source_notice", "text": "本期为 Mock 产出，未接真实模型", "bundle": "zh-CN", "status": "enabled", "sort_order": 8, "note": "历史文案：Mock 产出已归零，本键保留仅为兼容旧引用" }
+    {
+      "code": "app.name",
+      "text": "职引",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 1,
+      "note": "应用名"
+    },
+    {
+      "code": "home.tagline",
+      "text": "用自己的话说清困惑，一步一步把方向走出来",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 2,
+      "note": "首页定位，用户视角，不列功能"
+    },
+    {
+      "code": "home.task_group_title",
+      "text": "你现在最想解决的是哪件事？",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 3,
+      "note": "任务卡组标题"
+    },
+    {
+      "code": "conv.pipeline_title",
+      "text": "微循环管线",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 4,
+      "note": "右栏管线卡标题"
+    },
+    {
+      "code": "wb.title",
+      "text": "智能工作台",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 5,
+      "note": "工作台标题"
+    },
+    {
+      "code": "report.export_label",
+      "text": "导出",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 6,
+      "note": "完整报告页导出按钮"
+    },
+    {
+      "code": "stage.collect.label",
+      "text": "① 采集建模",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 10,
+      "note": "环节中文名：换环节告知行等后端文案用它，禁止把 LoopStage 枚举值写给用户"
+    },
+    {
+      "code": "stage.diagnose.label",
+      "text": "② 诊断匹配",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 11,
+      "note": "同上"
+    },
+    {
+      "code": "stage.decide.label",
+      "text": "③ 方向决策",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 12,
+      "note": "同上"
+    },
+    {
+      "code": "stage.act.label",
+      "text": "④ 行动计划",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 13,
+      "note": "同上"
+    },
+    {
+      "code": "stage.review.label",
+      "text": "⑤ 复盘校准",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 14,
+      "note": "同上"
+    },
+    {
+      "code": "wb.achievement.first_gap_claimed",
+      "text": "认领第一个差距",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 20,
+      "note": "成就徽章文案：key 与后端 achievement_badge_keys 的取值一一对应"
+    },
+    {
+      "code": "wb.achievement.direction_selected",
+      "text": "选定主攻方向",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 21,
+      "note": "同上"
+    },
+    {
+      "code": "wb.achievement.direction_reselected",
+      "text": "重新校准方向",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 22,
+      "note": "同上"
+    },
+    {
+      "code": "wb.achievement.first_task_done",
+      "text": "完成首个行动任务",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 23,
+      "note": "同上"
+    },
+    {
+      "code": "wb.achievement.first_review_completed",
+      "text": "完成首次复盘",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 24,
+      "note": "同上"
+    },
+    {
+      "code": "profile.field.career_interest",
+      "text": "职业兴趣",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 30,
+      "note": "画像关键字段中文名：key 与 policy_params.profile_collection.key_fields 一一对应"
+    },
+    {
+      "code": "profile.field.ability_strength",
+      "text": "能力优势",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 31,
+      "note": "同上"
+    },
+    {
+      "code": "profile.field.value_anchor",
+      "text": "价值锚点",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 32,
+      "note": "同上"
+    },
+    {
+      "code": "profile.field.target_direction",
+      "text": "目标方向",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 33,
+      "note": "同上"
+    },
+    {
+      "code": "profile.field.decision_window",
+      "text": "决策窗口",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 34,
+      "note": "同上"
+    },
+    {
+      "code": "profile.field.real_constraint",
+      "text": "真实约束",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 35,
+      "note": "同上"
+    },
+    {
+      "code": "demo.data_notice",
+      "text": "以下为演示数据，仅用于展示流程",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 7,
+      "note": "历史文案：演示数据已按「不允许保留 Mock」清除，本键保留仅为兼容旧引用"
+    },
+    {
+      "code": "mock.source_notice",
+      "text": "本期为 Mock 产出，未接真实模型",
+      "bundle": "zh-CN",
+      "status": "enabled",
+      "sort_order": 8,
+      "note": "历史文案：Mock 产出已归零，本键保留仅为兼容旧引用"
+    }
   ]
 }

@@ -70,6 +70,7 @@ from zhiyin_business.ports.function import ExportResult
 from zhiyin_business.ports.loop import LoopResult
 from zhiyin_business.ports.orchestrator import TurnResult
 from zhiyin_business.ports.workspace import StagePanel, WorkspaceView
+from zhiyin_business.services.loop import STAGE_LABELS
 from zhiyin_kernel.assets import ActionPlan, DirectionPlan, Report
 from zhiyin_kernel.blackboard import AssetVersion, TaskSession
 from zhiyin_kernel.dynamic_content import (
@@ -82,14 +83,6 @@ from zhiyin_kernel.dynamic_content import (
 from zhiyin_kernel.identity import UserAccount
 from zhiyin_kernel.registry import AgentDescriptor, TaskEntrySpec
 from zhiyin_kernel.enums import LoopStage, TaskStatus
-
-_STAGE_LABELS = {
-    LoopStage.COLLECT: "① 采集建模",
-    LoopStage.DIAGNOSE: "② 诊断匹配",
-    LoopStage.DECIDE: "③ 方向决策",
-    LoopStage.ACT: "④ 行动计划",
-    LoopStage.REVIEW: "⑤ 复盘校准",
-}
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +202,7 @@ def task_session_view(
         task_id=session.id,
         task_name=task_name,
         stage=session.loop_stage,
-        stage_label=_STAGE_LABELS[session.loop_stage],
+        stage_label=STAGE_LABELS[session.loop_stage],
         lead_agent_name=lead_agent_name,
         status=session.status,
         progress=progress,
@@ -232,7 +225,7 @@ def session_summary_view(
         task_id=panel.task_id or "",
         task_name=panel.title,
         stage=panel.stage,
-        stage_label=_STAGE_LABELS[panel.stage],
+        stage_label=STAGE_LABELS[panel.stage],
         lead_agent_name=lead_agent_name,
         status=TaskStatus.ACTIVE,
         progress=(list(LoopStage).index(panel.stage) + 1) / len(LoopStage),
@@ -279,7 +272,7 @@ def pipeline_cards(
         cards.append(
             PipelineCardView(
                 stage=stage,
-                title=_STAGE_LABELS[stage],
+                title=STAGE_LABELS[stage],
                 active=stage is session.loop_stage,
                 status=status,
                 current_output=(version.model_dump(mode="json") if version else None),

@@ -29,19 +29,12 @@ from zhiyin_business.ports.workspace import (
     WorkspaceService,
     WorkspaceView,
 )
+from zhiyin_business.services.loop import STAGE_LABELS
 from zhiyin_data_sdk.repositories import RegistryRepository
 from zhiyin_kernel.assets import TrackEvent
 from zhiyin_kernel.enums import AssetType, BehaviorEventType, LoopStage
 
 T = TypeVar("T")
-
-_STAGE_TITLES = {
-    LoopStage.COLLECT: "① 采集建模",
-    LoopStage.DIAGNOSE: "② 诊断匹配",
-    LoopStage.DECIDE: "③ 方向决策",
-    LoopStage.ACT: "④ 行动计划",
-    LoopStage.REVIEW: "⑤ 复盘校准",
-}
 
 
 class DefaultWorkspaceService(WorkspaceService):
@@ -94,31 +87,31 @@ class DefaultWorkspaceService(WorkspaceService):
         panels = [
             StagePanel(
                 stage=LoopStage.COLLECT,
-                title=_STAGE_TITLES[LoopStage.COLLECT],
+                title=STAGE_LABELS[LoopStage.COLLECT],
                 evaluation=_profile_evaluation(profile),
                 updated_at=profile.updated_at if profile is not None else None,
             ),
             StagePanel(
                 stage=LoopStage.DIAGNOSE,
-                title=_STAGE_TITLES[LoopStage.DIAGNOSE],
+                title=STAGE_LABELS[LoopStage.DIAGNOSE],
                 evaluation=report.verdict.summary if report is not None else "尚未生成诊断报告",
                 **_version_fields(latest_by_type.get(AssetType.REPORT)),
             ),
             StagePanel(
                 stage=LoopStage.DECIDE,
-                title=_STAGE_TITLES[LoopStage.DECIDE],
+                title=STAGE_LABELS[LoopStage.DECIDE],
                 evaluation=_plan_evaluation(plans),
                 **_version_fields(latest_by_type.get(AssetType.DIRECTION_PLAN)),
             ),
             StagePanel(
                 stage=LoopStage.ACT,
-                title=_STAGE_TITLES[LoopStage.ACT],
+                title=STAGE_LABELS[LoopStage.ACT],
                 evaluation=_action_evaluation(action_plan),
                 **_version_fields(latest_by_type.get(AssetType.ACTION_PLAN)),
             ),
             StagePanel(
                 stage=LoopStage.REVIEW,
-                title=_STAGE_TITLES[LoopStage.REVIEW],
+                title=STAGE_LABELS[LoopStage.REVIEW],
                 evaluation=f"已有 {len(behaviors)} 条行为记录" if behaviors else "尚无复盘记录",
                 updated_at=behaviors[0].occurred_at if behaviors else None,
             ),
@@ -187,7 +180,7 @@ class DefaultWorkspaceService(WorkspaceService):
         return [
             StagePanel(
                 stage=memory.loop_stage,
-                title=_STAGE_TITLES[memory.loop_stage],
+                title=STAGE_LABELS[memory.loop_stage],
                 evaluation=memory.summary,
                 updated_at=memory.last_active_at,
                 task_id=memory.task_id,

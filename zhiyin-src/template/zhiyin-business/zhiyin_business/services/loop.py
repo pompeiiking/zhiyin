@@ -142,11 +142,19 @@ def _optional_float(value: object) -> Optional[float]:
 STAGE_LABELS: dict[LoopStage, str] = {
     LoopStage.COLLECT: "① 采集建模",
     LoopStage.DIAGNOSE: "② 诊断匹配",
-    LoopStage.DECIDE: "③ 决策",
-    LoopStage.ACT: "④ 行动",
+    LoopStage.DECIDE: "③ 方向决策",
+    LoopStage.ACT: "④ 行动计划",
     LoopStage.REVIEW: "⑤ 复盘校准",
 }
-"""环节中文标签，仅用于模型指令中的环节自述，不作为前端展示文案。"""
+"""环节中文名的**唯一来源**（本模块 = 五环节状态机的归属地）。
+
+此前这份映射在 `services/workspace.py`（`_STAGE_TITLES`）与
+`api/dto/mappers.py`（`_STAGE_LABELS`）各有一份完全相同的副本，收敛前共三处；
+任一处改了措辞，用户就会在管线卡、工作台面板与告知行看到不同的环节名。
+
+`mappers.py` 与 `workspace.py` 都改为引用本常量。措辞沿用这两处**既有**的写法
+（"③ 方向决策" / "④ 行动计划"），避免为了收敛而改动已经上线给用户看的文案。
+"""
 
 _STAGE_DUTIES: dict[LoopStage, str] = {
     LoopStage.COLLECT: (
