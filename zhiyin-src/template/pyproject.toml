@@ -24,6 +24,7 @@ dependencies = [
 mysql = [
     "sqlalchemy[asyncio]>=2.0,<3",
     "asyncmy>=0.2.9,<1",
+    "cryptography>=42,<47",
     "pymysql>=1.1,<2",
     "alembic>=1.13,<2",
 ]
@@ -39,6 +40,7 @@ pami-infra = [
 m3 = [
     "sqlalchemy[asyncio]>=2.0,<3",
     "asyncmy>=0.2.9,<1",
+    "cryptography>=42,<47",
     "pymysql>=1.1,<2",
     "alembic>=1.13,<2",
     "asyncpg>=0.29,<1",

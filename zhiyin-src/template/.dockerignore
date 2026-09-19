@@ -17,6 +17,8 @@ tests/*
 contracts
 scripts/*
 !scripts/verify_m3_runtime.py
+!scripts/verify_pami_runtime.py
+!scripts/verify_wanwu_business.py
 !scripts/run_mysql_contracts.py
 zhiyin-web/node_modules
 zhiyin-web/dist
