@@ -8,7 +8,7 @@ const actions = ['认领一个差距', '比较方案', '查看行动任务', '�
 </template>
 
 <style scoped>
-.quick-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); padding:var(--space-2) var(--space-6); }
-button { border:0; border-radius:var(--radius-pill); background:var(--color-bg); color:var(--color-link); padding:var(--space-2) var(--space-3); cursor:pointer; font-size:var(--font-size-xs); }
-button:hover { background:var(--color-brand-soft); }
+.quick-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 11px var(--space-5) 0; }
+button { border: 1px solid var(--blueLine); border-radius: var(--pill); background: #fff; color: var(--blueD); padding: 8px 15px; cursor: pointer; font-size: 14px; font-weight: 600; }
+button:hover { background: var(--blueSoft); border-color: var(--blue); }
 </style>

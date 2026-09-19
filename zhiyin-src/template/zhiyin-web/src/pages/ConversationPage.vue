@@ -14,26 +14,61 @@ import SessionList from '@/components/conversation/SessionList.vue'
 
 <style scoped>
 .conv-page {
-  height: calc(100dvh - 60px);
+  height: calc(100dvh - 72px);
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(220px, 270px) minmax(420px, 1fr) minmax(250px, 320px);
+  grid-template-columns: 280px minmax(480px, 760px) 340px;
+  justify-content: center;
+  gap: var(--space-5);
+  padding: var(--space-5);
   overflow: hidden;
+  background: var(--paper);
 }
 
-@media (max-width: 1280px) {
-  .conv-page { grid-template-columns: 220px minmax(360px, 1fr) 280px; }
+/* 屏宽收紧时把中栏（对话）放在第一位：两侧栏先变窄，再降级为抽屉与步骤条（§6.1/§6.2）。 */
+@media (max-width: 1440px) {
+  .conv-page { grid-template-columns: 224px minmax(0, 1fr) 296px; justify-content: stretch; }
+}
+
+@media (max-width: 1180px) {
+  .conv-page { grid-template-columns: 172px minmax(0, 1fr) 240px; gap: var(--space-3); padding: var(--space-3); }
+  /* 两侧栏同步减小内边距，把宽度让给中间对话 */
+  :deep(.pipeline-panel), :deep(.session-list) { padding: var(--space-3); }
 }
 
 @media (max-width: 900px) {
-  .conv-page { grid-template-columns: 64px minmax(0, 1fr) 260px; }
+  .conv-page { grid-template-columns: 64px minmax(0, 1fr) 240px; }
   :deep(.session-list) { padding-inline:var(--space-3); }
   :deep(.session-list h2), :deep(.session-list .empty) { display:none; }
 }
 
 @media (max-width: 640px) {
-  .conv-page { height:calc(100dvh - 60px); grid-template-columns:1fr; }
-  :deep(.session-list) { display:none; }
-  :deep(.pipeline-panel) { display:none; }
+  .conv-page {
+    height: auto;
+    min-height: calc(100dvh - 72px);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    overflow: visible;
+  }
+  /* 左栏 → 顶部横向会话切换条 */
+  :deep(.session-list) {
+    order: 1;
+    flex: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  /* 中栏 → 固定高度，内部继续滚动 */
+  :deep(.chat-stream) {
+    order: 2;
+    flex: none;
+    height: 70vh;
+    min-height: 420px;
+  }
+  /* 右栏 → 底部步骤条 / 展开面板 */
+  :deep(.pipeline-panel) { order: 3; flex: none; }
 }
 </style>

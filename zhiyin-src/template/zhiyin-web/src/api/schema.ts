@@ -44,6 +44,9 @@ export type PipelineCardView = Schemas['PipelineCardView']
 // ---------- 工作台（workspace_controller） ----------
 
 export type WorkspacePageView = Schemas['WorkspacePageView']
+export type ProfilePanelView = Schemas['ProfilePanelView']
+export type StagePanelView = Schemas['StagePanelView']
+export type LoopStage = Schemas['LoopStage']
 
 // ---------- 资产（asset_controller） ----------
 

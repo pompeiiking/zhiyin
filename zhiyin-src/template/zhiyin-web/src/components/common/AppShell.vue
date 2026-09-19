@@ -23,4 +23,15 @@ import LoginModal from '@/components/common/LoginModal.vue'
 .app-main {
   flex: 1;
 }
+
+.app-shell:has(.conv-page) {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-main:has(.conv-page) {
+  min-height: 0;
+  overflow: hidden;
+}
 </style>
