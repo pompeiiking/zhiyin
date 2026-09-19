@@ -56,8 +56,21 @@ export const ERROR_HANDLING: Record<number, string> = {
   [ErrorCode.DEPENDENCY_UNAVAILABLE]: '依赖降级 → 顶部弱提示，不阻塞对话',
 }
 
+/**
+ * 接口前缀。**必须**与后端 `zhiyin_api.app.API_PREFIX` 一致（《AGENTS.md》§9）：
+ * 前端 base URL 用 `/api/v1`，endpoint 只写 `/app/...`，代理原样转发、不再补版本段。
+ *
+ * 为什么给兜底值而不是只读环境变量：`zhiyin-web/.env` 是 **gitignored** 的
+ * （`.gitignore` 的 `.env` 规则），新克隆的仓库里没有它。此前 `baseURL` 直接取
+ * `import.meta.env.VITE_API_BASE_URL`、**没有兜底**，于是缺 `.env` 时前端请求会打到
+ * `/app/bootstrap`（少了 `/api/v1`），而 vite 只代理 `/api`——实测构建产物里连
+ * 一个 `api/v1` 字符串都没有，属于"换个环境就静默不联通"。
+ * 需要指向别的后端时仍然用 `VITE_API_BASE_URL` 覆盖。
+ */
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
+
 const http: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  baseURL: API_BASE_URL,
   timeout: 60_000,
 })
 

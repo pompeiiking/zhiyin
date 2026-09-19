@@ -281,6 +281,48 @@ def _readme_component_refs() -> set[str]:
     return references
 
 
+def test_frontend_errors_are_all_mapped_to_a_handling_action() -> None:
+    """每个错误码都要有前端应对动作（UI 只按 code 分支，不解析文案）。"""
+    source = (SRC / "api" / "client.ts").read_text(encoding="utf-8")
+    assert "ERROR_HANDLING" in source
+
+
+def test_every_frontend_track_event_is_accepted_by_the_registry() -> None:
+    """前端上报的埋点事件必须**在注册表里且 channel=frontend**。
+
+    为什么必须守卫：`/app/track` 只接受注册表里 `channel == "frontend"` 的事件，
+    其余一律拒绝；而前端调用点普遍写成 `void trackEvent(...).catch(() => {})`
+    ——**失败被静默吞掉**，界面上完全看不出来。实测过：`wb_agent_open`、
+    `wb_axis_correct` 根本不在表里，`review_warning_response` 被标成 backend，
+    三个事件一直在丢，而且服务端当时还会冒成 500。
+
+    这条守卫是跨语言的（Vue 调用点 ↔ registry JSON），只有断言比对能做。
+    """
+    pattern = re.compile(r"trackEvent\(\s*'([^']+)'")
+    sent: dict[str, str] = {}
+    for path in list(SRC.rglob("*.vue")) + list(SRC.rglob("*.ts")):
+        text = path.read_text(encoding="utf-8")
+        for code in pattern.findall(text):
+            sent.setdefault(code, path.name)
+    assert sent, "前端没有任何 trackEvent 调用？请检查提取规则是否与实现漂移"
+
+    registry = json.loads(
+        (REGISTRY_DIR / "track_events.json").read_text(encoding="utf-8")
+    )
+    frontend_events = {
+        str(item["code"])
+        for item in registry["items"]
+        if str(item.get("channel")) == "frontend"
+    }
+    rejected = {code: src for code, src in sent.items() if code not in frontend_events}
+    assert not rejected, (
+        "以下前端埋点事件会被后端拒绝（且被 .catch 静默吞掉）："
+        + "；".join(f"{code}（{src}）" for code, src in sorted(rejected.items()))
+        + "\n  请在 data/registry/track_events.json 里补成 channel=frontend，"
+        "或改掉前端调用点。"
+    )
+
+
 def test_frontend_placement_table_matches_real_files() -> None:
     """《前端 README》§二 的落位表 ↔ 真实文件（与后端 services 落位表守卫同源）。
 

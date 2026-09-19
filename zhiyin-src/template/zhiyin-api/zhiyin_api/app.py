@@ -32,6 +32,7 @@ from __future__ import annotations
 from typing import Any, Iterable, Optional
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from zhiyin_api.controllers import ROUTERS
@@ -125,6 +126,42 @@ def _install_error_handlers(app: FastAPI) -> None:
             status_code=401,
             content=ApiResponse[None](
                 code=ErrorCode.UNAUTHORIZED, message=str(exc)
+            ).model_dump(mode="json"),
+        )
+
+    @app.exception_handler(ValueError)
+    async def _invalid_param(_: Request, exc: ValueError) -> JSONResponse:
+        """业务层的**入参类**异常统一映射为 INVALID_PARAM。
+
+        为什么必须显式处理：业务层用 `ValueError` 表达"这个入参不接受"是既有口径，
+        但没有处理器时它会冒到 FastAPI 默认的 500 —— 实测过一次：前端调
+        `/app/track` 传了一个不在注册表里的事件，服务端 500，而前端用
+        `.catch(() => {})` 吞掉，于是**埋点整条链路静默失效**，界面上完全看不出来。
+        500 与"入参不支持"是两件事：前者该报警，后者该让调用方改参数。
+        """
+        return JSONResponse(
+            status_code=400,
+            content=ApiResponse[None](
+                code=ErrorCode.INVALID_PARAM, message=str(exc)
+            ).model_dump(mode="json"),
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
+        """请求体/路径参数校验失败也要走**统一信封**。
+
+        默认 FastAPI 返回 `{"detail": [...]}`，前端 `client.ts` 靠
+        `{code, message, data, trace_id}` 拆包，拿到 `detail` 时只能退化成
+        "网络异常"——用户看到的是无意义的报错，而真实原因是参数不合法。
+        """
+        errors = exc.errors()
+        first = errors[0] if errors else {}
+        location = ".".join(str(part) for part in (first.get("loc") or []))
+        return JSONResponse(
+            status_code=422,
+            content=ApiResponse[None](
+                code=ErrorCode.INVALID_PARAM,
+                message=f"参数不合法：{location} {first.get('msg') or ''}".strip(),
             ).model_dump(mode="json"),
         )
 

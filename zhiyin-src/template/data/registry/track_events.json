@@ -1,5 +1,5 @@
 {
-  "_note": "职引 · 埋点事件归属表（PRD §十一，23 个事件）。决策 14=A：后端派生为主 + 前端上报为辅。channel=frontend 的纯体验型事件走 POST /app/track 上报；channel=backend 的事件由后端行为/接口推导，不接收入站上报。属动态资源：改归属不需要发版。",
+  "_note": "职引 · 埋点事件归属表（PRD §十一）。决策 14=A：后端派生为主 + 前端上报为辅。channel=frontend 的纯体验型事件走 POST /app/track 上报；channel=backend 的事件由后端行为/接口推导，不接收入站上报。属动态资源：改归属不需要发版。⚠️ 该表是**前端上报的白名单**：前端发的事件若不在表里（或标成 backend），`/app/track` 会拒绝——而前端用 `.catch()` 忽略失败，界面上看不出来。故 `tests/test_frontend_alignment.py` 有一条守卫：前端 `trackEvent('x')` 必须出现在本表且 channel=frontend。",
   "items": [
     { "code": "home_task_select", "channel": "backend", "note": "进入任务即可派生，无需前端上报" },
     { "code": "home_chat_open", "channel": "backend", "note": "进入 free_chat 任务入口派生" },
@@ -17,12 +17,14 @@
     { "code": "action_decompose", "channel": "backend", "note": "任务重新拆解由编排器派生" },
     { "code": "review_trigger", "channel": "backend", "note": "复盘触发由调度/编排器派生" },
     { "code": "review_warning_show", "channel": "frontend", "note": "停滞预警展示，纯前端事件" },
-    { "code": "review_warning_response", "channel": "backend", "note": "响应预警作为行为派生" },
+    { "code": "review_warning_response", "channel": "frontend", "note": "用户对预警的响应（稍后/不再提醒）由前端上报——实现即如此（`CoachMessageStream.vue`）。原标成 backend 与实现不符，会让上报被拒并静默丢失；如需改为后端派生，须同时改前端调用点" },
     { "code": "blackboard_propagate", "channel": "backend", "note": "影响面传播由 Worker 派生" },
     { "code": "wb_enter", "channel": "frontend", "note": "进入智能工作台，纯前端事件" },
+    { "code": "wb_agent_open", "channel": "frontend", "note": "工作台打开某个智能体，纯前端事件（原表缺失，导致上报被拒并静默丢失）" },
+    { "code": "wb_axis_correct", "channel": "frontend", "note": "工作台纠正方向轴，纯前端事件（原表缺失，同上）" },
     { "code": "asset_export", "channel": "backend", "note": "导出接口本身可派生" },
     { "code": "achievement_unlock", "channel": "backend", "note": "成就解锁由行为事件派生" },
-    { "code": "auth_login_success", "channel": "backend", "note": "登录成功由鉴权派生" },
+    { "code": "auth_login_success", "channel": "backend", "note": "鉴权派生" },
     { "code": "auth_guest_merge", "channel": "backend", "note": "游客合并由身份服务派生" },
     { "code": "home_reserve_click", "channel": "frontend", "note": "未开放任务预约提醒点击，纯前端事件" }
   ]
