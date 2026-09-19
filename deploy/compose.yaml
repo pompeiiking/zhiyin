@@ -42,8 +42,20 @@ services:
     ports: !reset []
   rag:
     ports: !reset []
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c 'cat < /dev/null > /dev/tcp/localhost/8681'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
   agent:
     ports: !reset []
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -c 'cat < /dev/null > /dev/tcp/localhost/7258'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
   nginx:
     ports: !override
       - "127.0.0.1:8081:8081"
@@ -111,6 +123,20 @@ services:
       zhiyin-migrate:
         condition: service_completed_successfully
       pgvector:
+        condition: service_healthy
+
+  zhiyin-web:
+    build:
+      context: ../../zhiyin-src/template
+      dockerfile: Dockerfile.web
+    image: zhiyin/web:dev
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    networks:
+      - wanwu-net
+    depends_on:
+      zhiyin-api:
         condition: service_healthy
 
   zhiyin-migrate:
