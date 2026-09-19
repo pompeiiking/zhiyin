@@ -128,7 +128,9 @@ def build_services(container: "Container") -> None:
         behaviors=container.behavior_service,
         memories=container.memory_service,
         assets=container.asset_service,
-        intent_policy=KeywordIntentPolicy(),
+        intent_policy=KeywordIntentPolicy(
+            params_loader=lambda: container.registry.get_policy_params("routing")
+        ),
         stage_policy=DefaultStagePolicy(),
         axis_a_policy=RuleFirstAxisAInferencePolicy(),
         lead_policy=RegistryLeadPolicy(container.registry),
