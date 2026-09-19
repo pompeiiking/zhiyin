@@ -11,6 +11,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from zhiyin_kernel.blackboard import ProfileField
 from zhiyin_kernel.enums import DimensionEvidenceLevel, PlanRole
 
 
@@ -74,7 +75,14 @@ class GapClaim(BaseModel):
 
 
 class Report(BaseModel):
-    """15 维诊断报告。"""
+    """15 维诊断报告。
+
+    `profile_snapshot` 是**生成这一版报告时的画像快照**，不是活状态。
+    为什么必须有它：报告是**版本化只读资产**（《前端页面设计》§4.4 第 245 行：
+    "报告全文页读取资产版本"），而画像会继续变化。若报告页实时读当前画像，
+    用户会看到"v1 报告里显示的是今天的画像"，两份东西对不上。
+    旧报告该字段为空列表 → 报告页不生成画像章节，向后兼容、无需数据迁移。
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -88,6 +96,10 @@ class Report(BaseModel):
     gap_claims: list[GapClaim] = Field(default_factory=list)
     sources: list[str] = Field(default_factory=list, description="事实来源，如学职平台/JD")
     methodologies: list[str] = Field(default_factory=list, description="本次使用的理论模型")
+    profile_snapshot: list[ProfileField] = Field(
+        default_factory=list,
+        description="本版本生成时的画像快照（冻结，不随画像继续变化）",
+    )
 
 
 class PlanGap(BaseModel):

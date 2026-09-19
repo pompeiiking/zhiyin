@@ -368,6 +368,11 @@ def report_full_text_view(
     （`WorkspaceView.direction_plans` / `action_plan`），但 API 层从未引用过它们，
     mapper 把它们丢掉了——所以前端拿不到真实方案，只能用编造内容顶替。
 
+    报告正文还要含「个人画像」（《前端页面设计》§4.4 第 243 行），但用的是
+    **报告里的画像快照**（`Report.profile_snapshot`），不是当前活画像：本页是
+    "只读资产版本"，实时画像会让报告 v1 里显示今天的画像、与工作台对不上。
+    旧报告没有快照（字段为空）→ 不生成该章节。
+
     没有数据的区块**不生成**：目录与正文保持一致，不在报告里放空章节。
     """
     toc = [
@@ -409,6 +414,22 @@ def report_full_text_view(
                 "id": "action",
                 "title": "行动计划",
                 "content": action_plan.model_dump(mode="json"),
+            }
+        )
+    # 个人画像放最后，与《前端页面设计》§4.4 的枚举顺序一致
+    # （"含 15 维全景、方案、行动计划、个人画像"）。
+    if report.profile_snapshot:
+        toc.append({"id": "profile", "title": "个人画像"})
+        sections.append(
+            {
+                "id": "profile",
+                "title": "个人画像",
+                "content": {
+                    "snapshot_of": report.generated_at.isoformat(),
+                    "fields": [
+                        field.model_dump(mode="json") for field in report.profile_snapshot
+                    ],
+                },
             }
         )
 

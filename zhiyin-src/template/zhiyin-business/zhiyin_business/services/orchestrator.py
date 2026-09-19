@@ -769,6 +769,10 @@ class DefaultOrchestrator(Orchestrator):
                 methodologies=list(
                     dict.fromkeys(ref.name or ref.theory_id for ref in output.theory_refs)
                 ),
+                # 把**生成这一版时的画像**冻结进报告（D2）。报告是版本化只读资产，
+                # 而画像是活状态；不冻结的话，报告页要么显示不了画像，要么显示的
+                # 是与本版本对不上的当前画像。此处 profile 正是本次诊断所用的那一份。
+                profile_snapshot=list(profile.fields) if profile else [],
             )
             return [
                 await self._assets.save_report(

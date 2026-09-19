@@ -584,3 +584,65 @@ async def test_handoff_is_the_only_stage_transition_path() -> None:
     assert after.loop_stage is LoopStage.REVIEW
     assert after.lead_agent == decision.to_agent
 
+
+@pytest.mark.asyncio
+async def test_report_carries_a_frozen_profile_snapshot() -> None:
+    """报告里的「个人画像」必须是**生成当时的快照**，不随画像继续变化（D2）。
+
+    为什么必须冻结：《前端页面设计》§4.4 要求报告全文含个人画像，同时要求本页
+    "读取资产版本"。报告是版本化只读资产、画像是活状态——若实时读当前画像，
+    用户会在 v1 报告里看到今天的画像，与工作台对不上。所以②诊断生成报告时把
+    当次画像冻结进 `Report.profile_snapshot`，随后画像再变也不影响这一版。
+    """
+    from zhiyin_api.dto.conversation import TaskEnterRequest
+    from zhiyin_business.ports.orchestrator import TurnRequest
+
+    user_id = "report-snapshot-user"
+    container = _container()
+
+    # 先让画像里有内容，否则快照为空（空快照不生成章节，是既定行为）
+    await container.profile_service.update_field(
+        user_id,
+        "career_interest",
+        ["结构设计"],
+        confidence=0.9,
+        source="conversation",
+        evidence=["我想做结构设计"],
+    )
+
+    session = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code="verify_direction")
+    )
+    await container.orchestrator.handle_message(
+        TurnRequest(user_id=user_id, task_id=session.task_id, message="想验证某方向行不行")
+    )
+
+    stored = await container.assets.get_report(user_id)
+    assert stored is not None
+    assert stored.profile_snapshot, "报告必须冻结当时的画像"
+    keys_before = sorted(field.key for field in stored.profile_snapshot)
+    assert "career_interest" in keys_before
+
+    # 画像继续变化：新加一个字段
+    await container.profile_service.update_field(
+        user_id,
+        "value_anchor",
+        ["专业成长空间"],
+        confidence=0.8,
+        source="conversation",
+        evidence=["最看重专业成长空间"],
+    )
+
+    # 已存的那一版报告**不受影响**：快照是冻结的
+    again = await container.assets.get_report(user_id, stored.version)
+    assert again is not None
+    assert sorted(field.key for field in again.profile_snapshot) == keys_before
+    assert "value_anchor" not in {field.key for field in again.profile_snapshot}
+
+    # 报告正文要有 profile 章节，且内容来自快照
+    view = await container.facade.get_report_full_text(user_id)
+    section_ids = [section["id"] for section in view.sections]
+    assert "profile" in section_ids
+    profile_section = next(s for s in view.sections if s["id"] == "profile")
+    assert sorted(f["key"] for f in profile_section["content"]["fields"]) == keys_before
+

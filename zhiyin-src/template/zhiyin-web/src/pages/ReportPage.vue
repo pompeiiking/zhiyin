@@ -242,8 +242,61 @@ function matchPercent(score: number): string {
   return `${Math.round(score * 100)}%`
 }
 
+interface ProfileFieldItem {
+  key: string
+  value: unknown
+  confidence: number
+  source: string
+  evidence: string[]
+}
+
+/**
+ * ⑤（末章）个人画像：**本版本生成时的快照**，不是当前活画像。
+ *
+ * 报告是版本化只读资产（《前端页面设计》§4.4：「报告全文页读取资产版本」），
+ * 画像是活状态。后端在②诊断生成报告时把当次画像冻结进
+ * `Report.profile_snapshot` 并随正文下发，所以这里显示的就是这一版的依据，
+ * 不会因为用户后来又补了信息而变成"v1 报告里显示今天的画像"。
+ * 旧报告没有快照 → 后端不生成该章节 → 这里自然不渲染。
+ */
+const profileSnapshot = computed<ProfileFieldItem[]>(() => {
+  const content = (sectionById('profile')?.content ?? {}) as Record<string, unknown>
+  const raw = Array.isArray(content.fields) ? (content.fields as Array<Record<string, unknown>>) : []
+  return raw.map((field) => ({
+    key: String(field.key ?? ''),
+    value: field.value,
+    confidence: Number(field.confidence ?? 0),
+    source: String(field.source ?? ''),
+    evidence: Array.isArray(field.evidence) ? (field.evidence as unknown[]).map(String) : [],
+  }))
+})
+
+/** 快照生成时间：让"这是哪一版的依据"可核对。 */
+const profileSnapshotAt = computed(() => {
+  const content = (sectionById('profile')?.content ?? {}) as Record<string, unknown>
+  return String(content.snapshot_of ?? '')
+})
+
+/** 字段中文名取文案包，与对话页/工作台同一口径。 */
+function profileFieldName(key: string): string {
+  return session.copyBundle[`profile.field.${key}`] ?? key
+}
+
+/** 值可能是字符串、数组或对象；空值如实显示"待采集"，与 `ProfileFields` 一致。 */
+function profileFieldValue(field: ProfileFieldItem): string {
+  const value = field.value
+  if (value === null || value === undefined) return '待采集'
+  if (Array.isArray(value)) return value.map((item) => String(item)).join(' / ')
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
+function confidencePercent(field: ProfileFieldItem): string {
+  return `${Math.round((field.confidence ?? 0) * 100)}%`
+}
+
 /** 已单独渲染的章节，其余章节走通用列表渲染。 */
-const RENDERED_IDS = new Set(['verdict', 'swot', 'directions', 'action'])
+const RENDERED_IDS = new Set(['verdict', 'swot', 'directions', 'action', 'profile'])
 const otherSections = computed(() =>
   sections.value.filter(
     (item) => !RENDERED_IDS.has(String(item.id)) && !String(item.id).startsWith('dimension-'),
@@ -464,6 +517,30 @@ onMounted(() => {
           <section v-else-if="report" class="rp-block">
             <h2 class="rp-block-title">行动计划</h2>
             <p class="rp-empty">尚未生成行动计划。在③选定方向后，④行动会产出带时间点的任务。</p>
+          </section>
+
+          <!-- 个人画像：本版本生成时的**快照**（§4.4 要求报告含个人画像）。
+               刻意写明"快照"，避免用户把它当成当前画像而与工作台对不上。 -->
+          <section v-if="profileSnapshot.length" id="profile" class="rp-block">
+            <div class="rp-block-head">
+              <h2 class="rp-block-title">个人画像</h2>
+              <span class="rp-block-method">
+                本版本生成时的画像快照{{ profileSnapshotAt ? ` · ${profileSnapshotAt.slice(0, 10)}` : '' }}
+              </span>
+            </div>
+            <ul class="rp-items">
+              <li v-for="field in profileSnapshot" :key="field.key" class="rp-item">
+                <div class="rp-item-head">
+                  <b class="rp-item-name">{{ profileFieldName(field.key) }}</b>
+                  <span class="rp-item-score">置信度 {{ confidencePercent(field) }}</span>
+                  <span v-if="field.source" class="rp-item-tag">{{ field.source }}</span>
+                </div>
+                <p class="rp-item-text">{{ profileFieldValue(field) }}</p>
+                <p v-if="field.evidence.length" class="rp-item-evidence">
+                  依据：{{ field.evidence.join(' / ') }}
+                </p>
+              </li>
+            </ul>
           </section>
 
           <section v-for="section in otherSections" :id="String(section.id)" :key="String(section.id)" class="rp-block">
