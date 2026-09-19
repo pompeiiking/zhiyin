@@ -48,8 +48,6 @@ class Settings:
     use_mysql: bool = False
     use_pgvector: bool = False
     use_minio: bool = False
-    # 前端联调预留：真实 Facade 已实现；Mock Facade 仍保留为可选测试替身。
-    mock_facade: bool = False
 
     # ---------- pami 接入 ----------
     pami_base_url: str = ""
@@ -111,7 +109,6 @@ class Settings:
             use_mysql=_env_bool("ZHIYIN_USE_MYSQL"),
             use_pgvector=_env_bool("ZHIYIN_USE_PGVECTOR"),
             use_minio=_env_bool("ZHIYIN_USE_MINIO"),
-            mock_facade=_env_bool("ZHIYIN_MOCK"),
             pami_base_url=_env("ZHIYIN_PAMI_BASE_URL"),
             pami_api_key=_env("ZHIYIN_PAMI_API_KEY"),
             pami_agent_api_key=_env("ZHIYIN_PAMI_AGENT_API_KEY"),

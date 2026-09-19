@@ -12,6 +12,11 @@ from __future__ import annotations
 import asyncio
 from typing import Awaitable, TypeVar
 
+from zhiyin_business.policies.profile import (
+    PROFILE_COLLECTION_POLICY,
+    calculate_coverage,
+    calculate_overall_confidence,
+)
 from zhiyin_business.ports.blackboard import (
     AssetService,
     BehaviorService,
@@ -24,6 +29,7 @@ from zhiyin_business.ports.workspace import (
     WorkspaceService,
     WorkspaceView,
 )
+from zhiyin_data_sdk.repositories import RegistryRepository
 from zhiyin_kernel.assets import TrackEvent
 from zhiyin_kernel.enums import AssetType, BehaviorEventType, LoopStage
 
@@ -50,11 +56,14 @@ class DefaultWorkspaceService(WorkspaceService):
         assets: AssetService,
         memories: ConversationMemoryService,
         behaviors: BehaviorService,
+        registry: RegistryRepository,
     ) -> None:
         self._profiles = profiles
         self._assets = assets
         self._memories = memories
         self._behaviors = behaviors
+        # 覆盖率与整体置信度的口径来自动态资源，必须由业务层读取并计算后透传。
+        self._registry = registry
 
     async def build_view(self, user_id: str) -> WorkspaceView:
         (
@@ -132,6 +141,7 @@ class DefaultWorkspaceService(WorkspaceService):
                 if badge is not None
             }
         )
+        coverage, overall_confidence = await self._profile_metrics(profile)
         return WorkspaceView(
             user_id=user_id,
             profile=profile,
@@ -151,6 +161,25 @@ class DefaultWorkspaceService(WorkspaceService):
                 "mentor",
                 "demo",
             ],
+            profile_coverage=coverage,
+            profile_overall_confidence=overall_confidence,
+        )
+
+    async def _profile_metrics(self, profile) -> tuple[float, float]:
+        """按 `policy_params.profile_collection` 计算覆盖率与整体置信度。
+
+        没有画像时两者都是 0.0，此时不必读参数（空画像不存在口径问题）。
+        有画像但读不到参数时**显式报错**：宁可让配置问题暴露，也不用近似公式
+        顶上一个看起来正常的数字——那正是 OPEN-6 要收敛掉的漂移。
+        """
+        if profile is None:
+            return 0.0, 0.0
+        params = await self._registry.get_policy_params(PROFILE_COLLECTION_POLICY)
+        if params is None:
+            raise RuntimeError("缺少动态规则参数：profile_collection")
+        return (
+            calculate_coverage(profile.fields, params),
+            calculate_overall_confidence(profile.fields, params),
         )
 
     async def list_sessions_summary(self, user_id: str) -> list[StagePanel]:

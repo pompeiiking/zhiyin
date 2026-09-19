@@ -305,18 +305,17 @@ def loop_stage_view(result: LoopResult) -> dict:
 
 
 def workspace_page_view(view: WorkspaceView) -> WorkspacePageView:
-    """工作台 ①-⑤ 聚合视图。"""
+    """工作台 ①-⑤ 聚合视图。
+
+    覆盖率与整体置信度**直接取业务层算好的值**，本函数不再自行计算：
+    此前这里内联了「字段数 /(字段数+缺口数)」与「全字段等权平均」，
+    与决策 5（关键字段口径）不是一回事，同一口径在两处各写一遍必然漂移
+    （OPEN-6）。映射层只做形状转换。
+    """
     profile = view.profile
-    field_count = len(profile.fields) if profile else 0
-    gap_count = len(profile.gaps) if profile else 0
-    denominator = field_count + gap_count
     profile_panel = ProfilePanelView(
-        coverage=field_count / denominator if denominator else 0.0,
-        overall_confidence=(
-            sum(item.confidence for item in profile.fields) / field_count
-            if profile and field_count
-            else 0.0
-        ),
+        coverage=view.profile_coverage,
+        overall_confidence=view.profile_overall_confidence,
         fields=[item.model_dump(mode="json") for item in profile.fields] if profile else [],
         gaps=[item.model_dump(mode="json") for item in profile.gaps] if profile else [],
         updated_at=profile.updated_at if profile else None,

@@ -159,5 +159,4 @@ M3 仍保留真实 Embedding、`raw_query`、事务管理器和 VectorSync 等�
 | `ZHIYIN_USE_MYSQL` + `ZHIYIN_DATABASE_URL` | 启用 MySQL 事务管理器 |
 | `ZHIYIN_USE_PAMI_LLM` / `_KNOWLEDGE` / `_AUTH` | 切换 pami 适配器（骨架，首次调用会明确报未实现，不静默回落） |
 | `ZHIYIN_DATA_DIR` / `_REGISTRY_DIR` / `_KNOWLEDGE_DIR` / `_OBJECT_DIR` | 本地存储位置 |
-| `ZHIYIN_LLM_PROVIDER` | 置空走 Mock（按产出契约 Schema 合成合法结果） |
-| `ZHIYIN_MOCK` | 前端联调开关（决策 15）：置 1 时 boot 装配 `MockApplicationFacade`；该替身目前是骨架，实现完成后启用 |
+| `ZHIYIN_LLM_PROVIDER` | 置空走本地合成实现（按产出契约 Schema 合成结果）；生产部署由 `ZHIYIN_USE_PAMI_LLM` 切换到真实模型 |

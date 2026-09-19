@@ -39,6 +39,7 @@ from zhiyin_infrastructure.local.object_store import LocalFileStore
 from zhiyin_infrastructure.local.repository import (
     InMemoryAssetRepository,
     InMemoryConversationMemoryRepository,
+    LocalJsonRegistryRepository,
 )
 from zhiyin_kernel.assets import CalendarNode, Report, Swot, Verdict
 from zhiyin_kernel.blackboard import BehaviorLog
@@ -383,11 +384,18 @@ async def test_workspace_partial_failure_still_returns_five_panels() -> None:
     memories = DefaultConversationMemoryService(InMemoryConversationMemoryRepository())
     assets = DefaultAssetService(InMemoryAssetRepository(), _event_bus(), DependencyImpactPolicy())
     workspace = DefaultWorkspaceService(
-        profiles=_EmptyProfiles(), assets=assets, memories=memories, behaviors=_Behaviors()
+        profiles=_EmptyProfiles(),
+        assets=assets,
+        memories=memories,
+        behaviors=_Behaviors(),
+        registry=LocalJsonRegistryRepository(str(DATA_DIR / "registry")),
     )
 
     view = await workspace.build_view("u1")
     assert view.profile is None
+    # 空画像没有口径问题：两项派生指标都是 0，不去读参数
+    assert view.profile_coverage == 0.0
+    assert view.profile_overall_confidence == 0.0
     assert [panel.stage for panel in view.panels] == list(LoopStage)
     assert "尚未建立画像" in view.panels[0].evaluation
 

@@ -49,6 +49,21 @@ def key_fields_from_params(params: PolicyParamSet) -> list[str]:
     return list(raw_key_fields)
 
 
+def calculate_coverage(
+    fields: Sequence[ProfileField], params: PolicyParamSet
+) -> float:
+    """计算关键字段覆盖率 = 已覆盖关键字段数 / 关键字段总数。
+
+    与 :func:`calculate_overall_confidence` 共用同一个 ``key_fields``：
+    覆盖率与置信度必须来自同一份口径，否则"覆盖够了但置信度按另一套算"
+    会给出自相矛盾的采集完成判定。
+    """
+    key_fields = key_fields_from_params(params)
+    present = {field.key for field in fields}
+    covered = sum(1 for key in key_fields if key in present)
+    return covered / len(key_fields)
+
+
 def calculate_overall_confidence(
     fields: Sequence[ProfileField], params: PolicyParamSet
 ) -> float:
@@ -72,6 +87,7 @@ def calculate_overall_confidence(
 
 __all__ = [
     "PROFILE_COLLECTION_POLICY",
+    "calculate_coverage",
     "calculate_overall_confidence",
     "key_fields_from_params",
 ]

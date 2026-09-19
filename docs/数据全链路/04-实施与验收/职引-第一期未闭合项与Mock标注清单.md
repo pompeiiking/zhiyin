@@ -7,7 +7,7 @@
 | 复核范围扩展 | `business-tao@dfd7f34`（业务分支，2026-09-15）：闭合 OPEN-5，新增 OPEN-6 |
 | 本轮更新 | `service-tao@6187923`（业务编排分支，2026-09-16）：闭合 OPEN-1、OPEN-2，并迁移为正式 e2e 回归 |
 | 与原记录的关系 | 《职引-数据能力全链路完成情况记录》的个人自评保持原样；**两份文档必须合读**，本文只补充其未覆盖的缺口 |
-| 当前状态 | OPEN-1、OPEN-2、OPEN-3、OPEN-5 已闭合；仍有未闭合项 2 条（OPEN-4、OPEN-6）；MOCK-1、MOCK-2 于 2026-09-19 因「清除 Mock」变更失去对象（见第五节） |
+| 当前状态 | OPEN-1、OPEN-2、OPEN-3、OPEN-4、OPEN-5 已闭合；OPEN-6 已修（见第五节）；MOCK-1、MOCK-2 于 2026-09-19 因「清除 Mock」变更失去对象（见第五节） |
 | 清理约定 | 每项修好后，删除对应代码标记与 `tests/e2e/test_phase1_open_items.py` 中的用例，并把本文状态改为"已闭合" |
 
 > **当前结论**：OPEN-1、OPEN-2 已由业务编排链路接通并转为正式 e2e 回归；
@@ -62,7 +62,7 @@
 | 原始响应说明 | 采集管线 `raw_store` 仍是可选注入点；M3 生产采集 Runner 落地时才从工厂创建 `crawl` 域并注入。在此之前不虚构生产消费方。 |
 | 代码位置 | `zhiyin-boot/zhiyin_boot/container/gateways.py` · `infrastructure/redis/__init__.py` · `infrastructure/crawl/pipeline.py` |
 
-### OPEN-4 · Mock 门面成为死配置，且与新契约不同步 —— 未闭合
+### OPEN-4 · Mock 门面成为死配置，且与新契约不同步 —— 已闭合（2026-09-19）
 
 | 项 | 内容 |
 | --- | --- |
@@ -70,7 +70,9 @@
 | 连带问题 | 门面契约本轮由同步改为 `async`，但 `MockApplicationFacade` 仍是同步签名——重新打开 `ZHIYIN_MOCK=1` 会直接报错，而不是报"未实现" |
 | 归属 | 接口 / 共享装配负责人 |
 | 退出判据 | 删除死配置，或把 Mock 门面同步成 async 并补一条装配用例 |
-| 代码标记 | `zhiyin-boot/zhiyin_boot/container/__init__.py` |
+| **闭合方式** | 采用**删除死配置**：删除 `zhiyin-api/zhiyin_api/facade/mock.py`、`Settings.mock_facade` 与 `ZHIYIN_MOCK` 读取、装配侧的注释块，并同步 `docs/开发指南.md` 与 `zhiyin-src/template/README.md` 的失效条目 |
+| **为什么不复活它** | 决策 15=A 的前提是"Facade 未实现、前端无法联调"。真实 `DefaultApplicationFacade` 已实现并完整接线，前提不再成立；且本期口径是**不允许保留 Mock**，复活一个全靠 `NotImplementedError` 的替身与口径相悖 |
+| 代码位置 | `zhiyin-boot/zhiyin_boot/container/__init__.py` · `zhiyin-boot/zhiyin_boot/settings.py` · `zhiyin-api/zhiyin_api/facade/mock.py`（已删除） |
 
 ### OPEN-5 · 服务级"骨架必须自报 skeleton"守卫已空转 —— 已闭合
 

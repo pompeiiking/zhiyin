@@ -81,6 +81,8 @@ DOCUMENTED_MISSING_PATHS: dict[str, str] = {
     "zhiyin_data_sdk/contracts/": "已迁出（共享内核归位到 zhiyin-kernel）",
     "zhiyin-data-sdk/zhiyin_data_sdk/contracts/": "同上",
     "zhiyin_orchestration/impl.py": "已拆为 impl/（一原语一文件）",
+    "facade/mock.py": "已删除（OPEN-4：Mock 门面与 ZHIYIN_MOCK 死配置一并移除）",
+    "api/facade/mock.py": "同上",
 }
 
 

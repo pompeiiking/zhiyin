@@ -117,6 +117,7 @@ def build_services(container: "Container") -> None:
         assets=container.asset_service,
         memories=container.memory_service,
         behaviors=container.behavior_service,
+        registry=container.registry,
     )
     container.function_service = DefaultFunctionService(
         assets=container.asset_service,

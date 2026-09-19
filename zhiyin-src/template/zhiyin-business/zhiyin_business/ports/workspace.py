@@ -73,6 +73,22 @@ class WorkspaceView(BaseModel):
     available_blocks: list[str] = Field(
         default_factory=list, description="可用的功能块入口：报告全文/导出/日历/成就/导师/演示"
     )
+    profile_coverage: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "关键字段覆盖率，按 policy_params.profile_collection 计算（决策 5 口径）。"
+            "由业务层算好透传：API 层不得自行用『字段数 /(字段数+缺口数)』之类的近似公式，"
+            "否则同一口径会出现两处实现并随任一侧修改漂移。"
+        ),
+    )
+    profile_overall_confidence: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="已采集关键字段的等权平均置信度，同上由业务层计算",
+    )
 
 
 class WorkspaceService(ABC):
