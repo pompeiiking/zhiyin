@@ -857,3 +857,54 @@ async def test_report_carries_a_frozen_profile_snapshot() -> None:
     profile_section = next(s for s in view.sections if s["id"] == "profile")
     assert sorted(f["key"] for f in profile_section["content"]["fields"]) == keys_before
 
+
+@pytest.mark.asyncio
+async def test_act_regeneration_keeps_completed_tasks() -> None:
+    """④ 重跑生成新行动计划时，文本未变的旧任务必须保留完成态（FR-ACT-003）。
+
+    为什么必须保留：`save_action_plan` 是按用户整体覆盖行动计划，新计划里
+    `done` 恒为 False。用户在报告页勾掉的任务，会因为他在④环节里追问一句而
+    被无声重置——工作台「已完成 N/7」从 7/7 退回 0/7，进度凭空消失。
+    继承口径与后端冻结的复合标识一致：`${phase.name}:${task.text}`。
+    """
+    from zhiyin_business.contracts.act import ActOutput
+    from zhiyin_business.contracts.common import BehaviorGuide
+    from zhiyin_kernel.assets import ActionPhase, ActionTask
+    from zhiyin_kernel.retrieval import EvidencePacket
+
+    user_id = "act-progress-user"
+    container = _container()
+
+    def _output() -> ActOutput:
+        return ActOutput(
+            phases=[
+                ActionPhase(
+                    name="夯实基础",
+                    date_range="2026-09-20至2026-10-05",
+                    tag="基础巩固",
+                    tasks=[
+                        ActionTask(text="复习函数与递归"),
+                        ActionTask(text="精读链表章节"),
+                    ],
+                )
+            ],
+            guide=BehaviorGuide(kind="task", text="先勾掉第一个小任务"),
+        )
+
+    packet = EvidencePacket(stage=LoopStage.ACT, question="怎么行动")
+    await container.orchestrator._persist_output(
+        user_id, LoopStage.ACT, _output(), evidence_packet=packet
+    )
+    first = await container.asset_service.get_action_plan(user_id)
+    assert first is not None
+    done_key = f"{first.phases[0].name}:{first.phases[0].tasks[0].text}"
+    await container.asset_service.mark_task_done(user_id, done_key)
+
+    await container.orchestrator._persist_output(
+        user_id, LoopStage.ACT, _output(), evidence_packet=packet
+    )
+    regenerated = await container.asset_service.get_action_plan(user_id)
+    assert regenerated is not None
+    assert regenerated.id != first.id, "重跑④应当产生新的行动计划资产"
+    assert [task.done for task in regenerated.phases[0].tasks] == [True, False]
+

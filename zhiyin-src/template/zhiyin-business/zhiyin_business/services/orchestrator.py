@@ -996,10 +996,40 @@ class DefaultOrchestrator(Orchestrator):
                         related_task_text=reminder.related_task_text,
                     ),
                 )
+            # FR-ACT-003：任务完成态是**用户进度**，不能因为一次追问重跑 ④ 就被抹掉。
+            # `save_action_plan` 按用户整体覆盖行动计划，新计划里 `done` 恒为 False，
+            # 于是工作台「已完成 N/7」会从 7/7 无声退回 0/7——用户勾过的任务凭空
+            # "未完成"。这里按冻结的复合标识 `${phase.name}:${task.text}` 从上一条
+            # 计划继承完成态：文本没变的旧任务保留 `done/done_at`，新任务仍为未完成。
+            previous = await self._assets.get_action_plan(user_id)
+            completed: dict[str, object] = {
+                f"{phase.name}:{task.text}": task.done_at
+                for phase in (previous.phases if previous is not None else [])
+                for task in phase.tasks
+                if task.done
+            }
+            phases = [
+                phase.model_copy(
+                    update={
+                        "tasks": [
+                            task.model_copy(
+                                update={
+                                    "done": True,
+                                    "done_at": completed[f"{phase.name}:{task.text}"],
+                                }
+                            )
+                            if f"{phase.name}:{task.text}" in completed
+                            else task
+                            for task in phase.tasks
+                        ]
+                    }
+                )
+                for phase in output.phases
+            ]
             plan = ActionPlan(
                 id=f"act_{uuid4().hex[:12]}",
                 plan_id=selected.id if selected is not None else None,
-                phases=output.phases,
+                phases=phases,
                 # 走到这里说明每条提醒都已落进日历；没有提醒时保持 False。
                 reminders_synced=bool(output.reminders),
             )
