@@ -286,7 +286,17 @@ class DefaultApplicationFacade(ApplicationFacade):
                 client_msg_id=body.client_msg_id,
             )
         )
-        return mappers.conversation_turn_view(turn)
+        # 与 `read_conversation_history` 同一口径：本轮回复可能来自交接前的主理
+        # （徽章这时已经是接手的主理），名字必须按每条消息各自的 `agent_id` 解析，
+        # 否则同一个气泡在"刚收到"与"刷新后"会显示两个不同的说话人。
+        descriptors = await asyncio.gather(
+            *(
+                self._registry.get_agent(agent_id)
+                for agent_id in {item.agent_id for item in turn.messages if item.agent_id}
+            )
+        )
+        agents = {item.id: item for item in descriptors if item is not None}
+        return mappers.conversation_turn_view(turn, agents=agents)
 
     async def read_conversation_history(
         self, user_id: str, task_id: str

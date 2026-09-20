@@ -135,6 +135,77 @@ async def test_acceptance_3_handoff_changes_lead_and_discloses() -> None:
     stored = await container.sessions.get(session.task_id)
     assert stored is not None and stored.lead_agent == turn.badge["agent_id"]
 
+    # "谁在说"必须按说话人自己归因，而不是按交接后的徽章。
+    # 这一轮的回复是**交接前**的主理（① 建档分析师）说的，徽章已经是接手的主理
+    # （④ 路径规划师）；`conversation_turn_view` 曾经只给"与徽章同一位"的消息填名字，
+    # 其余留空，前端只能回落到写死的称呼。于是同一个气泡在"刚收到"（实时轮次）与
+    # "刷新后"（历史查询）会显示两个不同的说话人。两条读取路径必须一致。
+    spoken = [item for item in turn.messages if item.role == "agent"]
+    assert spoken, "一轮真实回复必须有 AI 气泡"
+    assert all(item.agent_name for item in spoken), "AI 气泡的说话人展示名不能为空"
+    history = await container.facade.read_conversation_history(user_id, session.task_id)
+    logged = [item for item in history.messages if item.role == "agent"]
+    assert [(item.text, item.agent_name) for item in spoken] == [
+        (item.text, item.agent_name) for item in logged[-len(spoken) :]
+    ]
+
+
+@pytest.mark.asyncio
+async def test_acceptance_3_collect_completion_reports_speaker_not_badge() -> None:
+    """验收项 3 的另一半：交接发生在**本轮产出之后**时，说话人仍须按自己归因。
+
+    与上一条用例的区别很关键：上一条走的是"消息级路由交接"（先换主理再生成回复），
+    徽章与说话人天然同一位，验不出问题。本用例走的是"产出判定交接"
+    （`orchestrator.handle_message` 里 `loop_result.next_stage` 那一段）：
+
+    - ① 采集本轮达标 → 产出判定交接到②；
+    - 回复已在交接**之前**由①的主理生成，徽章却在交接**之后**按新主理组装。
+
+    此时如果把气泡说话人写成"与徽章同一位"，同一个气泡"刚收到"与"刷新后"就会
+    显示两个不同的说话人。这里断言：徽章是接手主理，气泡署名是①主理。
+    """
+    from zhiyin_api.dto.conversation import MessageRequest, TaskEnterRequest
+
+    container = _container()
+    user_id = "e2e_collect_handoff"
+    session = await container.facade.enter_task(
+        user_id, TaskEnterRequest(task_code="confused")
+    )
+    assert session.stage.value == "collect"
+    # 先把六个关键字段填满，让本轮采集必达"覆盖率 80% + 整体置信度 0.7"门槛，
+    # 从而稳定触发产出判定交接（不必依赖占位模型正好说对）。
+    for key in (
+        "career_interest",
+        "ability_strength",
+        "value_anchor",
+        "target_direction",
+        "decision_window",
+        "real_constraint",
+    ):
+        await container.profile_service.update_field(
+            user_id, key, f"{key}-已确认", confidence=0.9, source="conversation"
+        )
+    # 这句不含任何意图关键词：环节判定留在当前环节①，于是交接只可能来自产出判定。
+    turn = await container.facade.send_message(
+        user_id,
+        MessageRequest(task_id=session.task_id, message="再补充一点背景，你继续问我"),
+    )
+    assert turn.badge["agent_id"] == "career_advisor", "① 达标后徽章应换成②的主理"
+    stored = await container.sessions.get(session.task_id)
+    assert stored is not None and stored.loop_stage.value == "diagnose"
+
+    spoken = [item for item in turn.messages if item.role == "agent"]
+    assert spoken, "一轮真实回复必须有 AI 气泡"
+    assert {item.agent_id for item in spoken} == {"profile_analyst"}, (
+        "回复是交接前的①主理说的，不能被徽章带着一起改名"
+    )
+    assert all(item.agent_name for item in spoken), "AI 气泡的说话人展示名不能为空"
+    history = await container.facade.read_conversation_history(user_id, session.task_id)
+    logged = [item for item in history.messages if item.role == "agent"]
+    assert [(item.text, item.agent_name) for item in spoken] == [
+        (item.text, item.agent_name) for item in logged[-len(spoken) :]
+    ]
+
 
 @pytest.mark.asyncio
 async def test_acceptance_4_blackboard_is_shared_across_sessions() -> None:

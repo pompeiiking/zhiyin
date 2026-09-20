@@ -578,6 +578,40 @@ async def test_calendar_concurrent_writes_across_service_instances(tmp_path: Pat
     assert len(await first.list_calendar_nodes("u1")) == 20
 
 
+async def test_calendar_nodes_with_mixed_timezone_are_readable(tmp_path: Path) -> None:
+    """报告产出的任务是 naive 时间，手工登记可能带时区，两者混存不能读空。"""
+    assets = DefaultAssetService(
+        InMemoryAssetRepository(), _event_bus(), DependencyImpactPolicy()
+    )
+    service = DefaultFunctionService(
+        assets=assets,
+        behaviors=_Behaviors(),
+        object_store=LocalFileStore(str(tmp_path / "objects")),
+    )
+    await service.write_calendar_node(
+        "u1",
+        CalendarNode(
+            node_id="n-naive",
+            title="报告任务",
+            due_at=datetime(2026, 9, 20, 23, 59, 59),
+        ),
+    )
+    await service.write_calendar_node(
+        "u1",
+        CalendarNode(
+            node_id="n-aware",
+            title="手工节点",
+            due_at=datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        ),
+    )
+
+    nodes = await service.list_calendar_nodes("u1")
+    assert [node.node_id for node in nodes] == ["n-naive", "n-aware"]
+    # 排序归一不改变落库值：naive 仍然按无时区读回。
+    assert nodes[0].due_at.tzinfo is None
+    assert nodes[1].due_at == datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc)
+
+
 async def test_compliant_ingestion_is_idempotent_traceable_and_removable(
     tmp_path: Path,
 ) -> None:

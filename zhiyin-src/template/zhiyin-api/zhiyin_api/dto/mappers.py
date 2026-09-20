@@ -256,8 +256,18 @@ def session_summary_view(
     )
 
 
-def conversation_turn_view(turn: TurnResult) -> ConversationTurnView:
-    """一轮回复：最短结论 + 显式告知 + 行为引导 + 管线卡。"""
+def conversation_turn_view(
+    turn: TurnResult, *, agents: Optional[dict[str, AgentDescriptor]] = None
+) -> ConversationTurnView:
+    """一轮回复：最短结论 + 显式告知 + 行为引导 + 管线卡。
+
+    `agents` 与 `conversation_history_view` 同一口径：按 `agent_id` 逐个解析展示名，
+    由 Facade 取数（mapper 不取数）。**不能只认徽章那一个 agent**：本轮结束时可能刚
+    发生交接（徽章已换成接手的主理），而回复是交接前的主理说的；此时若把非徽章消息
+    的名字留空，前端只能回落到写死的称呼，同一个气泡在"刚收到"与"刷新后"会显示
+    两个不同的说话人。取不到名字就留空，不编造。
+    """
+    catalog = agents or {}
     return ConversationTurnView(
         task_id=turn.task_id,
         stage=turn.stage,
@@ -265,7 +275,11 @@ def conversation_turn_view(turn: TurnResult) -> ConversationTurnView:
         messages=[
             ConversationMessageView(
                 **message.model_dump(mode="python"),
-                agent_name=(turn.badge.name if message.agent_id == turn.badge.agent_id else None),
+                agent_name=(
+                    catalog[message.agent_id].name
+                    if message.agent_id in catalog
+                    else None
+                ),
             )
             for message in turn.messages
         ],

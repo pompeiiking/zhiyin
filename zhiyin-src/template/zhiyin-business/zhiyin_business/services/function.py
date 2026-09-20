@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime, timezone
 from typing import Literal, Optional
 from zhiyin_business.ports.blackboard import AssetService, BehaviorService
 from zhiyin_business.ports.function import DemoScript, ExportResult, FunctionService
@@ -30,6 +31,20 @@ _ACHIEVEMENT_BADGES = {
     BehaviorEventType.TASK_DONE: "first_task_done",
     BehaviorEventType.REVIEW: "first_review_completed",
 }
+
+
+def _sort_instant(value: Optional[datetime]) -> Optional[datetime]:
+    """把 `due_at` 归一到同一时间轴，仅供排序比较使用。
+
+    报告环节产出的任务时间为无时区 local datetime，手工登记的节点可能带时区；
+    直接比较会抛 `TypeError: can't compare offset-naive and offset-aware datetimes`，
+    而读路径的异常会被工作台吞成空日历。这里只做比较归一，不改写落库 / 返回的原始值。
+    """
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 class DefaultFunctionService(FunctionService):
@@ -78,7 +93,9 @@ class DefaultFunctionService(FunctionService):
             return []
         raw = json.loads((await self._object_store.get(key)).decode("utf-8"))
         nodes = [CalendarNode.model_validate(item) for item in raw.get("items", [])]
-        nodes.sort(key=lambda item: (item.due_at is None, item.due_at, item.node_id))
+        nodes.sort(
+            key=lambda item: (item.due_at is None, _sort_instant(item.due_at), item.node_id)
+        )
         return nodes
 
     async def write_calendar_node(self, user_id: str, node: CalendarNode) -> CalendarNode:

@@ -10,14 +10,20 @@ import TheoryTag from './TheoryTag.vue'
 //     `AnalysisHandoff`，已实测可用）；
 //   - `action` 从未下发 → 教练两颗按钮恒显示硬编码"立即行动/稍后"且没有任何点击行为。
 // 拿不到真实数据就不放会误导用户的控件，与报告页"拿不到就显示空态"同一口径。
+//
+// 回落的说话人必须是中性称呼：此前写死"职业顾问"，于是任何非职业顾问说的气泡
+// （例如交接前由建档分析师发出的回复）在后端没给名字时都会顶着"职业顾问"的名头。
+// 名字缺失时只说明"这是智能体发的"，不假扮某位具体主理。
 defineProps<{ role: 'agent' | 'user' | 'system'; content: string; author?: string; theory?: Record<string, unknown> }>()
+
+const NEUTRAL_AUTHOR = '智能体'
 </script>
 
 <template>
   <article class="msg" :class="role">
-    <span v-if="role !== 'user' && role !== 'system'" class="avatar" aria-hidden="true">{{ (author || '职业顾问').slice(0, 1) }}</span>
+    <span v-if="role !== 'user' && role !== 'system'" class="avatar" aria-hidden="true">{{ (author || NEUTRAL_AUTHOR).slice(0, 1) }}</span>
     <div class="bubble">
-      <small v-if="role !== 'user'">{{ author || (role === 'system' ? '系统提示' : '职业顾问') }}</small>
+      <small v-if="role !== 'user'">{{ author || (role === 'system' ? '系统提示' : NEUTRAL_AUTHOR) }}</small>
       <p>{{ content }}</p>
       <TheoryTag v-if="theory && role === 'agent'" :theory="theory" />
     </div>
